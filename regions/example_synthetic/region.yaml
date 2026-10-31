@@ -1,0 +1,40 @@
+meta:
+  name: example_synthetic
+  country_iso: SYN
+  data_year: 2024
+  data_level: L2
+  area_levels:
+  - ward
+  - zone
+  contact_country: SYN
+  units:
+    distance: km
+    area: km2
+    currency: tokens
+  notes: Synthetic benchmark fixture for system testing. Not a real location.
+  file_levels:
+    areas.csv: L2
+    age_structure.csv: L2
+    employment.csv: L2
+    venues.csv: L2
+    commute_od.csv: L2
+    contacts.csv: L2
+    hospitals.csv: L2
+    capacity.csv: L2
+    comorbidity.csv: L2
+    observed_cases.csv: L2
+    policy_timeline.csv: L2
+    sanitation.csv: L2
+  provenance:
+    general:
+      source: EpiSwarm Synthetic Generator
+      status: synthetic
+      notes: Generated for test automation and acceptance verification
+quick_inputs:
+  total_population: 110000
+  num_areas: 2
+  avg_household_size: 3.8
+  urban_fraction: 1.0
+  employment_rate: 0.61
+  beds_per_1000: 2.0
+  icu_beds_per_1000: 0.3

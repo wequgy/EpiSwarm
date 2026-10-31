@@ -1,0 +1,5 @@
+from_area,to_area,share,source,status
+A01,A01,0.65,synthetic_generator,synthetic
+A01,A02,0.35,synthetic_generator,synthetic
+A02,A01,0.30,synthetic_generator,synthetic
+A02,A02,0.70,synthetic_generator,synthetic

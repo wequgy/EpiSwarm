@@ -1,0 +1,5 @@
+date,hospital_id,category,nominal,effective_low,effective_high,medicine_stock,upper_cap_extra,source,status
+static,H01,general,100,80,110,adequate,25,synthetic_generator,synthetic
+static,H01,icu,15,12,18,adequate,5,synthetic_generator,synthetic
+static,H02,general,120,100,130,adequate,30,synthetic_generator,synthetic
+static,H02,icu,20,15,22,adequate,8,synthetic_generator,synthetic

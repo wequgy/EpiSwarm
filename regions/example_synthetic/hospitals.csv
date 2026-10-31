@@ -1,0 +1,3 @@
+hospital_id,name,area_id,lat,lon,sector,source,status
+H01,General Hospital A,A01,12.9720,77.5950,government,synthetic_generator,synthetic
+H02,Community Hospital B,A02,12.9360,77.6250,private,synthetic_generator,synthetic

@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "episwarm"
+version = "0.1.0"
+description = "EpiSwarm Studio: Configurable framework for epidemic simulation, healthcare overflow analysis, and response planning"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+    { name = "EpiSwarm Contributors" }
+]
+dependencies = [
+    "pydantic>=2.7.0",
+    "numpy>=1.26.0",
+    "scipy>=1.12.0",
+    "pandas>=2.2.0",
+    "pyyaml>=6.0",
+    "streamlit>=1.35.0",
+    "plotly>=5.20.0",
+    "optuna>=3.6.0",
+    "python-dotenv>=1.0.0",
+    "requests>=2.31.0"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0"
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+pythonpath = ["src"]

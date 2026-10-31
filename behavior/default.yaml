@@ -1,0 +1,60 @@
+name: default
+context: "Metropolitan urban environment during a respiratory epidemic with active public advisory warnings."
+provenance:
+  source: "EpiSwarm Behavioral Modeling Specification"
+  status: assumed
+  notes: "Behavioral prompts and trait distributions assumed for simulation benchmarking."
+
+traits:
+  compliance:
+    mean: 0.70
+    std: 0.15
+  rumor_susceptibility:
+    mean: 0.30
+    std: 0.20
+  risk_tolerance:
+    mean: 0.40
+    std: 0.20
+  institutional_trust:
+    mean: 0.60
+    std: 0.20
+
+rumor_spread_rate: 0.05
+
+questions:
+  - id: workplace_attendance
+    type: choice
+    options:
+      - usual
+      - reduced
+      - avoid
+    plain_instructions: "Given the current local outbreak level, active movement advisories, and whether you or household members exhibit respiratory symptoms, decide whether to attend your workplace as usual, reduce physical presence, or avoid attendance entirely."
+
+  - id: market_visits
+    type: choice
+    options:
+      - usual
+      - essential_only
+      - avoid
+    plain_instructions: "Given current local community transmission and crowding restrictions, decide whether to visit retail markets and social spaces at normal frequency, restrict visits strictly to essential groceries, or avoid crowded venues completely."
+
+  - id: wear_mask
+    type: noul
+    options:
+      - "yes"
+      - "no"
+    plain_instructions: "Given your risk tolerance, public health recommendations, and whether you are indoors in public or transit venues, decide whether you will consistently wear a protective mask."
+
+  - id: isolate_symptomatic
+    type: noul
+    options:
+      - "yes"
+      - "no"
+    plain_instructions: "If you develop mild to moderate respiratory symptoms (fever, cough), decide whether you will immediately isolate in your home and avoid all external contacts."
+
+  - id: accept_vaccine
+    type: noul
+    options:
+      - "yes"
+      - "no"
+    plain_instructions: "When a validated vaccine or preventive intervention is made available in your administrative area, decide whether you will accept vaccination."

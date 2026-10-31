@@ -1,0 +1,5 @@
+age_band,sex,condition,prevalence,source,status
+19-64,M,hypertension,0.22,synthetic_generator,synthetic
+19-64,F,hypertension,0.19,synthetic_generator,synthetic
+65+,M,diabetes,0.35,synthetic_generator,synthetic
+65+,F,diabetes,0.32,synthetic_generator,synthetic

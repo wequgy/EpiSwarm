@@ -1,0 +1,148 @@
+name: respiratory_generic
+description: Generic respiratory pathogen modeled after aerosol/droplet transmission with age-stratified severity.
+provenance:
+  source: "Levin et al. 2020 (IFR anchors) & Libin et al. 2020 (SEIR parameterization)"
+  status: assumed
+  notes: "SEIR progression rates cited; specific overflow multipliers assumed."
+
+transmission:
+  mode: person_to_person
+  r0: 2.5
+  overdispersion_k: 0.16
+  seasonality_amplitude: 0.10
+  waning_immunity_days: 180.0
+
+states:
+  - name: S
+    infectious: false
+    absorbing: false
+  - name: E
+    infectious: false
+    absorbing: false
+  - name: I_asymp
+    infectious: true
+    relative_infectiousness: 0.50
+    absorbing: false
+  - name: I_symp
+    infectious: true
+    relative_infectiousness: 1.00
+    absorbing: false
+  - name: H
+    infectious: true
+    relative_infectiousness: 0.10
+    needs_bed: general
+    needs_oxygen: true
+    absorbing: false
+  - name: ICU
+    infectious: true
+    relative_infectiousness: 0.05
+    needs_bed: icu
+    needs_oxygen: true
+    absorbing: false
+  - name: R
+    infectious: false
+    absorbing: true
+  - name: D
+    infectious: false
+    absorbing: true
+
+transitions:
+  # E -> I_asymp (35% probability, 3 days mean latent duration)
+  - from_state: E
+    to_state: I_asymp
+    base_probability: 0.35
+    duration:
+      type: gamma
+      mean_days: 3.0
+      sd_days: 1.0
+  # E -> I_symp (65% probability, 3 days mean latent duration)
+  - from_state: E
+    to_state: I_symp
+    base_probability: 0.65
+    duration:
+      type: gamma
+      mean_days: 3.0
+      sd_days: 1.0
+  # I_asymp -> R (100% resolve to R, 5 days duration)
+  - from_state: I_asymp
+    to_state: R
+    base_probability: 1.00
+    duration:
+      type: gamma
+      mean_days: 5.0
+      sd_days: 1.5
+  # I_symp -> H (hospitalized, ~4.5% baseline, age-stratified)
+  - from_state: I_symp
+    to_state: H
+    base_probability: 0.045
+    duration:
+      type: gamma
+      mean_days: 5.5
+      sd_days: 2.0
+    age_multipliers:
+      "0-4": 0.30
+      "5-18": 0.20
+      "19-64": 1.00
+      "65+": 4.50
+    comorbidity_multipliers:
+      "hypertension": 1.40
+      "diabetes": 1.60
+  # I_symp -> R (direct recovery without hospitalization, 95.5%)
+  - from_state: I_symp
+    to_state: R
+    base_probability: 0.955
+    duration:
+      type: gamma
+      mean_days: 7.0
+      sd_days: 2.0
+  # H -> ICU (~15% of hospitalized escalate to ICU)
+  - from_state: H
+    to_state: ICU
+    base_probability: 0.15
+    duration:
+      type: gamma
+      mean_days: 3.5
+      sd_days: 1.5
+    age_multipliers:
+      "65+": 2.00
+  # H -> R (80% of hospitalized recover)
+  - from_state: H
+    to_state: R
+    base_probability: 0.80
+    duration:
+      type: gamma
+      mean_days: 8.0
+      sd_days: 2.5
+  # H -> D (5% in-hospital fatality given care)
+  - from_state: H
+    to_state: D
+    base_probability: 0.05
+    duration:
+      type: gamma
+      mean_days: 6.0
+      sd_days: 2.0
+  # ICU -> D (40% mortality in ICU)
+  - from_state: ICU
+    to_state: D
+    base_probability: 0.40
+    duration:
+      type: gamma
+      mean_days: 7.0
+      sd_days: 3.0
+  # ICU -> R (60% recover from ICU)
+  - from_state: ICU
+    to_state: R
+    base_probability: 0.60
+    duration:
+      type: gamma
+      mean_days: 12.0
+      sd_days: 4.0
+
+overflow:
+  bed_unavailable_mortality_multiplier: 2.0
+  icu_unavailable_mortality_multiplier: 3.5
+  oxygen_unavailable_mortality_multiplier: 2.5
+  compliance_mortality_benefit: 0.85
+  non_compliance_mortality_penalty: 1.25
+
+sanitation_sensitivity: 0.05
