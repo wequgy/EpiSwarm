@@ -74,7 +74,7 @@ streamlit run src/episwarm/app/streamlit_app.py
 - **Attack Rate**: The cumulative percentage of the total population that contracts the disease over the course of the simulation.
 - **Structure-of-Arrays (SoA)**: A high-performance computing technique where data is stored in contiguous column arrays rather than individual Python object instances. This allows EpiSwarm to simulate 100,000 agents in under 160 MB of memory.
 - **Spectral Radius ($\Upsilon(M)$)**: The dominant eigenvalue of the social contact matrix $M$. It mathematically governs the transmission rate $\beta = \frac{R_0 \cdot \gamma}{\Upsilon(M)}$ as established in Libin et al. (2020).
-- **Healthcare Overflow**: When hospital admissions exceed available beds or oxygen. Patients who cannot receive care experience amplified mortality multipliers.
+- **Healthcare Overflow**: When hospital admissions exceed available configured clinical resources. Patients who cannot receive care experience amplified mortality multipliers.
 - **Spread Matrix**: A table showing the transmission delays between administrative areas. It tells decision-makers which neighboring areas are at immediate risk when an outbreak starts in a specific zone.
 - **Pareto Frontier**: A set of optimal policies where no single goal (e.g., saving lives) can be improved without sacrificing another goal (e.g., economic disruption cost).
 - **Provenance (Honesty Standards)**:

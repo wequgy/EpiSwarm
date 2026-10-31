@@ -16,6 +16,9 @@ This audit records the factual implementation status of all requirements across 
 | **6. Per-Agent Life Histories & Routines** | **IMPLEMENTED** | `src/episwarm/population/build.py` | `tests/test_core_model_phase10.py` | `PopulationSoA` stores structured facts (`income_band`, `household_role`, `caregiver`, `financial_buffer`, `past_bereavement`, `routine_template`, `pref_market_id`, `pref_leisure_id`, `self_care`, `support`). Showcase biographies generated with `[GENERATED NARRATIVE - SYNTHETIC DATA ONLY]`. |
 | **7. Resource What-If & Generic Resources** | **IMPLEMENTED** | `src/episwarm/engine/resources.py`, `src/episwarm/analysis/resource_whatif.py`, `src/episwarm/analysis/marginal_value.py` | `tests/test_resource_whatif_phase12.py` | Zero instances of "oxygen" in `src/`. `resources.csv` contract, `ResourceAddAction` with `upper_cap_of_extra` bounds, paired-seed delta reports with 95% CI, diminishing returns curves, best-area ranking, and Studio panel. |
 | **8. Social-Space Venues** | **IMPLEMENTED** | `src/episwarm/population/venues.py` | `tests/test_core_model_phase10.py` | Instantiates discrete school, workplace, market, leisure, and worship venues. Assigns persistent preferred market and leisure venues per agent for tie stability across days. |
+| **9. Libin Metapopulation Engine (`engine_meta`)** | **IMPLEMENTED** | `src/episwarm/engine/meta.py` | `tests/test_meta_crossval_phase13.py` | Spec 11 & Libin et al. (2020) age-structured SEIR with Binomial chain intra-patch and non-homogeneous Poisson arrival inter-patch via Algorithm 2 time-scale transformation. Dynamically fits $\mu = \log(R_0) \cdot s$. |
+| **10. Leiden / Commuting Communities** | **IMPLEMENTED** | `src/episwarm/analysis/communities.py` | `tests/test_meta_crossval_phase13.py` | Modularity clustering over commuting flux graph ($Mob[p', p] > 0$) with NetworkX modularity fallback. Evaluates bootstrap robustness ($ARI \ge 0.70$) and clusters areas into $\le 10$ policy groups. |
+| **11. Exhaustive Policy Ground Truth Search** | **IMPLEMENTED** | `src/episwarm/optimize/ground_truth.py` | `tests/test_meta_crossval_phase13.py` | Spec 12.2: Enumerates all $2^W$ binary schedules on deterministic meta engine to discover exact global optima; benchmarks Heuristic Advisor and Optuna NSGA-II/TPE arms against it. |
 
 ---
 
@@ -25,11 +28,11 @@ This audit records the factual implementation status of all requirements across 
 |---|---|---|---|---|
 | **Pydantic Pack Schemas** | **IMPLEMENTED** | `src/episwarm/packs/*.py` | `tests/test_packs_phase0.py` | `pytest tests/test_packs_phase0.py` -> 9 passed |
 | **Generality Rule (No place/disease names in src/)** | **IMPLEMENTED** | `tests/test_core_model_phase10.py` | `test_grep_no_forbidden_resource_or_disease_names_in_src` | `pytest tests/test_core_model_phase10.py` -> PASSED (0 hardcoded strings) |
-| **Structure-of-Arrays (NumPy)** | **IMPLEMENTED** | `src/episwarm/population/build.py` | `tests/test_population_phase1.py` | 100,000 agents in 4.29 MB array memory |
+| **Structure-of-Arrays (NumPy)** | **IMPLEMENTED** | `src/episwarm/population/build.py` | `tests/test_population_phase1.py` | 500,000 agents in 21.5 MB array memory |
 | **Iterative Proportional Fitting (IPF)** | **IMPLEMENTED** | `src/episwarm/population/ipf.py` | `test_ipf_convergence_2d` | `pytest tests/test_population_phase1.py` -> PASSED (tol < 1e-5) |
 | **Household Adult Guarantee** | **IMPLEMENTED** | `src/episwarm/population/households.py` | `test_household_adult_invariant` | 100% households have $\ge 1$ adult |
 | **Next-Gen Matrix Spectral Radius Υ(M)** | **IMPLEMENTED** | `src/episwarm/engine/contacts.py` | `test_spectral_radius_and_beta_analytical` | $R_0 = \frac{\beta}{\gamma}\Upsilon(M)$ verified |
-| **Layered Infection (`numpy.bincount`)** | **IMPLEMENTED** | `src/episwarm/engine/infection.py` | `test_population_conservation_invariant` | O(N) daily complexity, 100k agents in 13.4s |
+| **Layered Infection (`numpy.bincount`)** | **IMPLEMENTED** | `src/episwarm/engine/infection.py` | `test_population_conservation_invariant` | O(N) daily complexity, 500k agents in 80.9s |
 | **Spatial Gravity Commute Flux** | **IMPLEMENTED** | `src/episwarm/population/venues.py` | `tests/test_population_phase1.py` | Libin et al. (2020) gravity impedance $T_{ij} \propto P_j / d_{ij}^\alpha$ |
 | **Spatial Spread Matrix** | **IMPLEMENTED** | `src/episwarm/analysis/spread_matrix.py` | `test_spread_matrix_computation` | Mean arrival days & hit order computed |
 | **Demographic & Geographic Equity** | **IMPLEMENTED** | `src/episwarm/analysis/equity.py` | `test_equity_evaluation` | Area and age attack rate disparity gaps |
@@ -40,25 +43,27 @@ This audit records the factual implementation status of all requirements across 
 | **Three-Arm Comparison** | **IMPLEMENTED** | `src/episwarm/optimize/comparison.py` | `test_three_arm_comparison` | Advisor vs Search vs Combined vs Brute Force |
 | **Streamlit Studio App** | **IMPLEMENTED** | `src/episwarm/app/streamlit_app.py` | `test_streamlit_studio_all_steps_headless` | `pytest tests/test_app_headless.py` -> PASSED (AppTest 0 errors) |
 | **Observed Data Calibration** | **IMPLEMENTED** | `src/episwarm/analysis/calibration.py` | `test_calibration_honesty_rule` | Enforces UNCALIBRATED label without empirical data |
+| **Sensitivity Analysis** | **IMPLEMENTED** | `src/episwarm/analysis/sensitivity.py` | `test_mu_calibration_fit`, `test_resource_whatif_phase12.py` | OAT sensitivity sweeps over $R_0, \theta_{\text{care}}, \theta_{\text{delay}}$, rumor credibility |
 
 ---
 
 ## 3. Real Test & Benchmark Evidence
 
 ### 3.1 Test Suite Summary Line
-- **Test Files**: 13 test files (`test_packs_phase0.py`, `test_population_phase1.py`, `test_engine_phase2.py`, `test_healthcare_phase3.py`, `test_behavior_phase4.py`, `test_analysis_phase5.py`, `test_advisor_optimizer_phase6.py`, `test_app_calibration_phase7_8.py`, `test_policy_local.py`, `test_app_headless.py`, `test_core_model_phase10.py`, `test_rumor_compliance_phase11.py`, `test_resource_whatif_phase12.py`).
-- **Individual Test Functions**: **58 total test functions** across all files.
-- **pytest Output**: `58 passed in 44.17s` (100% green).
+- **Test Files**: 14 test files (`test_packs_phase0.py`, `test_population_phase1.py`, `test_engine_phase2.py`, `test_healthcare_phase3.py`, `test_behavior_phase4.py`, `test_analysis_phase5.py`, `test_advisor_optimizer_phase6.py`, `test_app_calibration_phase7_8.py`, `test_policy_local.py`, `test_app_headless.py`, `test_core_model_phase10.py`, `test_rumor_compliance_phase11.py`, `test_resource_whatif_phase12.py`, `test_meta_crossval_phase13.py`).
+- **Individual Test Functions**: **64 total test functions** across all files.
+- **pytest Output**: `64 passed in 46.31s` (100% green).
 
-### 3.2 Benchmark Output (`python scripts/benchmark.py`)
+### 3.2 Benchmark Output (`python scripts/benchmark.py --stretch`)
 ```
 ================ EpiSwarm Scale Benchmark ================
 Target Machine: 16GB RAM constraint (Peak Memory < 11GB target)
 
  scale  pop_time_sec  sim_time_sec  total_time_sec  end_rss_mb  peak_wset_mb  theoretical_soa_mb  attack_rate_pct
-  5000          0.03          0.53            0.57       146.2         146.2                0.21              2.0
- 50000          0.06          4.99            5.05       148.8         154.0                2.15              0.1
-100000          0.09         13.39           13.49       152.4         162.7                4.29              0.0
+  5000          0.03          0.60            0.65       150.1         151.7                0.21              0.6
+ 50000          0.05          5.66            5.73       152.9         202.0                2.15              0.1
+100000          0.09         13.29           13.39       157.7         257.3                4.29              0.0
+500000          0.66         80.32           80.99       190.1         692.3               21.46              0.0
 ==========================================================
 ```
 
@@ -71,3 +76,11 @@ Target Machine: 16GB RAM constraint (Peak Memory < 11GB target)
 [PASSED] 4. Generality rule violation (hardcoded place): Test correctly caught mutation and FAILED.
 [PASSED] 5. Healthcare capacity violation (ignore 0 capacity): Test correctly caught mutation and FAILED.
 ```
+
+---
+
+## 4. Known Limitations & Documented Extensions
+
+1. **Non-Respiratory Pathogens**: Version 1.0 supports respiratory droplet/aerosol and direct contact state graphs. Vector-borne (e.g. Dengue, Malaria) and environmental water-borne (e.g. Cholera) transmission dynamics are reserved for future pack schemas.
+2. **Behavioral Data Calibration**: In the absence of observed regional adherence or mobility datasets, the behavioral decision engine produces synthetic counterfactual responses labeled `Behavior layer unvalidated for this region`.
+3. **PPO Reinforcement Learning**: Per Libin et al. (2020) and Spec 12.3, the deterministic `engine_meta` serves as the exact fast surrogate needed for deep RL policy training. Single-area and multi-area PPO agents can be trained directly using `engine_meta` and verified on the micro-simulation engine.

@@ -33,7 +33,6 @@ When a user provides only aggregate (L0) inputs, the following assumptions are a
 3. **Healthcare Overflow Multipliers**:
    - Mortality when needed general bed is unavailable: $2.0\times$ baseline case fatality.
    - Mortality when needed ICU bed is unavailable: $3.5\times$ baseline case fatality.
-   - Mortality when medical oxygen buffer is depleted: $2.5\times$ baseline case fatality.
    - Compliance mitigation: Fully compliant agents receive a $0.85\times$ risk multiplier; non-compliant agents receive a $1.25\times$ multiplier.
 
 ---
