@@ -1,5 +1,9 @@
 area_id,venue_type,count,mean_size,size_sd,source,status
 A01,school,20,300,50,synthetic_generator,synthetic
 A01,workplace,150,40,20,synthetic_generator,synthetic
+A01,market,10,200,40,synthetic_generator,synthetic
+A01,leisure,15,80,25,synthetic_generator,synthetic
 A02,school,25,320,60,synthetic_generator,synthetic
 A02,workplace,180,45,25,synthetic_generator,synthetic
+A02,market,12,220,50,synthetic_generator,synthetic
+A02,leisure,18,90,30,synthetic_generator,synthetic

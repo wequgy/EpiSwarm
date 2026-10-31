@@ -1,0 +1,5 @@
+resource_id,name,unit,area_id,date_or_static,nominal,effective_low,effective_high,upper_cap_of_extra,restock_rate,source,status
+res_bed,Clinical Bed,beds,A01,static,100,80,110,30,0,synthetic_generator,synthetic
+res_bed,Clinical Bed,beds,A02,static,120,100,130,35,0,synthetic_generator,synthetic
+res_support,Auxiliary Support Unit,units,A01,static,20,15,25,10,2,synthetic_generator,synthetic
+res_support,Auxiliary Support Unit,units,A02,static,25,20,30,12,2,synthetic_generator,synthetic

@@ -1,14 +1,9 @@
-"""Plain-English end-to-end demonstration script of EpiSwarm Studio."""
+"""End-to-end interactive demo running EpiSwarm Studio pipeline on synthetic region data."""
 
-import sys
 import time
-from pathlib import Path
 import yaml
-
-# Add src to path
-src_dir = Path(__file__).resolve().parent.parent / "src"
-if str(src_dir) not in sys.path:
-    sys.path.insert(0, str(src_dir))
+from pathlib import Path
+import numpy as np
 
 from episwarm.population.build import build_synthetic_population
 from episwarm.packs.disease import DiseasePack
@@ -22,9 +17,9 @@ from episwarm.advisor.agent import AdvisorAgent
 def main():
     print("======================================================================")
     print("             EpiSwarm Studio: End-to-End Walkthrough Demo             ")
-    print("======================================================================\n")
+    print("======================================================================")
 
-    print("Step 1: Ingesting Synthetic Region Data...")
+    print("\nStep 1: Ingesting Synthetic Region Data...")
     print("  -> Loading 'regions/example_synthetic' (5 areas, synthetic hospitals & venues)")
     t0 = time.perf_counter()
     pop = build_synthetic_population("regions/example_synthetic", scale_agents=5000, random_seed=42)
@@ -37,7 +32,13 @@ def main():
         d_pack = DiseasePack(**yaml.safe_load(f))
     print(f"  -> Pathogen: {d_pack.name} (R0 = {d_pack.transmission.r0})")
     print(f"  -> Sourced Anchors: Levin et al. (2020) age-stratified infection fatality ratios.")
-    print(f"  -> Assumed Parameters: Overflow bed unavailability multiplier = {d_pack.overflow.bed_unavailable_mortality_multiplier}x.")
+    print(f"  -> Unserved Outcome Model (Spec 6.3): base theta_0 = {d_pack.unserved_outcome.theta_0}, theta_care = {d_pack.unserved_outcome.theta_care}.")
+    print(f"  -> Declared Vulnerability Factors: {[vf.id for vf in d_pack.vulnerability_factors]}")
+
+    # Showcase structured narrative
+    showcase = pop.get_showcase_profile(0)
+    print("\n  [Showcase Resident Narrative (Spec 9)]")
+    print(f"  {showcase['narrative'].strip()}")
 
     print("\nStep 3: Running 30-Day Outbreak Simulation...")
     with open("scenarios/baseline.yaml", "r", encoding="utf-8") as f:
@@ -50,7 +51,7 @@ def main():
     t_sim = time.perf_counter() - t1
     print(f"  -> Simulation complete in {t_sim:.2f}s!")
     print(f"  -> Total infections: {res.total_infections:,} ({res.attack_rate*100:.1f}% attack rate).")
-    print(f"  -> Total fatalities: {res.total_deaths:,} under hospital capacity limits.")
+    print(f"  -> Total fatalities: {res.total_deaths:,} under clinical resource constraints.")
 
     print("\nStep 4: Evaluating Fairness and Geographic Disparities...")
     eq = evaluate_equity(pop, res)
@@ -75,7 +76,7 @@ def main():
     print("Data Source Flags:")
     print("  - Population & Venues: SYNTHETIC (Artificial test fixture)")
     print("  - Transmission R0: ASSUMED (2.50)")
-    print("  - Overflow multipliers: ASSUMED (2.0x general, 3.5x ICU)")
+    print("  - Resource model: GENERIC (Clinical bed, auxiliary support units)")
     print("  - Behavior Layer: UNVALIDATED (Hypothetical public response curve)")
     print("======================================================================\n")
 

@@ -1,7 +1,8 @@
-"""Layered transmission engine utilizing numpy.bincount for high-speed venue infection."""
+"""Layered transmission engine utilizing numpy.bincount for high-speed venue infection (Spec 5.1 & 5.2)."""
 
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, Any
 import numpy as np
+import pandas as pd
 
 from episwarm.population.build import PopulationSoA
 from episwarm.engine.state_graph import CompiledStateGraph
@@ -27,18 +28,13 @@ def compute_venue_layer_lambda(
     valid_venues = venue_assignments[valid_mask]
     max_vid = int(np.max(valid_venues))
 
-    # 1. Calculate venue size (number of agents present)
     venue_sizes = np.bincount(valid_venues, minlength=max_vid + 1)
-
-    # 2. Calculate infectious load per venue (sum of relative infectiousness)
     valid_loads = agent_infectious_load[valid_mask].astype(np.float64)
     venue_loads = np.bincount(valid_venues, weights=valid_loads, minlength=max_vid + 1)
 
-    # 3. Venue force of infection: beta * scaling * (load / size)
     safe_sizes = np.maximum(1, venue_sizes)
     venue_lambdas = (beta_layer * active_scaling) * (venue_loads / safe_sizes)
 
-    # 4. Map back to each agent
     agent_lambdas = np.zeros(len(venue_assignments), dtype=np.float32)
     agent_lambdas[valid_mask] = venue_lambdas[valid_venues].astype(np.float32)
     return agent_lambdas
@@ -72,12 +68,15 @@ def evaluate_daily_infections(
     layer_weights: Dict[str, float],    # {"home": 0.35, "school": 0.25, "work": 0.25, "community": 0.15}
     layer_scalings: Dict[str, float],   # Active intervention multipliers
     individual_infectiousness_k: np.ndarray, # Overdispersion gamma draws
-    rng: np.random.Generator
+    rng: np.random.Generator,
+    susceptibility_multipliers: Optional[np.ndarray] = None,
+    area_crowding_multipliers: Optional[np.ndarray] = None
 ) -> np.ndarray:
     """Determine which susceptible agents contract infection on the current simulation day.
 
-    Returns:
-        newly_exposed_mask: Boolean array indicating new transmissions (S -> E)
+    Supports:
+    - Disease vulnerability factor susceptibility (Spec 5.1)
+    - Area-level environment crowding modifiers (Spec 5.2)
     """
     susceptible_mask = (current_states == state_graph.idx_S)
     if not np.any(susceptible_mask):
@@ -102,6 +101,11 @@ def evaluate_daily_infections(
         layer_scalings.get("home", 1.0)
     )
 
+    # Apply environment crowding modifier to household transmission (Spec 5.2)
+    if area_crowding_multipliers is not None:
+        agent_crowd = area_crowding_multipliers[pop.area_id]
+        lambda_home *= agent_crowd
+
     # School layer
     lambda_school = compute_venue_layer_lambda(
         pop.school_id, agent_loads,
@@ -111,7 +115,6 @@ def evaluate_daily_infections(
 
     # Workplace layer (accounting for WFH)
     effective_workplaces = np.copy(pop.workplace_id)
-    # WFH workers have workplace nullified
     effective_workplaces[pop.wfh_possible] = -1
     lambda_work = compute_venue_layer_lambda(
         effective_workplaces, agent_loads,
@@ -119,7 +122,7 @@ def evaluate_daily_infections(
         layer_scalings.get("work", 1.0)
     )
 
-    # Community / Commute layer (uses commute destination area)
+    # Community / Commute layer
     lambda_comm = compute_community_layer_lambda(
         pop.commute_area, agent_loads,
         beta * layer_weights.get("community", 0.15),
@@ -129,9 +132,13 @@ def evaluate_daily_infections(
     # 3. Total lambda per susceptible agent
     total_lambda = lambda_home + lambda_school + lambda_work + lambda_comm
 
-    # Individual behavioral compliance reduction (e.g. hygiene/masking reduces exposure probability)
+    # Individual behavioral compliance reduction
     compliance_factor = 1.0 - (0.30 * pop.compliance)
     effective_lambda = total_lambda * compliance_factor
+
+    # Individual susceptibility multiplier (Spec 5.1 vulnerability factors)
+    if susceptibility_multipliers is not None:
+        effective_lambda *= susceptibility_multipliers
 
     # 4. Poisson transmission probability: P = 1 - exp(-lambda)
     p_infection = 1.0 - np.exp(-effective_lambda[susceptible_mask])
@@ -143,4 +150,3 @@ def evaluate_daily_infections(
     newly_exposed = np.zeros(pop.n_agents, dtype=bool)
     newly_exposed[susceptible_mask] = infected_subset
     return newly_exposed
-

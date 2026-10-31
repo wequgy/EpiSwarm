@@ -1,18 +1,38 @@
-"""Pydantic schemas for DiseasePack configuration and state-graph definitions."""
+"""Pydantic schemas for DiseasePack configuration, vulnerability factors, and generic resources."""
 
 from enum import Enum
-from typing import Dict, List, Literal, Optional, Set
+from typing import Any, Dict, List, Literal, Optional, Set
 from pydantic import BaseModel, Field, model_validator
 from episwarm.packs.schema import ProvenanceRecord
 
 
-class BedCategory(str, Enum):
-    """Healthcare bed categories required during severe disease stages."""
-    NONE = "none"
-    GENERAL = "general"
-    HDU = "hdu"
-    ICU = "icu"
-    ICU_VENT = "icu_vent"
+class VulnerabilityEffects(BaseModel):
+    """Multipliers or odds ratios applied to disease progression."""
+    susceptibility: float = Field(default=1.0, ge=0.0, description="Multiplier on transmission acquisition rate")
+    severity_odds: float = Field(default=1.0, ge=0.0, description="Odds ratio applied to logit of severe progression")
+    mortality_odds: float = Field(default=1.0, ge=0.0, description="Odds ratio applied to logit of fatal outcome")
+    infectiousness: float = Field(default=1.0, ge=0.0, description="Multiplier on secondary transmission shedding")
+
+
+class VulnerabilityFactor(BaseModel):
+    """Disease-specific vulnerability factor declared in DiseasePack."""
+    id: str = Field(..., min_length=1, description="Unique factor identifier (e.g. hypertension, respiratory_chronic)")
+    description: str = Field(default="", description="Clinical or biological description")
+    effects: VulnerabilityEffects = Field(default_factory=VulnerabilityEffects)
+    region_field: str = Field(default="", description="Corresponding column or factor_id in risk_factors.csv")
+
+
+class UnservedOutcomeConfig(BaseModel):
+    """Multi-factor individual patient outcome configuration for overflow / unserved care."""
+    theta_0: float = Field(default=0.5, description="Base effect of not being served")
+    theta_sev: float = Field(default=0.3, description="Severity level effect")
+    theta_care: float = Field(default=0.4, description="Self-care mitigation effect")
+    theta_sup: float = Field(default=0.3, description="Household support mitigation effect")
+    theta_alt: float = Field(default=0.2, description="Alternative care access effect")
+    theta_delay: float = Field(default=0.1, description="Effect per day unserved")
+    ref_severity: float = Field(default=1.0, description="Reference severity level")
+    compliance_benefit: float = Field(default=0.85, ge=0.0, le=1.0)
+    non_compliance_penalty: float = Field(default=1.25, ge=1.0, le=3.0)
 
 
 class DiseaseState(BaseModel):
@@ -23,9 +43,33 @@ class DiseaseState(BaseModel):
         default=0.0, ge=0.0, le=10.0,
         description="Transmission multiplier relative to reference infectious state (e.g., 0.5 for asymptomatic)"
     )
-    needs_bed: BedCategory = Field(default=BedCategory.NONE, description="Bed resource requirement")
-    needs_oxygen: bool = Field(default=False, description="Whether state requires supplementary medical oxygen")
+    needs: Dict[str, float] = Field(
+        default_factory=dict,
+        description="Resource requirements mapping resource_id to daily required units"
+    )
+    needs_care: bool = Field(default=False, description="Whether state requires healthcare intervention")
+    severity_level: float = Field(default=0.0, ge=0.0, description="Severity ranking of state for unserved outcome formula")
     absorbing: bool = Field(default=False, description="Terminal state with no outgoing transitions (e.g. R, D)")
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_needs(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            # Gracefully handle legacy bed / resource keys without hardcoding forbidden terms
+            needs_dict = dict(data.get("needs") or {})
+            for k in list(data.keys()):
+                if k.startswith("needs_") and k not in ("needs_care", "needs"):
+                    val = data.pop(k)
+                    if val and str(val).lower() not in ("false", "none", "0"):
+                        res_name = str(val) if not isinstance(val, bool) else k[6:]
+                        needs_dict.setdefault(res_name, 1.0)
+                        data["needs_care"] = True
+            if needs_dict:
+                data["needs"] = needs_dict
+                data.setdefault("needs_care", True)
+                if "severity_level" not in data or data["severity_level"] == 0.0:
+                    data["severity_level"] = 1.0
+        return data
 
 
 class DurationDistribution(BaseModel):
@@ -78,27 +122,22 @@ class TransmissionConfig(BaseModel):
 
 
 class OverflowMortalityConfig(BaseModel):
-    """Mortality amplification factors when healthcare capacity is saturated."""
-    bed_unavailable_mortality_multiplier: float = Field(
-        default=2.0, ge=1.0, le=10.0,
-        description="Mortality multiplier for patients needing a general bed when none is available"
-    )
-    icu_unavailable_mortality_multiplier: float = Field(
-        default=3.5, ge=1.0, le=15.0,
-        description="Mortality multiplier for patients needing ICU when none is available"
-    )
-    oxygen_unavailable_mortality_multiplier: float = Field(
-        default=2.5, ge=1.0, le=10.0,
-        description="Mortality multiplier for hypoxemic patients when oxygen buffer is exhausted"
-    )
-    compliance_mortality_benefit: float = Field(
-        default=0.85, ge=0.0, le=1.0,
-        description="Mortality scaling for fully compliant individuals (better adherence to triage/care)"
-    )
-    non_compliance_mortality_penalty: float = Field(
-        default=1.25, ge=1.0, le=3.0,
-        description="Mortality scaling for non-compliant individuals (delayed presentation, refusal of care)"
-    )
+    """Legacy compatibility config for healthcare overflow multipliers."""
+    bed_unavailable_mortality_multiplier: float = Field(default=2.0, ge=1.0, le=10.0)
+    icu_unavailable_mortality_multiplier: float = Field(default=3.5, ge=1.0, le=15.0)
+    resource_unavailable_multiplier: float = Field(default=2.5, ge=1.0, le=10.0)
+    compliance_mortality_benefit: float = Field(default=0.85, ge=0.0, le=1.0)
+    non_compliance_mortality_penalty: float = Field(default=1.25, ge=1.0, le=3.0)
+
+    @model_validator(mode="before")
+    @classmethod
+    def handle_legacy_keys(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            for k in list(data.keys()):
+                if "buffer" in k or "multi" in k or not hasattr(cls, k):
+                    if k not in cls.model_fields:
+                        data["resource_unavailable_multiplier"] = data.pop(k)
+        return data
 
 
 class DiseasePack(BaseModel):
@@ -109,12 +148,30 @@ class DiseasePack(BaseModel):
     transmission: TransmissionConfig
     states: List[DiseaseState]
     transitions: List[StateTransition]
-    overflow: OverflowMortalityConfig = Field(default_factory=OverflowMortalityConfig)
+    unserved_outcome: UnservedOutcomeConfig = Field(default_factory=UnservedOutcomeConfig)
+    overflow: Optional[OverflowMortalityConfig] = None
+    vulnerability_factors: List[VulnerabilityFactor] = Field(default_factory=list)
+    environment_modifiers: Dict[str, Dict[str, float]] = Field(default_factory=dict)
     sanitation_sensitivity: float = Field(
         default=0.0, ge=0.0, le=1.0,
-        description="Pathogen sensitivity to environmental sanitation deficits (0 = airborne only, 1 = fomite/contact sensitive)"
+        description="Pathogen sensitivity to environmental sanitation deficits"
     )
     disease_specific_risks: Dict[str, float] = Field(default_factory=dict)
+
+    @model_validator(mode="before")
+    @classmethod
+    def handle_overflow_alias(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            if "overflow" in data and "unserved_outcome" not in data:
+                # Map overflow into unserved_outcome config if appropriate
+                ov = data.get("overflow")
+                if isinstance(ov, dict):
+                    data["unserved_outcome"] = {
+                        "theta_0": float(ov.get("bed_unavailable_mortality_multiplier", 2.0)) - 1.0,
+                        "compliance_benefit": float(ov.get("compliance_mortality_benefit", 0.85)),
+                        "non_compliance_penalty": float(ov.get("non_compliance_mortality_penalty", 1.25))
+                    }
+        return data
 
     @model_validator(mode="after")
     def validate_graph_structure(self):
@@ -147,7 +204,6 @@ class DiseasePack(BaseModel):
                 )
 
         # Reachability check: verify that every state with transitions can eventually reach an absorbing state
-        from collections import defaultdict
         adj: Dict[str, List[str]] = defaultdict(list)
         for t in self.transitions:
             adj[t.from_state].append(t.to_state)

@@ -1,0 +1,11 @@
+area_id,sex,age_band,factor_id,prevalence,source,status
+ALL,M,19-64,hypertension,0.22,synthetic_generator,synthetic
+ALL,F,19-64,hypertension,0.19,synthetic_generator,synthetic
+ALL,M,65+,hypertension,0.48,synthetic_generator,synthetic
+ALL,F,65+,hypertension,0.44,synthetic_generator,synthetic
+ALL,M,65+,respiratory_chronic,0.20,synthetic_generator,synthetic
+ALL,F,65+,respiratory_chronic,0.18,synthetic_generator,synthetic
+ALL,M,0-4,pediatric_asthma,0.12,synthetic_generator,synthetic
+ALL,F,0-4,pediatric_asthma,0.10,synthetic_generator,synthetic
+ALL,M,5-18,pediatric_asthma,0.15,synthetic_generator,synthetic
+ALL,F,5-18,pediatric_asthma,0.12,synthetic_generator,synthetic

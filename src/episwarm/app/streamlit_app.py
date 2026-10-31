@@ -142,6 +142,18 @@ if step == "1. Region & Population":
             st.text(pop.summary())
             st.success(f"Instantiated {pop.n_agents:,} synthetic agents!")
 
+            with st.expander("Resident Profiles & Structured Life Histories (Showcase Agents)", expanded=True):
+                st.write("Structured life history facts and generated narratives for representative agents:")
+                for showcase_idx in range(min(5, pop.n_agents)):
+                    profile = pop.get_showcase_profile(showcase_idx)
+                    col_p1, col_p2 = st.columns([1, 2])
+                    with col_p1:
+                        st.markdown(f"**Agent #{profile['agent_id']}** ({profile['age']} yo {profile['sex']}, {profile['area']})")
+                        st.caption(f"Role: {profile['role']} | Routine: {profile['routine']}")
+                        st.caption(f"Self-Care: {profile['self_care']:.2f} | Support: {profile['support']:.2f}")
+                    with col_p2:
+                        st.info(profile['narrative'])
+
 # --- STEP 2: DISEASE STATE GRAPH ---
 elif step == "2. Disease State Graph":
     st.header("Step 2: Disease State Machine & Transmission Presets")
@@ -172,16 +184,22 @@ elif step == "2. Disease State Graph":
 
 # --- STEP 3: HEALTHCARE & CAPACITY ---
 elif step == "3. Healthcare & Capacity":
-    st.header("Step 3: Hospital Beds, ICU, and Oxygen Buffer")
+    st.header("Step 3: Regional Resources and Healthcare Capacity")
+    res_file = st.session_state.region_dir / "resources.csv"
     cap_file = st.session_state.region_dir / "capacity.csv"
-    if cap_file.exists():
+
+    if res_file.exists():
+        res_df = pd.read_csv(res_file)
+        st.dataframe(res_df)
+        fig = px.bar(res_df, x="resource_id", y="nominal", color="area_id", barmode="group", title="Nominal Generic Resources by Area")
+        st.plotly_chart(fig, use_container_width=True)
+    elif cap_file.exists():
         cap_df = pd.read_csv(cap_file)
         st.dataframe(cap_df)
-
         fig = px.bar(cap_df, x="hospital_id", y="nominal", color="category", barmode="group", title="Nominal Capacity by Facility")
         st.plotly_chart(fig, use_container_width=True)
     else:
-        st.info("No capacity.csv present. Defaulting to 1.5 general beds and 0.2 ICU beds per 1k population.")
+        st.info("No resources.csv or capacity.csv present. Defaulting to standard generic clinical resources.")
 
 # --- STEP 4: INTERVENTIONS & SCENARIO ---
 elif step == "4. Interventions & Scenario":

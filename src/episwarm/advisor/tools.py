@@ -33,7 +33,7 @@ AVAILABLE_MEASURES = [
     },
     {
         "type": "surge_beds",
-        "description": "Provisions emergency ICU beds and oxygen buffers.",
+        "description": "Provisions emergency clinical capacity and auxiliary resource buffers.",
         "typical_cost_per_day": 1.5,
         "default_stringency": 0.30
     }

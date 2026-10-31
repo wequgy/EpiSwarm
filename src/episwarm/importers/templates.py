@@ -30,6 +30,18 @@ CSV_CONTRACTS: Dict[str, List[str]] = {
         "date", "hospital_id", "category", "nominal", "effective_low",
         "effective_high", "medicine_stock", "upper_cap_extra", "source", "status"
     ],
+    "resources.csv": [
+        "resource_id", "name", "unit", "area_id", "date_or_static", "nominal",
+        "effective_low", "effective_high", "upper_cap_of_extra", "restock_rate", "source", "status"
+    ],
+    "risk_factors.csv": [
+        "area_id", "sex", "age_band", "factor_id", "prevalence", "source", "status"
+    ],
+    "environment.csv": [
+        "area_id", "safe_water_share", "improved_sanitation_share", "handwashing_facility_share",
+        "persons_per_room", "informal_settlement_share", "clean_cooking_share", "green_space_share",
+        "climate_zone", "extra", "source", "status"
+    ],
     "comorbidity.csv": [
         "age_band", "sex", "condition", "prevalence", "source", "status"
     ],
@@ -106,6 +118,24 @@ TEMPLATE_EXAMPLES: Dict[str, List[Dict[str, str]]] = {
         {"date": "static", "hospital_id": "H01", "category": "icu", "nominal": "15", "effective_low": "12", "effective_high": "18", "medicine_stock": "adequate", "upper_cap_extra": "5", "source": "synthetic_generator", "status": "synthetic"},
         {"date": "static", "hospital_id": "H02", "category": "general", "nominal": "120", "effective_low": "100", "effective_high": "130", "medicine_stock": "adequate", "upper_cap_extra": "30", "source": "synthetic_generator", "status": "synthetic"},
         {"date": "static", "hospital_id": "H02", "category": "icu", "nominal": "20", "effective_low": "15", "effective_high": "22", "medicine_stock": "adequate", "upper_cap_extra": "8", "source": "synthetic_generator", "status": "synthetic"}
+    ],
+    "resources.csv": [
+        {"resource_id": "res_bed", "name": "Clinical Care Bed", "unit": "beds", "area_id": "A01", "date_or_static": "static", "nominal": "100", "effective_low": "80", "effective_high": "110", "upper_cap_of_extra": "25", "restock_rate": "0", "source": "synthetic_generator", "status": "synthetic"},
+        {"resource_id": "res_bed", "name": "Clinical Care Bed", "unit": "beds", "area_id": "A02", "date_or_static": "static", "nominal": "120", "effective_low": "100", "effective_high": "130", "upper_cap_of_extra": "30", "restock_rate": "0", "source": "synthetic_generator", "status": "synthetic"},
+        {"resource_id": "res_support", "name": "Respiratory Support Unit", "unit": "units", "area_id": "A01", "date_or_static": "static", "nominal": "20", "effective_low": "15", "effective_high": "25", "upper_cap_of_extra": "10", "restock_rate": "2", "source": "synthetic_generator", "status": "synthetic"},
+        {"resource_id": "res_support", "name": "Respiratory Support Unit", "unit": "units", "area_id": "A02", "date_or_static": "static", "nominal": "25", "effective_low": "20", "effective_high": "30", "upper_cap_of_extra": "10", "restock_rate": "2", "source": "synthetic_generator", "status": "synthetic"}
+    ],
+    "risk_factors.csv": [
+        {"area_id": "ALL", "sex": "M", "age_band": "19-64", "factor_id": "hypertension", "prevalence": "0.22", "source": "synthetic_generator", "status": "synthetic"},
+        {"area_id": "ALL", "sex": "F", "age_band": "19-64", "factor_id": "hypertension", "prevalence": "0.19", "source": "synthetic_generator", "status": "synthetic"},
+        {"area_id": "ALL", "sex": "M", "age_band": "65+", "factor_id": "hypertension", "prevalence": "0.45", "source": "synthetic_generator", "status": "synthetic"},
+        {"area_id": "ALL", "sex": "F", "age_band": "65+", "factor_id": "hypertension", "prevalence": "0.42", "source": "synthetic_generator", "status": "synthetic"},
+        {"area_id": "ALL", "sex": "M", "age_band": "65+", "factor_id": "respiratory_chronic", "prevalence": "0.20", "source": "synthetic_generator", "status": "synthetic"},
+        {"area_id": "ALL", "sex": "F", "age_band": "65+", "factor_id": "respiratory_chronic", "prevalence": "0.18", "source": "synthetic_generator", "status": "synthetic"}
+    ],
+    "environment.csv": [
+        {"area_id": "A01", "safe_water_share": "0.92", "improved_sanitation_share": "0.88", "handwashing_facility_share": "0.85", "persons_per_room": "1.4", "informal_settlement_share": "0.08", "clean_cooking_share": "0.89", "green_space_share": "0.22", "climate_zone": "temperate", "extra": "{}", "source": "synthetic_generator", "status": "synthetic"},
+        {"area_id": "A02", "safe_water_share": "0.78", "improved_sanitation_share": "0.72", "handwashing_facility_share": "0.68", "persons_per_room": "2.2", "informal_settlement_share": "0.25", "clean_cooking_share": "0.70", "green_space_share": "0.12", "climate_zone": "temperate", "extra": "{}", "source": "synthetic_generator", "status": "synthetic"}
     ],
     "comorbidity.csv": [
         {"age_band": "19-64", "sex": "M", "condition": "hypertension", "prevalence": "0.22", "source": "synthetic_generator", "status": "synthetic"},

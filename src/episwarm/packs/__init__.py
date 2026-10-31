@@ -4,13 +4,14 @@ from episwarm.packs.schema import ProvenanceRecord, ProvenanceStatus
 from episwarm.packs.region import RegionPack, RegionMeta, L0QuickInputs, DataLevel
 from episwarm.packs.disease import (
     DiseasePack, DiseaseState, StateTransition,
-    DurationDistribution, TransmissionConfig, OverflowMortalityConfig, BedCategory
+    DurationDistribution, TransmissionConfig, OverflowMortalityConfig,
+    VulnerabilityFactor, VulnerabilityEffects, UnservedOutcomeConfig
 )
 from episwarm.packs.behavior import (
     BehaviorPack, DecisionQuestion, QuestionType, TraitDistribution
 )
 from episwarm.packs.scenario import (
-    ScenarioPack, SeedingConfig, InterventionAction, TargetObjective
+    ScenarioPack, SeedingConfig, InterventionAction, TargetObjective, ResourceAddAction
 )
 
 __all__ = [
@@ -26,7 +27,9 @@ __all__ = [
     "DurationDistribution",
     "TransmissionConfig",
     "OverflowMortalityConfig",
-    "BedCategory",
+    "VulnerabilityFactor",
+    "VulnerabilityEffects",
+    "UnservedOutcomeConfig",
     "BehaviorPack",
     "DecisionQuestion",
     "QuestionType",
@@ -35,5 +38,5 @@ __all__ = [
     "SeedingConfig",
     "InterventionAction",
     "TargetObjective",
+    "ResourceAddAction",
 ]
-

@@ -30,14 +30,19 @@ states:
   - name: H
     infectious: true
     relative_infectiousness: 0.10
-    needs_bed: general
-    needs_oxygen: true
+    needs:
+      res_bed: 1.0
+    needs_care: true
+    severity_level: 1.0
     absorbing: false
   - name: ICU
     infectious: true
     relative_infectiousness: 0.05
-    needs_bed: icu
-    needs_oxygen: true
+    needs:
+      res_bed: 1.0
+      res_support: 1.0
+    needs_care: true
+    severity_level: 2.5
     absorbing: false
   - name: R
     infectious: false
@@ -47,7 +52,6 @@ states:
     absorbing: true
 
 transitions:
-  # E -> I_asymp (35% probability, 3 days mean latent duration)
   - from_state: E
     to_state: I_asymp
     base_probability: 0.35
@@ -55,7 +59,6 @@ transitions:
       type: gamma
       mean_days: 3.0
       sd_days: 1.0
-  # E -> I_symp (65% probability, 3 days mean latent duration)
   - from_state: E
     to_state: I_symp
     base_probability: 0.65
@@ -63,7 +66,6 @@ transitions:
       type: gamma
       mean_days: 3.0
       sd_days: 1.0
-  # I_asymp -> R (100% resolve to R, 5 days duration)
   - from_state: I_asymp
     to_state: R
     base_probability: 1.00
@@ -71,7 +73,6 @@ transitions:
       type: gamma
       mean_days: 5.0
       sd_days: 1.5
-  # I_symp -> H (hospitalized, ~4.5% baseline, age-stratified)
   - from_state: I_symp
     to_state: H
     base_probability: 0.045
@@ -87,7 +88,6 @@ transitions:
     comorbidity_multipliers:
       "hypertension": 1.40
       "diabetes": 1.60
-  # I_symp -> R (direct recovery without hospitalization, 95.5%)
   - from_state: I_symp
     to_state: R
     base_probability: 0.955
@@ -95,7 +95,6 @@ transitions:
       type: gamma
       mean_days: 7.0
       sd_days: 2.0
-  # H -> ICU (~15% of hospitalized escalate to ICU)
   - from_state: H
     to_state: ICU
     base_probability: 0.15
@@ -105,7 +104,6 @@ transitions:
       sd_days: 1.5
     age_multipliers:
       "65+": 2.00
-  # H -> R (80% of hospitalized recover)
   - from_state: H
     to_state: R
     base_probability: 0.80
@@ -113,7 +111,6 @@ transitions:
       type: gamma
       mean_days: 8.0
       sd_days: 2.5
-  # H -> D (5% in-hospital fatality given care)
   - from_state: H
     to_state: D
     base_probability: 0.05
@@ -121,7 +118,6 @@ transitions:
       type: gamma
       mean_days: 6.0
       sd_days: 2.0
-  # ICU -> D (40% mortality in ICU)
   - from_state: ICU
     to_state: D
     base_probability: 0.40
@@ -129,7 +125,6 @@ transitions:
       type: gamma
       mean_days: 7.0
       sd_days: 3.0
-  # ICU -> R (60% recover from ICU)
   - from_state: ICU
     to_state: R
     base_probability: 0.60
@@ -138,11 +133,33 @@ transitions:
       mean_days: 12.0
       sd_days: 4.0
 
-overflow:
-  bed_unavailable_mortality_multiplier: 2.0
-  icu_unavailable_mortality_multiplier: 3.5
-  oxygen_unavailable_mortality_multiplier: 2.5
-  compliance_mortality_benefit: 0.85
-  non_compliance_mortality_penalty: 1.25
+vulnerability_factors:
+  - id: hypertension
+    description: "Cardiovascular hypertension elevating disease severity and hospitalization odds"
+    effects:
+      susceptibility: 1.10
+      severity_odds: 1.50
+      mortality_odds: 1.35
+    region_field: hypertension
+  - id: respiratory_chronic
+    description: "Chronic obstructive pulmonary or asthma history amplifying susceptibility and fatality"
+    effects:
+      susceptibility: 1.30
+      severity_odds: 2.20
+      mortality_odds: 1.80
+    region_field: respiratory_chronic
+
+environment_modifiers:
+  household_transmission:
+    persons_per_room: 0.25
+
+unserved_outcome:
+  theta_0: 0.60
+  theta_sev: 0.35
+  theta_care: 0.45
+  theta_sup: 0.30
+  theta_alt: 0.25
+  theta_delay: 0.15
+  ref_severity: 1.0
 
 sanitation_sensitivity: 0.05

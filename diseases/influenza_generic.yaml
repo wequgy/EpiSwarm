@@ -26,8 +26,10 @@ states:
   - name: H
     infectious: true
     relative_infectiousness: 0.10
-    needs_bed: general
-    needs_oxygen: true
+    needs:
+      res_bed: 1.0
+    needs_care: true
+    severity_level: 1.0
     absorbing: false
   - name: R
     infectious: false
@@ -37,7 +39,6 @@ states:
     absorbing: true
 
 transitions:
-  # E -> I (1.5 days mean latent period)
   - from_state: E
     to_state: I
     base_probability: 1.00
@@ -46,7 +47,6 @@ transitions:
       mean_days: 1.5
       sd_days: 0.5
 
-  # I -> H (1.5% hospitalization)
   - from_state: I
     to_state: H
     base_probability: 0.015
@@ -58,7 +58,6 @@ transitions:
       "0-4": 2.0
       "65+": 3.0
 
-  # I -> R (98.5% recover directly)
   - from_state: I
     to_state: R
     base_probability: 0.985
@@ -67,7 +66,6 @@ transitions:
       mean_days: 3.5
       sd_days: 1.0
 
-  # H -> R (96% in-hospital recovery)
   - from_state: H
     to_state: R
     base_probability: 0.96
@@ -76,7 +74,6 @@ transitions:
       mean_days: 5.0
       sd_days: 1.5
 
-  # H -> D (4% in-hospital fatality)
   - from_state: H
     to_state: D
     base_probability: 0.04
@@ -85,11 +82,26 @@ transitions:
       mean_days: 4.0
       sd_days: 1.0
 
-overflow:
-  bed_unavailable_mortality_multiplier: 1.8
-  icu_unavailable_mortality_multiplier: 2.5
-  oxygen_unavailable_mortality_multiplier: 2.0
-  compliance_mortality_benefit: 0.90
-  non_compliance_mortality_penalty: 1.20
+vulnerability_factors:
+  - id: pediatric_asthma
+    description: "Pediatric respiratory condition predisposing to acute influenza exacerbations"
+    effects:
+      susceptibility: 1.25
+      severity_odds: 1.80
+      mortality_odds: 1.20
+    region_field: pediatric_asthma
+
+environment_modifiers:
+  household_transmission:
+    persons_per_room: 0.10
+
+unserved_outcome:
+  theta_0: 0.40
+  theta_sev: 0.25
+  theta_care: 0.35
+  theta_sup: 0.25
+  theta_alt: 0.20
+  theta_delay: 0.10
+  ref_severity: 1.0
 
 sanitation_sensitivity: 0.02

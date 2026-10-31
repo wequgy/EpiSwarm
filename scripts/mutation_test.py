@@ -40,7 +40,7 @@ def run_mutation_check():
         {
             "name": "5. Healthcare capacity violation (ignore 0 capacity)",
             "file": Path("src/episwarm/engine/healthcare.py"),
-            "code_target": "is_served = np.zeros(n_patients, dtype=bool)",
+            "code_target": "is_served = (service_levels >= 1.0)",
             "code_mutated": "is_served = np.ones(n_patients, dtype=bool)",  # Pretend all served
             "test_cmd": "pytest tests/test_healthcare_phase3.py -k test_compliance_mortality_benefit_vs_penalty"
         }

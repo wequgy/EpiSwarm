@@ -1,17 +1,17 @@
-"""Pydantic schemas for ScenarioPack configuration and intervention plans."""
+"""Pydantic schemas for ScenarioPack defining time horizons, seeding, and interventions."""
 
-from typing import Dict, List, Optional
+from typing import Dict, List, Literal, Optional
 from pydantic import BaseModel, Field, model_validator
 from episwarm.packs.schema import ProvenanceRecord
 
 
 class SeedingConfig(BaseModel):
-    """Outbreak seeding conditions."""
+    """Initial infection seeding conditions."""
     area_id: Optional[str] = Field(
         default=None,
-        description="Target area ID to seed. If None and seed_all_areas is True, seeds all sequentially."
+        description="Target area ID to seed initial cases (null means distributed according to area population)"
     )
-    seed_all_areas: bool = Field(
+    all_areas: bool = Field(
         default=False,
         description="Flag indicating sequential evaluation across all areas (for spread matrix computation)"
     )
@@ -24,7 +24,7 @@ class InterventionAction(BaseModel):
     name: str = Field(..., min_length=1)
     measure_type: str = Field(
         ...,
-        description="Category: school_closure, workplace_reduction, market_closure, mask_mandate, surge_beds, oxygen_buffer, vaccination"
+        description="Category: school_closure, workplace_reduction, market_closure, mask_mandate, curfew, resource_surge, vaccination"
     )
     area_id: str = Field(
         default="ALL",
@@ -42,7 +42,7 @@ class InterventionAction(BaseModel):
     )
     parameters: Dict[str, float] = Field(
         default_factory=dict,
-        description="Optional auxiliary parameters (e.g. extra_beds, target_coverage)"
+        description="Optional auxiliary parameters (e.g. extra_units, target_coverage)"
     )
 
     @model_validator(mode="after")
@@ -52,10 +52,22 @@ class InterventionAction(BaseModel):
         return self
 
 
+class ResourceAddAction(BaseModel):
+    """Scenario intervention provisioning generic healthcare resources (spec 6.4)."""
+    resource_id: str = Field(..., min_length=1, description="Resource identifier declared in resources.csv")
+    area_id: str = Field(default="ALL", description="Specific area ID or 'ALL' for uniform distribution")
+    amount: float = Field(..., gt=0.0, description="Units to provision")
+    start_day: int = Field(default=0, ge=0, description="Day on which provisioning is requested")
+    delay_days: int = Field(default=0, ge=0, description="Setup / procurement delay in days")
+    ramp_days: int = Field(default=0, ge=0, description="Linear ramp duration to full capacity")
+    duration_days: Optional[int] = Field(default=None, gt=0, description="Duration in days (null for remaining horizon)")
+    cost_per_unit: float = Field(default=1.0, ge=0.0, description="Economic cost per unit")
+
+
 class TargetObjective(BaseModel):
     """Quantitative optimization targets."""
     max_deaths: Optional[int] = Field(default=None, ge=0)
-    max_peak_icu_overflow_days: Optional[int] = Field(default=0, ge=0)
+    max_peak_overflow_days: Optional[int] = Field(default=0, ge=0)
     max_cost_proxy: Optional[float] = Field(default=None, ge=0.0)
     max_equity_gap: Optional[float] = Field(default=None, ge=0.0, le=1.0)
 
@@ -68,6 +80,6 @@ class ScenarioPack(BaseModel):
     random_seed: int = Field(default=42, description="Master random seed for full reproducibility")
     seeding: SeedingConfig
     interventions: List[InterventionAction] = Field(default_factory=list)
+    resource_adds: List[ResourceAddAction] = Field(default_factory=list)
     objectives: Optional[TargetObjective] = None
     provenance: ProvenanceRecord
-
