@@ -77,3 +77,4 @@ class RulePolicy(DecisionPolicy):
 
         self.cache.put("rule", question.id, sit_hash, buck_hash, probs)
         return probs
+

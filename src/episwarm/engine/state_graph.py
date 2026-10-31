@@ -154,3 +154,4 @@ class CompiledStateGraph:
                 dwell_times[mask] = self.sample_dwell_time(current_state_idx, to_idx, count, rng)
 
         return next_states, dwell_times
+

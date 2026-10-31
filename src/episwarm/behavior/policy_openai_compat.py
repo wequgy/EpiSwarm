@@ -90,3 +90,4 @@ class OpenAICompatiblePolicy(DecisionPolicy):
         except Exception:
             self.fallback_count += 1
             return self.fallback.decide(question, situation, bucket, context)
+

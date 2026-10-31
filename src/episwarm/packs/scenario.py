@@ -70,3 +70,4 @@ class ScenarioPack(BaseModel):
     interventions: List[InterventionAction] = Field(default_factory=list)
     objectives: Optional[TargetObjective] = None
     provenance: ProvenanceRecord
+

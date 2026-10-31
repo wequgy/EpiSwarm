@@ -74,3 +74,4 @@ def analytical_beta_from_r0(
     upsilon = compute_spectral_radius(contact_matrix)
     beta = (r0 * gamma) / upsilon
     return float(beta), float(upsilon)
+

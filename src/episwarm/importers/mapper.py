@@ -83,3 +83,4 @@ class ColumnMapper:
             remapped["source"] = "user_upload"
 
         return remapped
+

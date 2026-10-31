@@ -77,3 +77,4 @@ def assign_comorbidity_multipliers(
             multipliers[affected] *= 1.40
 
     return multipliers
+

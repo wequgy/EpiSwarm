@@ -47,3 +47,4 @@ def load_excel_workbook(file_path: Union[str, Path]) -> Dict[str, pd.DataFrame]:
         tables[target_key] = pd.read_excel(xls, sheet_name=sheet_name)
 
     return tables
+

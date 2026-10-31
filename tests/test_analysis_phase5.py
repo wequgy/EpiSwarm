@@ -63,3 +63,4 @@ def test_multi_seed_metrics_ci():
     # CI lower <= mean <= CI upper
     assert report.ci_lower.cumulative_deaths <= report.mean_objectives.cumulative_deaths
     assert report.ci_upper.cumulative_deaths >= report.mean_objectives.cumulative_deaths
+

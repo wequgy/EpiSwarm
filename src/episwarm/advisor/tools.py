@@ -91,3 +91,4 @@ class AdvisorToolKit:
     def compare(self, run_id_a: str, run_id_b: str) -> Dict[str, Any]:
         """Compare the objective vectors between two runs."""
         return self.memory.compare_runs(run_id_a, run_id_b)
+

@@ -229,3 +229,4 @@ def build_synthetic_population(
         int_to_area_id=int_to_area_id,
         area_id_to_int=area_id_to_int
     )
+

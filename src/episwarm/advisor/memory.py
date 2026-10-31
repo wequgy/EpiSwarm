@@ -57,3 +57,4 @@ class AdvisorMemory:
             "cost_delta": obj_b.economic_cost_proxy - obj_a.economic_cost_proxy,
             "equity_gap_delta": obj_b.equity_disparity_gap - obj_a.equity_disparity_gap
         }
+

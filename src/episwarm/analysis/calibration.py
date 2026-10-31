@@ -79,3 +79,4 @@ def calibrate_to_observed_data(
         fitted_beta=sim_res.calibrated_beta,
         summary_message=f"Calibrated against {n_days} days of empirical observations (RMSE: {rmse:.1f}, R^2: {r2:.3f})."
     )
+

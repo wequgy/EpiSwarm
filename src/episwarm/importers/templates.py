@@ -140,3 +140,4 @@ def get_template_csv(filename: str) -> str:
         lines.append(",".join(row_values))
 
     return "\n".join(lines) + "\n"
+

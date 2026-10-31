@@ -71,3 +71,4 @@ class RegionPack(BaseModel):
     """Complete Region configuration bundle."""
     meta: RegionMeta
     quick_inputs: Optional[L0QuickInputs] = None
+

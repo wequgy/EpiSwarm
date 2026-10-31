@@ -182,3 +182,4 @@ def _extract_status(df: pd.DataFrame) -> str:
         elif len(statuses) > 1:
             return "MIXED"
     return "UNKNOWN"
+

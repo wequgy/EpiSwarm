@@ -83,3 +83,4 @@ def evaluate_equity(
         area_disparity_gap=round(geo_gap, 4),
         age_disparity_gap=round(age_gap, 4)
     )
+

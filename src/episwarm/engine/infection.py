@@ -143,3 +143,4 @@ def evaluate_daily_infections(
     newly_exposed = np.zeros(pop.n_agents, dtype=bool)
     newly_exposed[susceptible_mask] = infected_subset
     return newly_exposed
+

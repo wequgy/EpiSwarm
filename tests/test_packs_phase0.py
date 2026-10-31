@@ -153,3 +153,4 @@ def test_generality_rule_no_hardcoded_places_or_diseases():
                 violations.append((str(py_file), term))
 
     assert not violations, f"Generality violation: hardcoded names found in src/: {violations}"
+

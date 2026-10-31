@@ -120,3 +120,4 @@ def test_reproducibility():
     np.testing.assert_array_equal(pop1.household_id, pop2.household_id)
     np.testing.assert_array_equal(pop1.workplace_id, pop2.workplace_id)
     np.testing.assert_array_equal(pop1.compliance, pop2.compliance)
+

@@ -27,3 +27,4 @@ class ProvenanceRecord(BaseModel):
         default=None,
         description="Optional explanatory notes or assumptions regarding this value."
     )
+

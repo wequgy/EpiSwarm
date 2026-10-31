@@ -61,3 +61,4 @@ def compose_households(
     # Invariant assertion: every household has at least one adult
     assert np.all(household_ids >= 0), "All agents must be assigned to a household"
     return household_ids
+

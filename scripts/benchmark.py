@@ -14,13 +14,16 @@ from episwarm.packs.scenario import ScenarioPack
 from episwarm.engine.sim import run_simulation
 
 
-def get_process_memory_mb() -> float:
+def get_process_memory_mb() -> tuple[float, float]:
     process = psutil.Process(os.getpid())
-    return process.memory_info().rss / (1024.0 * 1024.0)
+    info = process.memory_info()
+    rss = info.rss / (1024.0 * 1024.0)
+    peak = getattr(info, "peak_wset", info.rss) / (1024.0 * 1024.0)
+    return rss, peak
 
 
 def benchmark_scale(scale: int, horizon: int = 30) -> dict:
-    start_mem = get_process_memory_mb()
+    start_rss, _ = get_process_memory_mb()
     t0 = time.perf_counter()
 
     # 1. Build Population
@@ -40,15 +43,19 @@ def benchmark_scale(scale: int, horizon: int = 30) -> dict:
     results = run_simulation(pop, d_pack, s_pack)
     sim_time = time.perf_counter() - t1
     total_time = time.perf_counter() - t0
-    peak_mem = get_process_memory_mb()
+    end_rss, peak_wset = get_process_memory_mb()
+
+    # SoA Theoretical size: ~45 bytes per agent in memory
+    theoretical_soa_mb = (scale * 45) / (1024.0 * 1024.0)
 
     return {
         "scale": scale,
         "pop_time_sec": round(pop_time, 2),
         "sim_time_sec": round(sim_time, 2),
         "total_time_sec": round(total_time, 2),
-        "mem_delta_mb": round(peak_mem - start_mem, 1),
-        "total_mem_mb": round(peak_mem, 1),
+        "end_rss_mb": round(end_rss, 1),
+        "peak_wset_mb": round(peak_wset, 1),
+        "theoretical_soa_mb": round(theoretical_soa_mb, 2),
         "attack_rate_pct": round(results.attack_rate * 100, 1)
     }
 
@@ -68,7 +75,7 @@ def main():
         print(f"Running benchmark for {s:,} agents...")
         res = benchmark_scale(s, horizon=30)
         rows.append(res)
-        print(f" -> Completed in {res['total_time_sec']}s (Peak RAM: {res['total_mem_mb']} MB, Infections: {res['attack_rate_pct']}%)")
+        print(f" -> Completed in {res['total_time_sec']}s (Peak RAM: {res['peak_wset_mb']} MB, Infections: {res['attack_rate_pct']}%)")
 
     df = pd.DataFrame(rows)
     print("\n" + df.to_string(index=False))
@@ -77,3 +84,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

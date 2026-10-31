@@ -51,3 +51,4 @@ class BehaviorPack(BaseModel):
         description="Daily probability of misinformation transmission per contact"
     )
     provenance: ProvenanceRecord
+

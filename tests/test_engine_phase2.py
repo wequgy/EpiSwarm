@@ -128,3 +128,4 @@ def test_simulation_reproducibility():
     np.testing.assert_array_equal(r1.daily_state_counts, r2.daily_state_counts)
     assert r1.total_infections == r2.total_infections
     assert r1.total_deaths == r2.total_deaths
+

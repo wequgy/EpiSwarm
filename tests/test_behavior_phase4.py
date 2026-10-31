@@ -104,9 +104,16 @@ def test_variance_and_ablation(test_cache, sample_question):
     jev_pol = JevPolicy(api_key=None, cache=test_cache)
 
     policies = {"Rule": rule_pol, "Jev_Fallback": jev_pol}
-    ablation_df = run_behavior_ablation(policies, sample_question)
+    archetypes = generate_benchmark_archetypes()
+    ablation_df = run_behavior_ablation(policies, sample_question, archetypes)
 
     assert len(ablation_df) == 2
     assert "mean_variance" in ablation_df.columns
-    # Ensure mean variance across diverse archetypes > 0
-    assert ablation_df["mean_variance"].iloc[0] > 0.001
+    # Robust variance check: variance must demonstrate strong behavioral differentiation (> 0.02)
+    assert ablation_df["mean_variance"].iloc[0] > 0.02
+
+    # Check spread across archetypes: extreme archetypes must differ by at least 35 percentage points
+    prob_avoid = [rule_pol.decide(sample_question, sit, buck)["avoid"] for sit, buck in archetypes]
+    spread = max(prob_avoid) - min(prob_avoid)
+    assert spread >= 0.35, f"Behavioral policy lacks sensitivity: spread across archetypes is only {spread:.3f}"
+

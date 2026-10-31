@@ -36,3 +36,4 @@ class Recommendation(BaseModel):
         default="This is a model recommendation under stated assumptions, not an empirical prediction. Decision-makers must evaluate local socioeconomic factors.",
         description="Mandatory disclaimer banner"
     )
+

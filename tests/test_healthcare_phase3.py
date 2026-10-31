@@ -88,3 +88,4 @@ def test_compliance_mortality_benefit_vs_penalty():
     assert mults[0] < mults[1]
     assert abs(mults[0] - 2.10) < 1e-5
     assert abs(mults[1] - 3.90) < 1e-5
+

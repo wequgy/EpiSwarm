@@ -40,3 +40,4 @@ def continuous_to_band(val: float) -> str:
     elif val < 0.65:
         return "medium"
     return "high"
+

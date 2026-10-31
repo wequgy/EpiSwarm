@@ -91,3 +91,4 @@ class JevPolicy(DecisionPolicy):
             # Network or timeout failure: fallback cleanly
             self.fallback_count += 1
             return self.fallback.decide(question, situation, bucket, context)
+
