@@ -3,7 +3,7 @@ context: "Metropolitan urban environment during a respiratory epidemic with acti
 provenance:
   source: "EpiSwarm Behavioral Modeling Specification"
   status: assumed
-  notes: "Behavioral prompts and trait distributions assumed for simulation benchmarking."
+  notes: "Behavioral prompts, rumor dynamics, and trait distributions assumed for simulation benchmarking."
 
 traits:
   compliance:
@@ -20,6 +20,28 @@ traits:
     std: 0.20
 
 rumor_spread_rate: 0.05
+
+rumor_topics:
+  - id: mild_flu_claim
+    label: "Pathogen is a harmless seasonal flu"
+    seed_area: "ALL"
+    seed_day: 5
+    num_seeds: 25
+    credibility: 0.85
+    behavior_effects:
+      mask_reduction: 0.45
+      vaccination_reduction: 0.50
+      isolation_reduction: 0.40
+      attendance_boost: 0.25
+
+compliance_weights:
+  w_risk: 0.25
+  w_norm: 0.20
+  w_enf: 0.15
+  w_fat: 0.20
+  kappa: 0.30
+  fatigue_rate: 0.015
+  fatigue_recovery: 0.02
 
 questions:
   - id: workplace_attendance

@@ -1,4 +1,4 @@
-"""Simulation engine stepping through epidemic progression day by day (Spec 5, 6 & 9)."""
+"""Simulation engine stepping through epidemic progression, generic resources, and rumor/compliance dynamics (Spec 5-9)."""
 
 import time
 import hashlib
@@ -11,10 +11,14 @@ import pandas as pd
 from episwarm.population.build import PopulationSoA
 from episwarm.packs.disease import DiseasePack
 from episwarm.packs.scenario import ScenarioPack, InterventionAction, ResourceAddAction
+from episwarm.packs.behavior import BehaviorPack
 from episwarm.engine.state_graph import CompiledStateGraph
 from episwarm.engine.infection import evaluate_daily_infections
 from episwarm.engine.contacts import parse_contact_matrix, analytical_beta_from_r0
 from episwarm.engine.resources import RegionalResourceSystem
+from episwarm.behavior.network import build_social_network
+from episwarm.behavior.rumor import RumorDynamicsEngine
+from episwarm.behavior.compliance import DynamicComplianceEngine
 
 
 @dataclass
@@ -47,6 +51,12 @@ class SimulationResults:
     attack_rate: float
     overflow_deaths: int = 0
     daily_unmet_demand: Dict[str, int] = field(default_factory=dict)
+
+    # Rumor & Compliance telemetry (Spec 7 & 8)
+    daily_mean_compliance: Optional[np.ndarray] = None
+    daily_rumor_beliefs: Dict[str, np.ndarray] = field(default_factory=dict)
+    deaths_attributable_to_rumor: int = 0
+
     manifest: Dict[str, Any] = field(default_factory=dict)
 
     def summary_table(self) -> str:
@@ -127,9 +137,11 @@ def run_simulation(
     layer_weights: Optional[Dict[str, float]] = None,
     resources_df: Optional[pd.DataFrame] = None,
     environment_df: Optional[pd.DataFrame] = None,
-    areas_df: Optional[pd.DataFrame] = None
+    areas_df: Optional[pd.DataFrame] = None,
+    behavior_pack: Optional[BehaviorPack] = None,
+    enable_rumor: bool = True
 ) -> SimulationResults:
-    """Execute complete multi-day epidemic simulation with generic resources and vulnerability factors."""
+    """Execute complete multi-day epidemic simulation with generic resources, vulnerability factors, and rumor dynamics."""
     rng = np.random.default_rng(scenario_pack.random_seed)
     age_bands = ["0-4", "5-18", "19-64", "65+"]
     state_graph = CompiledStateGraph(disease_pack, age_bands)
@@ -171,7 +183,6 @@ def run_simulation(
                 if aid_s in pop.area_id_to_int:
                     aid_idx = pop.area_id_to_int[aid_s]
                     ppr = float(r.get("persons_per_room", 1.5))
-                    # Scale factor centered around baseline 1.5 persons/room
                     area_crowding[aid_idx] = float(np.clip(1.0 + home_crowd_mod * (ppr - 1.5), 0.5, 3.0))
 
     # 4. Regional Healthcare Resource System (Spec 6.1, 6.2, 6.3, 6.4)
@@ -185,12 +196,29 @@ def run_simulation(
         unserved_config=disease_pack.unserved_outcome
     )
 
-    # Apply scenario resource additions (Spec 6.4)
     for res_add in scenario_pack.resource_adds:
         if res_add.start_day == 0:
             resource_system.apply_resource_addition(res_add)
 
-    # 5. Initialize agent states & dwell times
+    # 5. Social Network, Rumor Dynamics, and Compliance Engines (Spec 7 & 8)
+    horizon = scenario_pack.horizon_days
+    social_network = build_social_network(pop, rng=rng)
+
+    rumor_engine: Optional[RumorDynamicsEngine] = None
+    compliance_engine: Optional[DynamicComplianceEngine] = None
+    daily_mean_compliance = np.zeros(horizon, dtype=np.float32)
+    daily_rumor_beliefs: Dict[str, np.ndarray] = {}
+
+    # Snapshot base compliance for isolated runs
+    saved_compliance = np.copy(pop.compliance)
+
+    if behavior_pack and behavior_pack.rumor_topics and enable_rumor:
+        rumor_engine = RumorDynamicsEngine(pop, behavior_pack.rumor_topics, social_network)
+        compliance_engine = DynamicComplianceEngine(pop, behavior_pack.compliance_weights, social_network)
+        for t in behavior_pack.rumor_topics:
+            daily_rumor_beliefs[t.id] = np.zeros(horizon, dtype=np.float32)
+
+    # 6. Initialize agent states & dwell times
     states = np.full(pop.n_agents, state_graph.idx_S, dtype=np.int16)
     dwell_remaining = np.zeros(pop.n_agents, dtype=np.float32)
     unserved_days = np.zeros(pop.n_agents, dtype=np.int16)
@@ -199,7 +227,7 @@ def run_simulation(
     individual_k = rng.gamma(shape=k_param, scale=1.0, size=pop.n_agents).astype(np.float32)
     individual_k /= max(1e-6, np.mean(individual_k))
 
-    # 6. Seeding
+    # 7. Seeding
     seeding = scenario_pack.seeding
     seeded_state_idx = state_graph.name_to_idx.get(seeding.seeded_state, state_graph.name_to_idx.get("I_symp", 1))
 
@@ -216,9 +244,7 @@ def run_simulation(
         state_graph.idx_S, seeded_state_idx, n_seed, rng
     )
 
-    horizon = scenario_pack.horizon_days
     n_states = state_graph.n_states
-
     daily_state_counts = np.zeros((horizon, n_states), dtype=np.int32)
     daily_area_infections = np.zeros((horizon, n_areas), dtype=np.int32)
     daily_hospital_demand = np.zeros(horizon, dtype=np.int32)
@@ -232,10 +258,13 @@ def run_simulation(
 
     total_overflow_deaths = 0
 
-    # 7. Day-by-day stepping loop
+    # 8. Day-by-day stepping loop
     for day in range(horizon):
-        # A. Resolve active interventions and resource additions for the day
+        # A. Resolve active interventions, corrections, and resource additions
         layer_scalings = {"home": 1.0, "school": 1.0, "work": 1.0, "community": 1.0}
+        active_corrections: Dict[str, float] = {}
+        area_enforcements = np.zeros(n_areas, dtype=np.float32)
+
         for iv in scenario_pack.interventions:
             if iv.start_day <= day <= iv.end_day:
                 scale_val = max(0.0, 1.0 - iv.stringency)
@@ -245,12 +274,52 @@ def run_simulation(
                     layer_scalings["work"] = min(layer_scalings["work"], scale_val)
                 elif iv.measure_type in ("curfew", "market_closure"):
                     layer_scalings["community"] = min(layer_scalings["community"], scale_val)
+                elif iv.measure_type == "correction_campaign":
+                    eff = float(iv.parameters.get("efficacy", 0.40) * iv.stringency)
+                    tid = iv.parameters.get("topic_id", "all")
+                    if tid == "all" and behavior_pack:
+                        for top in behavior_pack.rumor_topics:
+                            active_corrections[top.id] = max(active_corrections.get(top.id, 0.0), eff)
+                    else:
+                        active_corrections[tid] = max(active_corrections.get(tid, 0.0), eff)
+
+                # Enforcement tracking
+                aid_int = pop.area_id_to_int.get(iv.area_id, -1)
+                if aid_int >= 0:
+                    area_enforcements[aid_int] = max(area_enforcements[aid_int], iv.stringency)
+                elif iv.area_id == "ALL":
+                    area_enforcements.fill(max(float(np.max(area_enforcements)), iv.stringency))
 
         for res_add in scenario_pack.resource_adds:
             if res_add.start_day == day and day > 0:
                 resource_system.apply_resource_addition(res_add)
 
-        # B. Healthcare allocation & unserved outcomes (Spec 6.2 & 6.3)
+        # B. Step Rumor and Dynamic Compliance Engines (Spec 7 & 8)
+        daily_mean_compliance[day] = float(np.mean(pop.compliance))
+        if rumor_engine and compliance_engine:
+            # Step rumor dynamics
+            rumor_tele = rumor_engine.step_day(day, active_corrections, rng)
+            for tid, stat in rumor_tele.items():
+                if tid in daily_rumor_beliefs:
+                    daily_rumor_beliefs[tid][day] = stat["mean_belief"]
+
+            # Area incident rates for local risk perception
+            recent_infections = daily_area_infections[max(0, day - 7):day + 1].sum(axis=0) if day > 0 else np.zeros(n_areas)
+            area_pops = np.bincount(pop.area_id, minlength=n_areas)
+            area_rates = recent_infections / np.maximum(1, area_pops)
+
+            # Step dynamic compliance
+            pop.compliance = compliance_engine.step_day(
+                area_enforcements, area_rates.astype(np.float32), rumor_engine.beliefs
+            )
+            daily_mean_compliance[day] = float(np.mean(pop.compliance))
+
+            # Apply rumor behavioral distortions
+            mask_red, iso_red = rumor_engine.compute_behavior_distortions()
+            # Distortions scale community contact and decrease isolation
+            layer_scalings["community"] *= float(1.0 + 0.20 * np.mean(mask_red))
+
+        # C. Healthcare allocation & unserved outcomes (Spec 6.2 & 6.3)
         care_mask = state_graph.needs_care[states]
         agent_adverse_probs: Optional[np.ndarray] = None
 
@@ -272,7 +341,6 @@ def run_simulation(
                 p_served_adverse=p_served_ref
             )
 
-            # Accumulate unserved days
             unserved_now = (service_levels == 0.0)
             unserved_days[care_indices[unserved_now]] += 1
             unserved_days[care_indices[~unserved_now]] = 0
@@ -280,11 +348,10 @@ def run_simulation(
             agent_adverse_probs = np.full(pop.n_agents, 0.05, dtype=np.float32)
             agent_adverse_probs[care_indices] = adverse_probs
 
-            # Track excess deaths due to unserved overflow
             excess_adverse = np.maximum(0.0, adverse_probs - p_served_ref)
             total_overflow_deaths += int(np.sum(excess_adverse > 0.05))
 
-        # C. Dwell time countdown and state transitions
+        # D. Dwell time countdown and state transitions
         non_absorbing = ~state_graph.is_absorbing[states] & (states != state_graph.idx_S)
         dwell_remaining[non_absorbing] -= 1.0
         expired_mask = non_absorbing & (dwell_remaining <= 0.0)
@@ -306,7 +373,7 @@ def run_simulation(
                 states[group_mask] = next_st
                 dwell_remaining[group_mask] = new_dwell
 
-        # D. Evaluate new infections (S -> E)
+        # E. Evaluate new infections (S -> E)
         newly_infected = evaluate_daily_infections(
             pop, state_graph, states, calib_beta,
             layer_weights, layer_scalings, individual_k, rng,
@@ -325,10 +392,13 @@ def run_simulation(
             counts_by_aid = np.bincount(inf_areas, minlength=n_areas)
             daily_area_infections[day, :] = counts_by_aid[:n_areas]
 
-        # E. Record daily telemetry
+        # F. Record daily telemetry
         daily_state_counts[day, :] = np.bincount(states, minlength=n_states)[:n_states]
         daily_hospital_demand[day] = int(np.sum(state_graph.needs_bed[states] == 1))
         daily_icu_demand[day] = int(np.sum(state_graph.needs_bed[states] == 3))
+
+    # Restore pop baseline compliance to prevent mutative side effects
+    pop.compliance = saved_compliance
 
     init_s = pop.n_agents - n_seed
     final_s = daily_state_counts[-1, state_graph.idx_S]
@@ -367,5 +437,52 @@ def run_simulation(
         total_deaths=total_deaths,
         attack_rate=attack_rate,
         overflow_deaths=total_overflow_deaths,
+        daily_mean_compliance=daily_mean_compliance,
+        daily_rumor_beliefs=daily_rumor_beliefs,
         manifest=manifest
     )
+
+
+def run_counterfactual_rumor_analysis(
+    pop: PopulationSoA,
+    disease_pack: DiseasePack,
+    scenario_pack: ScenarioPack,
+    behavior_pack: BehaviorPack,
+    n_seeds: int = 5
+) -> Dict[str, Any]:
+    """Execute paired counterfactual evaluation comparing runs with and without misinformation (Spec 7.4).
+
+    Returns:
+        delta_deaths: array of (deaths_with_rumor - deaths_without_rumor)
+        mean_delta_deaths: float
+        ci_lower: float 95% CI
+        ci_upper: float 95% CI
+    """
+    deltas = []
+    base_seed = scenario_pack.random_seed
+
+    for s_idx in range(n_seeds):
+        scen_run = scenario_pack.model_copy(deep=True)
+        scen_run.random_seed = base_seed + s_idx * 17
+
+        # 1. Run with rumor active
+        res_with = run_simulation(pop, disease_pack, scen_run, behavior_pack=behavior_pack, enable_rumor=True)
+
+        # 2. Run counterfactual with rumor disabled (same seed)
+        res_without = run_simulation(pop, disease_pack, scen_run, behavior_pack=behavior_pack, enable_rumor=False)
+
+        diff = res_with.total_deaths - res_without.total_deaths
+        deltas.append(diff)
+
+    deltas_arr = np.array(deltas, dtype=np.float64)
+    mean_diff = float(np.mean(deltas_arr))
+    std_diff = float(np.std(deltas_arr, ddof=1)) if len(deltas) > 1 else 0.0
+    se = std_diff / np.sqrt(len(deltas))
+
+    return {
+        "deltas": deltas,
+        "mean_delta_deaths": mean_diff,
+        "ci_lower": mean_diff - 1.96 * se,
+        "ci_upper": mean_diff + 1.96 * se,
+        "deaths_attributable_to_rumor": int(round(max(0.0, mean_diff)))
+    }

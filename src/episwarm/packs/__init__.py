@@ -8,7 +8,8 @@ from episwarm.packs.disease import (
     VulnerabilityFactor, VulnerabilityEffects, UnservedOutcomeConfig
 )
 from episwarm.packs.behavior import (
-    BehaviorPack, DecisionQuestion, QuestionType, TraitDistribution
+    BehaviorPack, DecisionQuestion, QuestionType, TraitDistribution,
+    RumorTopic, RumorBehaviorEffects, ComplianceWeights
 )
 from episwarm.packs.scenario import (
     ScenarioPack, SeedingConfig, InterventionAction, TargetObjective, ResourceAddAction

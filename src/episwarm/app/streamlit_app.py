@@ -219,6 +219,18 @@ elif step == "4. Interventions & Scenario":
         st.subheader("Optimization Targets")
         st.json(s_dict.get("objectives", {}))
 
+        with st.expander("Rumor, Misinformation & Dynamic Compliance Settings (Spec 7 & 8)", expanded=True):
+            st.markdown("Configure misinformation topics, peer network dynamics, and official correction campaigns:")
+            b_path = Path("behavior/default.yaml")
+            if b_path.exists():
+                with open(b_path, "r", encoding="utf-8") as bf:
+                    b_dict = yaml.safe_load(bf)
+                topics = b_dict.get("rumor_topics", [])
+                st.write("Active Misinformation Topics:")
+                st.dataframe(pd.DataFrame(topics))
+                st.write("Compliance Weights & Fatigue Parameters:")
+                st.json(b_dict.get("compliance_weights", {}))
+
 # --- STEP 5: SIMULATION ENGINE ---
 elif step == "5. Simulation Engine":
     st.header("Step 5: Run Outbreak Simulation")
@@ -248,7 +260,11 @@ elif step == "5. Simulation Engine":
             s_pack = ScenarioPack(**s_data)
 
         with st.spinner("Stepping through epidemic progression day by day..."):
-            res = run_simulation(st.session_state.pop_soa, d_pack, s_pack)
+            b_pack = None
+            if Path("behavior/default.yaml").exists():
+                with open("behavior/default.yaml", "r", encoding="utf-8") as bf:
+                    b_pack = BehaviorPack(**yaml.safe_load(bf))
+            res = run_simulation(st.session_state.pop_soa, d_pack, s_pack, behavior_pack=b_pack)
             st.session_state.sim_results = res
             st.success("Simulation finished!")
 
@@ -261,6 +277,19 @@ elif step == "5. Simulation Engine":
         df_curves["day"] = np.arange(len(df_curves))
         fig = px.line(df_curves, x="day", y=res.state_names, title="Epidemic Compartment Dynamics (State Trajectories)")
         st.plotly_chart(fig, use_container_width=True)
+
+        if res.daily_mean_compliance is not None:
+            col_b1, col_b2 = st.columns(2)
+            with col_b1:
+                df_comp = pd.DataFrame({"day": np.arange(len(res.daily_mean_compliance)), "compliance": res.daily_mean_compliance})
+                fig_comp = px.line(df_comp, x="day", y="compliance", title="Public Policy Compliance Over Time (with Fatigue & Norms)")
+                st.plotly_chart(fig_comp, use_container_width=True)
+            with col_b2:
+                if res.daily_rumor_beliefs:
+                    df_rumor = pd.DataFrame(res.daily_rumor_beliefs)
+                    df_rumor["day"] = np.arange(len(df_rumor))
+                    fig_rumor = px.line(df_rumor, x="day", y=list(res.daily_rumor_beliefs.keys()), title="Mean Rumor Belief Over Time Across Social Network")
+                    st.plotly_chart(fig_rumor, use_container_width=True)
 
 # --- STEP 6: ANALYSIS & EQUITY ---
 elif step == "6. Analysis & Equity":

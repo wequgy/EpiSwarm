@@ -8,8 +8,8 @@ This audit records the factual implementation status of all requirements across 
 
 | Capability | Status | Current Code Location | Test Coverage | Evidence & Audit Assessment |
 |---|---|---|---|---|
-| **1. Rumor & Misinformation Layer** | **PARTIAL / STUBBED** | `src/episwarm/population/traits.py` (line 14), `behavior/default.yaml` | `tests/test_behavior_phase4.py` | Agent `rumor_susceptibility` trait and topic parameters exist; dynamic network propagation ($A \cdot \text{share}_k$, sparse adjacency matrix, belief dynamics, correction campaigns per Spec Section 7) is **scheduled for Phase 11**. |
-| **2. Dynamic Compliance Model** | **PARTIAL / STUBBED** | `src/episwarm/population/traits.py`, `src/episwarm/engine/infection.py` | `tests/test_healthcare_phase3.py` | Static compliance trait and linear scaling exist; dynamic fatigue accumulation, social norm feedback ($w_{\text{norm}}$), and rumor erosion (Spec Section 8) are **scheduled for Phase 11**. |
+| **1. Rumor & Misinformation Layer** | **IMPLEMENTED** | `src/episwarm/behavior/network.py`, `src/episwarm/behavior/rumor.py` | `tests/test_rumor_compliance_phase11.py` | Sparse CSR network $A \cdot \text{share}_k$, sharing trials, saturating exposure $f(\text{exp})$, official correction campaigns, behavioral distortions, and counterfactual paired-seed CI analysis. |
+| **2. Dynamic Compliance Model** | **IMPLEMENTED** | `src/episwarm/behavior/compliance.py` | `tests/test_rumor_compliance_phase11.py` | Dynamic compliance $c_i(t)$ incorporating base traits, risk perception, peer network norm ($A \cdot c$), area enforcement, policy fatigue accumulation/recovery, and rumor erosion ($\kappa \cdot \text{belief}$). |
 | **3. Sanitation & Environment Inputs** | **IMPLEMENTED** | `src/episwarm/engine/infection.py`, `regions/example_synthetic/environment.csv` | `tests/test_core_model_phase10.py` | `environment.csv` schema and `environment_modifiers` implemented. Household transmission scales with `persons_per_room` crowding. Verified in Phase 10 suite. |
 | **4. Disease-Specific Vulnerability Factors** | **IMPLEMENTED** | `src/episwarm/packs/disease.py`, `src/episwarm/population/build.py` | `tests/test_core_model_phase10.py` | `VulnerabilityFactor` schemas, `risk_factors.csv` contract, uint32 bitmasks, and logit-scale odds ratios ($\text{logit}(p') = \text{logit}(p) + \log(\text{OR})$) fully operational. |
 | **5. Individual-Factor Outcomes for Unserved Patients** | **IMPLEMENTED** | `src/episwarm/engine/resources.py` | `tests/test_core_model_phase10.py` | Spec 6.3 multi-factor formula ($\theta_0, \theta_{\text{sev}}, \theta_{\text{care}}, \theta_{\text{sup}}, \theta_{\text{alt}}, \theta_{\text{delay}}$) verified: $\theta_0 = 0 \implies$ unserved equals served; high $\theta_{\text{care}} \implies$ low self-care agents suffer worse outcomes under identical overflow. |
@@ -46,9 +46,9 @@ This audit records the factual implementation status of all requirements across 
 ## 3. Real Test & Benchmark Evidence
 
 ### 3.1 Test Suite Summary Line
-- **Test Files**: 11 test files (`test_packs_phase0.py`, `test_population_phase1.py`, `test_engine_phase2.py`, `test_healthcare_phase3.py`, `test_behavior_phase4.py`, `test_analysis_phase5.py`, `test_advisor_optimizer_phase6.py`, `test_app_calibration_phase7_8.py`, `test_policy_local.py`, `test_app_headless.py`, `test_core_model_phase10.py`).
-- **Individual Test Functions**: **50 total test functions** across all files.
-- **pytest Output**: `50 passed in 25.44s` (100% green).
+- **Test Files**: 12 test files (`test_packs_phase0.py`, `test_population_phase1.py`, `test_engine_phase2.py`, `test_healthcare_phase3.py`, `test_behavior_phase4.py`, `test_analysis_phase5.py`, `test_advisor_optimizer_phase6.py`, `test_app_calibration_phase7_8.py`, `test_policy_local.py`, `test_app_headless.py`, `test_core_model_phase10.py`, `test_rumor_compliance_phase11.py`).
+- **Individual Test Functions**: **55 total test functions** across all files.
+- **pytest Output**: `55 passed in 30.12s` (100% green).
 
 ### 3.2 Benchmark Output (`python scripts/benchmark.py`)
 ```
