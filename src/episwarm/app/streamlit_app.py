@@ -11,7 +11,7 @@ import plotly.graph_objects as go
 
 from episwarm.packs.region import RegionPack, RegionMeta, L0QuickInputs
 from episwarm.packs.disease import DiseasePack
-from episwarm.packs.scenario import ScenarioPack, InterventionAction, SeedingConfig
+from episwarm.packs.scenario import ScenarioPack, InterventionAction, SeedingConfig, ResourceAddAction
 from episwarm.packs.behavior import BehaviorPack
 from episwarm.importers.quick_region import QuickRegionBuilder
 from episwarm.importers.mapper import ColumnMapper
@@ -25,6 +25,8 @@ from episwarm.analysis.equity import evaluate_equity
 from episwarm.analysis.spread_matrix import compute_spread_matrix
 from episwarm.analysis.metrics import evaluate_single_run_objectives
 from episwarm.analysis.calibration import calibrate_to_observed_data
+from episwarm.analysis.marginal_value import compute_marginal_value_curve, rank_areas_by_marginal_benefit
+from episwarm.analysis.resource_whatif import evaluate_resource_whatif_paired
 
 # Page config
 st.set_page_config(
@@ -47,7 +49,15 @@ with col_b2:
 with col_b3:
     st.error("🛡️ BEHAVIOR LAYER UNVALIDATED: LLM-driven compliance is hypothetical.")
 
-# Sidebar navigation
+# Sidebar navigation & Mode Selector (Spec 3.1)
+st.sidebar.header("Studio Mode")
+studio_mode = st.sidebar.radio(
+    "Active Mode",
+    ["Simulate (Exploration)", "Plan (Advisory & Optimization)"],
+    index=0
+)
+st.sidebar.caption("Neither mode predicts outbreak timing. All comparisons are counterfactual.")
+
 st.sidebar.header("Workflow Steps")
 step = st.sidebar.radio(
     "Navigation",
@@ -201,6 +211,64 @@ elif step == "3. Healthcare & Capacity":
     else:
         st.info("No resources.csv or capacity.csv present. Defaulting to standard generic clinical resources.")
 
+    # --- ADD RESOURCES (WHAT-IF) PANEL (Spec 6.4) ---
+    with st.expander("Add Resources & What-If Capacity Planning (Spec 6.4)", expanded=True):
+        st.subheader("What-If Scenario: Provision Extra Clinical Resources")
+        col_w1, col_w2, col_w3 = st.columns(3)
+        with col_w1:
+            whatif_res = st.text_input("Resource ID", "res_bed")
+        with col_w2:
+            whatif_area = st.text_input("Target Area ('ALL' or area_id)", "ALL")
+        with col_w3:
+            whatif_amt = st.number_input("Units to Provision", value=20.0, step=5.0)
+
+        col_wb1, col_wb2 = st.columns(2)
+        with col_wb1:
+            if st.button("Evaluate Resource What-If (Paired Comparison)"):
+                if st.session_state.pop_soa is None:
+                    st.session_state.pop_soa = build_synthetic_population(st.session_state.region_dir, scale_agents=st.session_state.pop_scale)
+                with open("diseases/respiratory_generic.yaml", "r", encoding="utf-8") as df:
+                    d_pack = DiseasePack(**yaml.safe_load(df))
+                with open("scenarios/baseline.yaml", "r", encoding="utf-8") as sf:
+                    s_pack = ScenarioPack(**yaml.safe_load(sf))
+
+                action = ResourceAddAction(resource_id=whatif_res, area_id=whatif_area, amount=float(whatif_amt))
+                res_df = pd.read_csv(res_file) if res_file.exists() else None
+
+                try:
+                    report = evaluate_resource_whatif_paired(
+                        st.session_state.pop_soa, d_pack, s_pack, [action], resources_df=res_df, n_paired_seeds=4
+                    )
+                    st.success("Paired counterfactual evaluation completed!")
+                    st.write("#### Paired Delta Comparison (Variant vs Baseline):")
+                    st.write(f"- **Deaths Reduction:** {report['deaths_delta']['mean']:.1f} (95% CI: [{report['deaths_delta']['ci_lower']:.1f}, {report['deaths_delta']['ci_upper']:.1f}])")
+                    st.write(f"- **Overflow Fatalities Delta:** {report['overflow_deaths_delta']['mean']:.1f}")
+                    st.write(f"- **Unmet Demand Delta:** {report['unmet_demand_delta']['mean']:.1f}")
+                    st.write(f"- **Disparity Gap Delta:** {report['equity_gap_delta']['mean']*100:.2f}%")
+                except ValueError as e:
+                    st.error(str(e))
+
+        with col_wb2:
+            if st.button("Compute Marginal Value Curve & Best Area"):
+                if st.session_state.pop_soa is None:
+                    st.session_state.pop_soa = build_synthetic_population(st.session_state.region_dir, scale_agents=st.session_state.pop_scale)
+                with open("diseases/respiratory_generic.yaml", "r", encoding="utf-8") as df:
+                    d_pack = DiseasePack(**yaml.safe_load(df))
+                with open("scenarios/baseline.yaml", "r", encoding="utf-8") as sf:
+                    s_pack = ScenarioPack(**yaml.safe_load(sf))
+
+                m_res = compute_marginal_value_curve(
+                    st.session_state.pop_soa, d_pack, s_pack, resource_id=whatif_res, area_id=whatif_area, step_units=10.0, max_units=40.0, n_paired_seeds=3
+                )
+                ranking = rank_areas_by_marginal_benefit(
+                    st.session_state.pop_soa, d_pack, s_pack, resource_id=whatif_res, test_units=15.0, n_paired_seeds=3
+                )
+                df_mv = pd.DataFrame([{"units": p.units_added, "deaths": p.mean_deaths, "marginal_benefit": p.marginal_death_reduction} for p in m_res.curve])
+                fig_mv = px.line(df_mv, x="units", y="marginal_benefit", title="Marginal Value Curve (Diminishing Returns)")
+                st.plotly_chart(fig_mv, use_container_width=True)
+                st.write(f"**Diminishing Returns Threshold:** ~{m_res.diminishing_returns_threshold_units:.0f} units")
+                st.write(f"**Best Area Ranking for Next Unit:** {ranking}")
+
 # --- STEP 4: INTERVENTIONS & SCENARIO ---
 elif step == "4. Interventions & Scenario":
     st.header("Step 4: Non-Pharmaceutical Interventions & Objectives")
@@ -324,6 +392,9 @@ elif step == "6. Analysis & Equity":
 # --- STEP 7: POLICY ADVISOR & OPTIMIZER ---
 elif step == "7. Policy Advisor & Optimizer":
     st.header("Step 7: Autonomous Policy Advisor & NSGA-II Optimizer")
+    if "Simulate" in studio_mode:
+        st.info("ℹ️ Currently in Simulate Mode. The Autonomous Advisor is primary in Plan Mode. Switch to 'Plan (Advisory & Optimization)' in the sidebar for focused decision support.")
+
     tab_adv, tab_opt = st.tabs(["Advisor Agent", "Optuna NSGA-II Pareto Front"])
 
     with tab_adv:

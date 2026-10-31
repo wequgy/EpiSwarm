@@ -14,7 +14,7 @@ This audit records the factual implementation status of all requirements across 
 | **4. Disease-Specific Vulnerability Factors** | **IMPLEMENTED** | `src/episwarm/packs/disease.py`, `src/episwarm/population/build.py` | `tests/test_core_model_phase10.py` | `VulnerabilityFactor` schemas, `risk_factors.csv` contract, uint32 bitmasks, and logit-scale odds ratios ($\text{logit}(p') = \text{logit}(p) + \log(\text{OR})$) fully operational. |
 | **5. Individual-Factor Outcomes for Unserved Patients** | **IMPLEMENTED** | `src/episwarm/engine/resources.py` | `tests/test_core_model_phase10.py` | Spec 6.3 multi-factor formula ($\theta_0, \theta_{\text{sev}}, \theta_{\text{care}}, \theta_{\text{sup}}, \theta_{\text{alt}}, \theta_{\text{delay}}$) verified: $\theta_0 = 0 \implies$ unserved equals served; high $\theta_{\text{care}} \implies$ low self-care agents suffer worse outcomes under identical overflow. |
 | **6. Per-Agent Life Histories & Routines** | **IMPLEMENTED** | `src/episwarm/population/build.py` | `tests/test_core_model_phase10.py` | `PopulationSoA` stores structured facts (`income_band`, `household_role`, `caregiver`, `financial_buffer`, `past_bereavement`, `routine_template`, `pref_market_id`, `pref_leisure_id`, `self_care`, `support`). Showcase biographies generated with `[GENERATED NARRATIVE - SYNTHETIC DATA ONLY]`. |
-| **7. Resource What-If & Generic Resources** | **IMPLEMENTED** | `src/episwarm/engine/resources.py`, `src/episwarm/packs/scenario.py` | `tests/test_core_model_phase10.py` | Zero instances of "oxygen" or hardcoded resource names in `src/`. Generic `resources.csv` contract and `ResourceAddAction` with `upper_cap_of_extra` enforcement verified. |
+| **7. Resource What-If & Generic Resources** | **IMPLEMENTED** | `src/episwarm/engine/resources.py`, `src/episwarm/analysis/resource_whatif.py`, `src/episwarm/analysis/marginal_value.py` | `tests/test_resource_whatif_phase12.py` | Zero instances of "oxygen" in `src/`. `resources.csv` contract, `ResourceAddAction` with `upper_cap_of_extra` bounds, paired-seed delta reports with 95% CI, diminishing returns curves, best-area ranking, and Studio panel. |
 | **8. Social-Space Venues** | **IMPLEMENTED** | `src/episwarm/population/venues.py` | `tests/test_core_model_phase10.py` | Instantiates discrete school, workplace, market, leisure, and worship venues. Assigns persistent preferred market and leisure venues per agent for tie stability across days. |
 
 ---
@@ -46,9 +46,9 @@ This audit records the factual implementation status of all requirements across 
 ## 3. Real Test & Benchmark Evidence
 
 ### 3.1 Test Suite Summary Line
-- **Test Files**: 12 test files (`test_packs_phase0.py`, `test_population_phase1.py`, `test_engine_phase2.py`, `test_healthcare_phase3.py`, `test_behavior_phase4.py`, `test_analysis_phase5.py`, `test_advisor_optimizer_phase6.py`, `test_app_calibration_phase7_8.py`, `test_policy_local.py`, `test_app_headless.py`, `test_core_model_phase10.py`, `test_rumor_compliance_phase11.py`).
-- **Individual Test Functions**: **55 total test functions** across all files.
-- **pytest Output**: `55 passed in 30.12s` (100% green).
+- **Test Files**: 13 test files (`test_packs_phase0.py`, `test_population_phase1.py`, `test_engine_phase2.py`, `test_healthcare_phase3.py`, `test_behavior_phase4.py`, `test_analysis_phase5.py`, `test_advisor_optimizer_phase6.py`, `test_app_calibration_phase7_8.py`, `test_policy_local.py`, `test_app_headless.py`, `test_core_model_phase10.py`, `test_rumor_compliance_phase11.py`, `test_resource_whatif_phase12.py`).
+- **Individual Test Functions**: **58 total test functions** across all files.
+- **pytest Output**: `58 passed in 44.17s` (100% green).
 
 ### 3.2 Benchmark Output (`python scripts/benchmark.py`)
 ```
