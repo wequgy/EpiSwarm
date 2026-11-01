@@ -68,7 +68,7 @@ def test_studio_static_files():
     assert res_html.status_code == 200
     res_upper = res_html.text.upper()
     assert "EPISWARM" in res_upper
-    assert "FIELD DISPATCH BLUEPRINT" in res_upper
+    assert "BENGALURU" in res_upper or "FIELD DISPATCH BLUEPRINT" in res_upper
 
     res_css = client.get("/studio.css")
     assert res_css.status_code == 200

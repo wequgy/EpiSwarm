@@ -159,7 +159,14 @@ def run_studio_simulation(req: SimulationRequest):
                 "rumor_belief": r_belief
             })
 
-        # District summaries
+        # District summaries mapped to Bengaluru Zones
+        bangalore_zone_names = {
+            "A01": "Central Zone (Majestic / KR Market)",
+            "A02": "East Tech Corridor (Whitefield / ORR)",
+            "A03": "South Sector (Koramangala / Electronic City)",
+            "A04": "North Sector (Malleswaram / Manyata)"
+        }
+
         district_summaries = {}
         for aid, a_idx in pop.area_id_to_int.items():
             d_pop = int(np.sum(pop.area_id == a_idx))
@@ -167,26 +174,26 @@ def run_studio_simulation(req: SimulationRequest):
             final_s = int(res.daily_state_counts[-1, 0] * frac)
             final_inf = d_pop - final_s
             ar = float(round(final_inf / max(1, d_pop), 4))
+            zone_label = bangalore_zone_names.get(aid, f"Ward {aid}")
             district_summaries[aid] = {
-                "name": f"District {aid}",
+                "name": zone_label,
+                "district_id": aid,
                 "population": d_pop,
                 "attack_rate": ar,
                 "infections": final_inf,
                 "icu_peak": int(np.max(res.daily_icu_demand) * frac)
             }
 
-        # Hospital Saturation Metrics
+        # Bangalore Hospital Saturation Metrics
         peak_icu = int(np.max(res.daily_icu_demand))
-        licensed_beds = 620
-        icu_capacity = 85
-        st_jude_pct = min(100, int(round((peak_icu * 0.55 / 45) * 100)))
-        mercy_pct = min(100, int(round((peak_icu * 0.30 / 25) * 100)))
-        westside_pct = min(100, int(round((peak_icu * 0.15 / 15) * 100)))
+        vic_pct = min(100, int(round((peak_icu * 0.55 / 45) * 100)))
+        manipal_pct = min(100, int(round((peak_icu * 0.30 / 25) * 100)))
+        bowring_pct = min(100, int(round((peak_icu * 0.15 / 15) * 100)))
 
         hospitals = [
-            {"name": "St. Jude General", "occupancy_pct": st_jude_pct, "overflow_risk": st_jude_pct >= 90},
-            {"name": "Memorial Mercy", "occupancy_pct": mercy_pct, "overflow_risk": mercy_pct >= 90},
-            {"name": "Westside Clinic", "occupancy_pct": westside_pct, "overflow_risk": westside_pct >= 90}
+            {"name": "Victoria Hospital (Majestic)", "occupancy_pct": vic_pct, "overflow_risk": vic_pct >= 90, "beds": 45},
+            {"name": "Manipal Hospital (Old Airport Rd)", "occupancy_pct": manipal_pct, "overflow_risk": manipal_pct >= 90, "beds": 25},
+            {"name": "Bowring & Lady Curzon Hospital", "occupancy_pct": bowring_pct, "overflow_risk": bowring_pct >= 90, "beds": 15}
         ]
 
         # Sample Agents for Visual Display
@@ -250,11 +257,11 @@ def get_current_results():
 def get_showcase_agents(limit: int = 5):
     """Retrieve detailed showcase agent biographies."""
     showcase_roles = [
-        {"name": "Dr. Sarah Chen", "role": "ICU Physician", "district": "District A01", "biography": "[GENERATED NARRATIVE - SYNTHETIC DATA ONLY] Resident in Sector 04 coordinating critical care surge capacity. Strict adherence to N95 protocols."},
-        {"name": "Marcus Vance", "role": "High School Instructor", "district": "District A01", "biography": "[GENERATED NARRATIVE - SYNTHETIC DATA ONLY] Navigating school closure mandates and hybrid attendance schedules across urban wards."},
-        {"name": "Aisha Patel", "role": "Transit Logistics Lead", "district": "District A02", "biography": "[GENERATED NARRATIVE - SYNTHETIC DATA ONLY] Municipal worker monitoring inter-district commuter corridors during peak exposure windows."},
-        {"name": "Kenji Sato", "role": "Marketplace Merchant", "district": "District A02", "biography": "[GENERATED NARRATIVE - SYNTHETIC DATA ONLY] Small business owner observing peer mask adherence and local mobility shifts."},
-        {"name": "David Miller", "role": "Civic Volunteer", "district": "District A01", "biography": "[GENERATED NARRATIVE - SYNTHETIC DATA ONLY] High-risk senior citizen practicing early voluntary isolation upon municipal advisory notices."}
+        {"name": "Dr. Ananya Rao", "role": "Chief Epidemiologist", "district": "Central (Victoria Hospital)", "biography": "[GENERATED NARRATIVE - SYNTHETIC DATA ONLY] Coordinating critical care surge capacity and ICU triage at Victoria Hospital during metro outbreak peak."},
+        {"name": "Vikram Kulkarni", "role": "Tech Lead & Commuter", "district": "East Corridor (Whitefield)", "biography": "[GENERATED NARRATIVE - SYNTHETIC DATA ONLY] Software architect commuting daily along the Namma Metro Purple Line corridor between Indiranagar and ITPL Whitefield."},
+        {"name": "Pooja Hegde", "role": "School Principal", "district": "North Zone (Malleswaram)", "biography": "[GENERATED NARRATIVE - SYNTHETIC DATA ONLY] Managing hybrid attendance compliance and sanitation advisories across North Bengaluru K-12 educational wards."},
+        {"name": "Syed Farooq", "role": "Wholesale Merchant", "district": "Central (KR Market)", "biography": "[GENERATED NARRATIVE - SYNTHETIC DATA ONLY] Essential trader in KR Flower & Vegetable Market monitoring merchant crowd density and mask adherence."},
+        {"name": "Ramesh Gowda", "role": "Metro Operations Lead", "district": "Majestic Station Interchange", "biography": "[GENERATED NARRATIVE - SYNTHETIC DATA ONLY] Transit supervisor managing high-volume passenger boarding gates at Kempegowda Majestic Interchange."}
     ]
     return showcase_roles[:limit]
 

@@ -1,11 +1,9 @@
-/* EpiSwarm Studio - Field Dispatch Blueprint (Google Stitch Neo-Brutalist Design System) */
+/* EpiSwarm Studio - Bengaluru Metropolitan Model (Clean Field Dispatch Blueprint) */
 @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;600;700;800&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200');
 
 :root {
   --bg-canvas: #E6EBF0;
-  --bg-surface: #F5FAFF;
-  --bg-card: #FFFFFF;
   --ink: #171c20;
   --ink-muted: #596168;
   --border-ink: 2px solid #171c20;
@@ -16,6 +14,8 @@
 
 * {
   box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
 body {
@@ -32,38 +32,12 @@ body {
   font-family: 'Space Mono', monospace !important;
 }
 
-/* Perspective Grid Floor from Stitch */
-.grid-perspective {
-  background-size: 40px 40px;
+/* Blueprint Grid Texture */
+.blueprint-grid {
+  background-size: 32px 32px;
   background-image: 
-    linear-gradient(to right, rgba(23, 28, 32, 0.08) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(23, 28, 32, 0.08) 1px, transparent 1px);
-}
-
-/* Pulsing Transmission Vectors */
-.pulse-link {
-  stroke-dasharray: 4, 4;
-  animation: dashmove 1.4s linear infinite;
-}
-
-@keyframes dashmove {
-  to {
-    stroke-dashoffset: -16;
-  }
-}
-
-/* Character Sway Motion */
-@keyframes floatAgent {
-  0%, 100% { transform: translate(-50%, -50%) translateY(0px); }
-  50% { transform: translate(-50%, -50%) translateY(-4px); }
-}
-
-.agent-sway {
-  animation: floatAgent 3.5s ease-in-out infinite;
-}
-
-.agent-sway-delayed {
-  animation: floatAgent 4.2s ease-in-out infinite -1.8s;
+    linear-gradient(to right, rgba(23, 28, 32, 0.07) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(23, 28, 32, 0.07) 1px, transparent 1px);
 }
 
 /* Nav Tabs */
@@ -90,14 +64,63 @@ body {
 .view-panel {
   display: none;
   width: 100%;
-  height: calc(100vh - 58px);
 }
 
 .view-panel.active {
+  display: flex;
+}
+
+#view-scenario.active, #view-agents.active, #view-decision.active {
   display: block;
 }
 
-/* Scrubber Range Slider */
+/* Status Chips on Map Nodes */
+.status-chip {
+  font-family: 'Space Mono', monospace;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border: 1px solid #171c20;
+  text-transform: uppercase;
+}
+
+/* Policy Quick Toggle Chips in Bottom Scrubber */
+.policy-chip {
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border: 2px solid #171c20;
+  background: #FFFFFF;
+  color: #596168;
+  cursor: pointer;
+  transition: all 0.1s ease;
+}
+
+.policy-chip.active {
+  background: #bfe0f5;
+  color: #171c20;
+  box-shadow: 2px 2px 0px #171c20;
+}
+
+.policy-chip:active {
+  transform: translate(1px, 1px);
+  box-shadow: none;
+}
+
+/* Animated Metro / Commuter Transmission Vectors */
+.pulse-flow {
+  stroke-dasharray: 6 6;
+  animation: metroPulse 1.2s linear infinite;
+}
+
+@keyframes metroPulse {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+
+/* Timeline Range Input */
 input[type="range"] {
   -webkit-appearance: none;
   appearance: none;

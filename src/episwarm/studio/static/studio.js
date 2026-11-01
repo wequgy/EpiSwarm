@@ -1,6 +1,6 @@
 /**
- * EpiSwarm Studio - Field Dispatch Controller
- * Matches the Google Stitch Field Dispatch Blueprint UI.
+ * EpiSwarm Studio - Bengaluru Metropolitan Model Controller
+ * Clean, uncluttered, high-legibility interface connecting to FastAPI simulation backend.
  */
 
 const STATE = {
@@ -22,7 +22,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadShowcaseAgents();
 });
 
-// Navigation Tab Switching
+// Setup Navigation Tabs
 function setupNavigation() {
   document.querySelectorAll('.nav-tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -30,6 +30,12 @@ function setupNavigation() {
       switchTab(target);
     });
   });
+
+  const topRun = document.getElementById('btn-top-run-scenario');
+  if (topRun) topRun.addEventListener('click', () => switchTab('scenario'));
+
+  const sideAdvisor = document.getElementById('btn-sidebar-advisor');
+  if (sideAdvisor) sideAdvisor.addEventListener('click', () => switchTab('decision'));
 }
 
 function switchTab(tabId) {
@@ -53,7 +59,7 @@ async function loadSystemStatus() {
   try {
     const res = await fetch('/api/status');
     const data = await res.json();
-    console.log('[System Status]', data);
+    console.log('[System Status: Ready]', data);
   } catch (err) {
     console.warn('Backend status check error:', err);
   }
@@ -62,7 +68,7 @@ async function loadSystemStatus() {
 // Load or Run Default Simulation
 async function loadCurrentSimulation() {
   try {
-    showLoadingBanner('Synchronizing simulation telemetry...');
+    showLoadingBanner('Synchronizing Bengaluru simulation telemetry...');
     const res = await fetch('/api/current_results');
     const data = await res.json();
     STATE.simulationData = data;
@@ -105,21 +111,6 @@ function setupControls() {
     playBtn.addEventListener('click', togglePlayPause);
   }
 
-  // Speed Toggles
-  document.querySelectorAll('.speed-toggle-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.speed-toggle-btn').forEach(b => {
-        b.classList.remove('bg-[#bfe0f5]', 'font-bold');
-        b.classList.add('hover:bg-[#e4e9ee]');
-      });
-      btn.classList.add('bg-[#bfe0f5]', 'font-bold');
-      STATE.playSpeed = parseInt(btn.getAttribute('data-speed'), 10) || 1;
-      if (STATE.isPlaying) {
-        startPlayInterval();
-      }
-    });
-  });
-
   // Step buttons
   const stepPrev = document.getElementById('btn-bottom-step-prev');
   if (stepPrev) {
@@ -142,17 +133,7 @@ function setupControls() {
     });
   }
 
-  // Run Scenario triggers
-  const topRun = document.getElementById('btn-top-run-scenario');
-  if (topRun) topRun.addEventListener('click', () => switchTab('scenario'));
-
-  const commitRun = document.getElementById('btn-commit-run');
-  if (commitRun) commitRun.addEventListener('click', executeSimulation);
-
-  const bottomCommit = document.getElementById('btn-bottom-commit');
-  if (bottomCommit) bottomCommit.addEventListener('click', () => switchTab('scenario'));
-
-  // R0 slider
+  // Parameter Studio sliders
   const r0Slider = document.getElementById('param-r0');
   if (r0Slider) {
     r0Slider.addEventListener('input', (e) => {
@@ -162,7 +143,6 @@ function setupControls() {
     });
   }
 
-  // Compliance slider
   const compSlider = document.getElementById('param-compliance');
   if (compSlider) {
     compSlider.addEventListener('input', (e) => {
@@ -172,39 +152,18 @@ function setupControls() {
     });
   }
 
-  // Advisor CTA
+  // Commit Run
+  const commitRun = document.getElementById('btn-commit-run');
+  if (commitRun) commitRun.addEventListener('click', executeSimulation);
+
+  // Policy Advisor
   const advisorBtn = document.getElementById('btn-trigger-advisor');
   if (advisorBtn) advisorBtn.addEventListener('click', requestPolicyAdvisor);
 
-  // Intervention quick toggles in bottom dock
-  setupQuickToggles();
-}
-
-function setupQuickToggles() {
-  const toggles = [
-    { id: 'toggle-lockdown', labelOff: 'OFF', labelOn: 'ACTIVE' },
-    { id: 'toggle-schools', labelOff: 'OPEN', labelOn: 'ACTIVE' },
-    { id: 'toggle-masks', labelOff: 'ADVISORY', labelOn: 'ACTIVE' },
-    { id: 'toggle-vax', labelOff: 'STANDBY', labelOn: 'ACTIVE' },
-    { id: 'toggle-tracing', labelOff: 'STANDBY', labelOn: 'ACTIVE' },
-    { id: 'toggle-awareness', labelOff: 'QUEUED', labelOn: 'BROADCAST' }
-  ];
-
-  toggles.forEach(t => {
-    const el = document.getElementById(t.id);
-    if (!el) return;
-    el.addEventListener('click', () => {
-      const isActive = el.textContent === t.labelOn;
-      el.textContent = isActive ? t.labelOff : t.labelOn;
-      const parent = el.closest('div.border-2');
-      if (parent) {
-        if (!isActive) {
-          parent.classList.add('bg-[#bfe0f5]', 'shadow-[2px_2px_0px_#171c20]');
-        } else {
-          parent.classList.remove('bg-[#bfe0f5]', 'shadow-[2px_2px_0px_#171c20]');
-          parent.classList.add('bg-[#F8FAFC]');
-        }
-      }
+  // Policy Chips toggles
+  document.querySelectorAll('.policy-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      chip.classList.toggle('active');
     });
   });
 }
@@ -220,7 +179,7 @@ function togglePlayPause() {
 function startPlay() {
   STATE.isPlaying = true;
   const btn = document.getElementById('btn-play-pause');
-  if (btn) btn.innerHTML = '<span class="material-symbols-outlined text-base">pause</span>';
+  if (btn) btn.innerHTML = '<span class="material-symbols-outlined text-sm">pause</span><span>PAUSE</span>';
   startPlayInterval();
 }
 
@@ -228,12 +187,12 @@ function pausePlay() {
   STATE.isPlaying = false;
   clearInterval(STATE.playInterval);
   const btn = document.getElementById('btn-play-pause');
-  if (btn) btn.innerHTML = '<span class="material-symbols-outlined text-base">play_arrow</span>';
+  if (btn) btn.innerHTML = '<span class="material-symbols-outlined text-sm">play_arrow</span><span>PLAY</span>';
 }
 
 function startPlayInterval() {
   clearInterval(STATE.playInterval);
-  const intervalMs = Math.max(100, Math.floor(600 / STATE.playSpeed));
+  const intervalMs = Math.max(100, Math.floor(550 / STATE.playSpeed));
   const maxDay = STATE.simulationData ? STATE.simulationData.horizon_days - 1 : 29;
 
   STATE.playInterval = setInterval(() => {
@@ -256,47 +215,63 @@ function updateUI() {
   if (slider) slider.value = day;
 
   setElemText('current-day-label', `DAY ${dStr} OF 30`);
-  setElemText('header-clock-ticker', `DAY ${dStr} — 09:42:18 EST`);
-  setElemText('horizon-remaining-label', `HORIZON: ${Math.max(0, 30 - day)} DAYS REMAINING`);
+  setElemText('top-day-badge', `DAY ${dStr} OF 30`);
 
   if (!STATE.simulationData) return;
   const metrics = STATE.simulationData.daily_metrics || [];
   const current = metrics[day] || {};
 
-  // Vital Bento Metrics
-  setElemText('stat-active-cases', (current.active_cases || 0).toLocaleString());
-  setElemText('stat-reff', (STATE.simulationData.empirical_r0 || 2.42).toFixed(2));
-  
+  const activeCases = current.active_cases || 0;
+  const reff = (STATE.simulationData.empirical_r0 || 2.42).toFixed(2);
+
+  // Top header badges
+  setElemText('top-cases-badge', activeCases.toLocaleString());
+  setElemText('top-reff-badge', reff);
+
+  // Right Sidebar Metrics
+  setElemText('stat-active-cases', activeCases.toLocaleString());
+  setElemText('stat-reff', reff);
+
+  // Update Map Zones (Active cases proportionally mapped across Bengaluru sectors)
+  const centralActive = Math.round(activeCases * 0.42);
+  const eastActive = Math.round(activeCases * 0.32);
+  const southActive = Math.round(activeCases * 0.16);
+  const northActive = Math.max(0, activeCases - centralActive - eastActive - southActive);
+
+  const cumAR = ((STATE.simulationData.attack_rate || 0.40) * 100).toFixed(1);
+  const progressRatio = Math.min(1.0, (day + 1) / (STATE.simulationData.horizon_days || 30));
+  const curAR = (cumAR * progressRatio).toFixed(1);
+
+  setElemText('zone-central-active', centralActive.toLocaleString());
+  setElemText('zone-central-ar', `${curAR}%`);
+
+  setElemText('zone-east-active', eastActive.toLocaleString());
+  setElemText('zone-east-ar', `${(curAR * 0.95).toFixed(1)}%`);
+
+  setElemText('zone-south-active', southActive.toLocaleString());
+  setElemText('zone-south-ar', `${(curAR * 0.75).toFixed(1)}%`);
+
+  setElemText('zone-north-active', northActive.toLocaleString());
+  setElemText('zone-north-ar', `${(curAR * 0.65).toFixed(1)}%`);
+
+  // Bengaluru Hospital Saturation Meters
   const icuDemand = current.icu_demand || 0;
-  const licensedBeds = 85;
-  setElemText('stat-hospital-load', `${icuDemand} / ${licensedBeds}`);
-  const occPct = Math.min(100, Math.round((icuDemand / licensedBeds) * 100));
-  setElemText('stat-hospital-sub', `${occPct}% OCCUPANCY`);
+  const vicPct = Math.min(100, Math.round((icuDemand * 0.55 / 45) * 100));
+  const manipalPct = Math.min(100, Math.round((icuDemand * 0.30 / 25) * 100));
+  const bowringPct = Math.min(100, Math.round((icuDemand * 0.15 / 15) * 100));
 
-  setElemText('stat-recovered', (current.recovered || 0).toLocaleString());
-  const totalPop = STATE.simulationData.total_population || 5000;
-  const attRate = ((current.recovered || 0) / totalPop * 100).toFixed(1);
-  setElemText('stat-attack-rate', `${attRate}% POP`);
-
-  // Hospital Saturation Progress Bars
-  const stJude = Math.min(100, Math.round((icuDemand * 0.55 / 45) * 100));
-  const mercy = Math.min(100, Math.round((icuDemand * 0.30 / 25) * 100));
-  const westside = Math.min(100, Math.round((icuDemand * 0.15 / 15) * 100));
-
-  updateBar('meter-st-jude', 'meter-st-jude-pct', stJude, 'St. Jude General');
-  updateBar('meter-mercy', 'meter-mercy-pct', mercy, 'Memorial Mercy');
-  updateBar('meter-westside', 'meter-westside-pct', westside, 'Westside Clinic');
-
-  setElemText('tag-ward-beds', `WARD 7: ${stJude}% BEDS`);
+  updateHospitalBar('meter-victoria', 'meter-victoria-pct', vicPct, 45);
+  updateHospitalBar('meter-manipal', 'meter-manipal-pct', manipalPct, 25);
+  updateHospitalBar('meter-bowring', 'meter-bowring-pct', bowringPct, 15);
 
   // Update Dispatch Ledger
   updateDispatchLedger(day, current);
 
-  // Update Sparkline marker
+  // Update Sparkline
   renderSparkline();
 }
 
-function updateBar(barId, pctId, pct, name) {
+function updateHospitalBar(barId, pctId, pct, beds) {
   const bar = document.getElementById(barId);
   const text = document.getElementById(pctId);
   if (bar) {
@@ -304,7 +279,7 @@ function updateBar(barId, pctId, pct, name) {
     bar.className = 'h-full ' + (pct >= 90 ? 'bg-[#ba1a1a]' : (pct >= 70 ? 'bg-[#f59e0b]' : 'bg-[#436274]'));
   }
   if (text) {
-    text.textContent = pct >= 90 ? `${pct}% [OVERFLOW RISK]` : `${pct}%`;
+    text.textContent = pct >= 90 ? `${pct}% [OVERFLOW RISK]` : `${pct}% (${Math.round(beds * pct / 100)}/${beds} beds)`;
     text.className = 'font-bold ' + (pct >= 90 ? 'text-[#ba1a1a]' : 'text-[#171c20]');
   }
 }
@@ -314,23 +289,23 @@ function updateDispatchLedger(day, metric) {
   if (!container) return;
 
   const alerts = [
-    { day: 0, tag: 'INDEX CASE [08:00]', desc: 'Baseline case verified in Sector A01 residential ward. Contact tracing activated.', color: '#436274' },
-    { day: 4, tag: 'DENSITY SPIKE [08:15]', desc: 'Sector 4 transit hub crowd density spike (+34%). Secondary infection contact chains forming.', color: '#436274' },
-    { day: 8, tag: 'SURGE WARNING [11:20]', desc: 'St. Jude General ICU occupancy reaches critical warning threshold (72%).', color: '#f59e0b' },
-    { day: 11, tag: 'RUMOR SURGE [09:38]', desc: 'Mask misinformation viral post reaching 450+ agents in Ward 3. Skepticism rising.', color: '#ba1a1a' },
-    { day: 14, tag: 'INTERVENTION [14:00]', desc: 'Municipal K-12 school closure advisory enacted across District A01 & A02.', color: '#436274' },
-    { day: 18, tag: 'PEAK INFLECTION [16:45]', desc: `Peak epidemic demand. Unmet critical care requests: ${metric.unmet_demand || 0} beds.`, color: '#ba1a1a' },
-    { day: 24, tag: 'STABILIZATION [10:00]', desc: 'Effective R₀ drops below 1.0. Community viral clearance velocity accelerating.', color: '#059669' }
+    { day: 0, tag: 'INDEX CASE', desc: 'First clinical cluster reported near KR Wholesale Market. Primary contact tracing active.', color: '#436274' },
+    { day: 4, tag: 'METRO SURGE', desc: 'High commuter density detected on Namma Metro Purple Line (Majestic ↔ Indiranagar).', color: '#436274' },
+    { day: 8, tag: 'SURGE WARNING', desc: 'Victoria Hospital ICU bed occupancy passes 70% threshold. Triage protocol initiated.', color: '#f59e0b' },
+    { day: 11, tag: 'CONTAINMENT', desc: 'BBMP orders 50% passenger capacity cap on public bus and metro coaches.', color: '#436274' },
+    { day: 14, tag: 'TECH ADVISORY', desc: 'Outer Ring Road (ORR) and Whitefield IT campuses transition to mandatory WFH schedules.', color: '#436274' },
+    { day: 18, tag: 'PEAK TRANSMISSION', desc: `Peak epidemic demand. Unmet critical care requests: ${metric.unmet_demand || 0} beds.`, color: '#ba1a1a' },
+    { day: 25, tag: 'CLEARANCE', desc: 'Effective R_t drops below 1.0. Community viral clearance accelerating across South wards.', color: '#059669' }
   ];
 
   const visible = alerts.filter(a => a.day <= day);
   container.innerHTML = visible.map(a => `
-    <div class="border-2 border-[#171c20] p-2 bg-[#F8FAFC] shadow-[2px_2px_0px_#171c20]">
-      <div class="flex items-center justify-between text-[10px] font-bold mb-1" style="color: ${a.color};">
-        <span>${a.tag}</span>
-        <span class="material-symbols-outlined text-xs">info</span>
+    <div class="border border-[#171c20] p-1.5 bg-[#F8FAFC]">
+      <div class="flex items-center justify-between text-[9px] font-bold mb-0.5" style="color: ${a.color};">
+        <span>● ${a.tag}</span>
+        <span>DAY ${String(a.day).padStart(2, '0')}</span>
       </div>
-      <p class="text-xs text-[#171c20] leading-tight font-bold">${a.desc}</p>
+      <p class="text-[11px] text-[#171c20] leading-tight font-bold">${a.desc}</p>
     </div>
   `).join('');
 }
@@ -349,23 +324,23 @@ function renderSparkline() {
 
   const maxVal = Math.max(...metrics.map(m => m.active_cases || 1));
 
-  // Threshold ICU line
+  // ICU Capacity Threshold Line
   ctx.strokeStyle = '#ba1a1a';
-  ctx.setLineDash([4, 2]);
+  ctx.setLineDash([3, 2]);
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(0, 12);
-  ctx.lineTo(w, 12);
+  ctx.moveTo(0, 10);
+  ctx.lineTo(w, 10);
   ctx.stroke();
   ctx.setLineDash([]);
 
   // Trajectory curve
   ctx.beginPath();
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 2.5;
   ctx.strokeStyle = '#ba1a1a';
   metrics.forEach((m, idx) => {
     const x = (idx / (metrics.length - 1)) * w;
-    const y = h - ((m.active_cases || 0) / maxVal) * (h - 16) - 4;
+    const y = h - ((m.active_cases || 0) / maxVal) * (h - 14) - 2;
     if (idx === 0) ctx.moveTo(x, y);
     else ctx.lineTo(x, y);
   });
@@ -373,7 +348,7 @@ function renderSparkline() {
 
   // Current Day Marker
   const curX = (STATE.currentDay / (metrics.length - 1)) * w;
-  const curY = h - (((metrics[STATE.currentDay]?.active_cases || 0) / maxVal) * (h - 16)) - 4;
+  const curY = h - (((metrics[STATE.currentDay]?.active_cases || 0) / maxVal) * (h - 14)) - 2;
   ctx.fillStyle = '#171c20';
   ctx.beginPath();
   ctx.arc(curX, curY, 4, 0, Math.PI * 2);
@@ -391,10 +366,10 @@ function renderShowcaseAgentCards() {
   container.innerHTML = STATE.showcaseAgents.map(a => `
     <div class="border-2 border-[#171c20] p-4 bg-[#F8FAFC] shadow-[3px_3px_0px_#171c20]">
       <div class="flex justify-between items-center mb-1">
-        <span class="font-display font-bold text-sm text-[#171c20]">${a.name}</span>
+        <span class="font-display font-bold text-base text-[#171c20]">${a.name}</span>
         <span class="px-2 py-0.5 bg-[#bfe0f5] border border-[#171c20] text-[10px] font-bold">${a.district}</span>
       </div>
-      <div class="text-[11px] text-[#596168] font-bold mb-2">ROLE: ${a.role.toUpperCase()}</div>
+      <div class="text-[11px] text-[#436274] font-bold mb-2">ROLE: ${a.role.toUpperCase()}</div>
       <p class="text-xs text-[#334155] mb-2 leading-relaxed">${a.biography}</p>
       <div class="text-[9px] px-2 py-0.5 bg-[#FEF3C7] border border-[#171c20] inline-block font-bold">
         [GENERATED NARRATIVE - SYNTHETIC DATA ONLY]
@@ -434,14 +409,14 @@ function renderDecisionPareto() {
   ctx.strokeStyle = '#436274';
   ctx.lineWidth = 3;
   ctx.beginPath();
-  ctx.moveTo(50, 40);
-  ctx.bezierCurveTo(120, 180, 280, 200, 440, 215);
+  ctx.moveTo(50, 30);
+  ctx.bezierCurveTo(120, 140, 260, 160, 420, 175);
   ctx.stroke();
 
   // Point
   ctx.fillStyle = '#ba1a1a';
   ctx.beginPath();
-  ctx.arc(220, 190, 7, 0, Math.PI * 2);
+  ctx.arc(200, 150, 6, 0, Math.PI * 2);
   ctx.fill();
   ctx.strokeStyle = '#171c20';
   ctx.lineWidth = 2;
@@ -449,7 +424,7 @@ function renderDecisionPareto() {
 
   ctx.fillStyle = '#171c20';
   ctx.font = 'bold 10px "Space Mono", monospace';
-  ctx.fillText('OPTIMAL POLICY EQUILIBRIUM', 235, 188);
+  ctx.fillText('OPTIMAL BENGALURU POLICY POINT', 215, 148);
 }
 
 // Execute New Simulation
@@ -474,7 +449,7 @@ async function executeSimulation() {
   }
   if (maskMandate) {
     interventions.push({
-      name: 'mask_advisory',
+      name: 'transit_mask_mandate',
       measure_type: 'mask_mandate',
       area_id: 'ALL',
       start_day: 5,
@@ -497,7 +472,7 @@ async function executeSimulation() {
   };
 
   try {
-    showLoadingBanner('Executing calibrated agent-based simulation...');
+    showLoadingBanner('Simulating Bengaluru epidemic trajectory...');
     const res = await fetch('/api/simulate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -521,7 +496,7 @@ async function executeSimulation() {
 async function requestPolicyAdvisor() {
   const container = document.getElementById('advisor-output-box');
   if (container) {
-    container.innerHTML = '<div class="text-xs text-[#436274] font-bold p-3">Consulting Gemini Policy Advisor loop...</div>';
+    container.innerHTML = '<div class="text-xs text-[#436274] font-bold p-3">Evaluating counterfactual policy trade-offs...</div>';
   }
 
   try {
@@ -530,22 +505,22 @@ async function requestPolicyAdvisor() {
 
     if (container) {
       container.innerHTML = `
-        <div class="border-2 border-[#171c20] p-4 bg-[#F8FAFC] shadow-[3px_3px_0px_#171c20] mt-3">
+        <div class="border-2 border-[#171c20] p-4 bg-white shadow-[3px_3px_0px_#171c20] mt-3">
           <div class="flex justify-between items-center mb-2">
-            <span class="font-display font-bold text-sm text-[#171c20]">RECOMMENDATION READY</span>
-            <span class="px-2 py-0.5 bg-[#D1FAE5] text-[#065F46] border border-[#171c20] text-[10px] font-bold">VERIFIED</span>
+            <span class="font-display font-bold text-sm text-[#171c20]">OPTIMAL BENGALURU ADVISORY</span>
+            <span class="px-2 py-0.5 bg-[#D1FAE5] text-[#065F46] border border-[#171c20] text-[10px] font-bold">FEASIBLE</span>
           </div>
           <div class="text-xs mb-2">
-            <strong>PREDICTED REDUCTION IN OVERFLOW DEATHS:</strong> <span class="text-[#059669] font-bold">-${rec.predicted_deaths_reduction || 35}%</span>
+            <strong>ESTIMATED REDUCTION IN OVERFLOW DEATHS:</strong> <span class="text-[#059669] font-bold">-${rec.predicted_deaths_reduction || 35}%</span>
           </div>
-          <div class="text-[11px] bg-white border border-[#171c20] p-2 mb-2">
-            <strong>RECOMMENDED ACTIONS:</strong>
+          <div class="text-[11px] bg-[#F8FAFC] border border-[#171c20] p-2 mb-2">
+            <strong>RECOMMENDED MEASURES:</strong>
             <ul class="list-disc pl-4 mt-1">
               ${(rec.recommended_measures || []).map(m => `<li>${m.name} (${m.measure_type}) Days ${m.start_day}-${m.end_day}</li>`).join('')}
             </ul>
           </div>
           <div class="text-[9px] text-[#596168]">
-            <strong>ADVISORY NOTE:</strong> ${rec.human_in_the_loop_advisory || 'Illustrative simulation advice.'}
+            <strong>NOTE:</strong> ${rec.human_in_the_loop_advisory || 'Illustrative simulation advice.'}
           </div>
         </div>
       `;
