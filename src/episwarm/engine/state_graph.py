@@ -2,7 +2,6 @@
 
 from typing import Dict, List, Optional, Tuple, Any
 import numpy as np
-from scipy import stats
 
 from episwarm.packs.disease import DiseasePack, DiseaseState, StateTransition
 
@@ -45,7 +44,6 @@ class CompiledStateGraph:
             self.severity_level[i] = s.severity_level
             self.state_needs.append(dict(s.needs))
 
-            # Approximate bed requirement for backward compatibility
             needs_keys = [k.lower() for k in s.needs.keys()]
             if any("icu" in k for k in needs_keys):
                 self.needs_bed[i] = 3
@@ -58,13 +56,108 @@ class CompiledStateGraph:
             from_idx = self.name_to_idx[t.from_state]
             self.transitions_by_from[from_idx].append(t)
 
-        # Calculate mean infectious period for R0 calibration
-        inf_durations = []
-        for i in range(self.n_states):
-            if self.is_infectious[i]:
-                for t in self.transitions_by_from[i]:
-                    inf_durations.append(t.duration.mean_days)
-        self.mean_infectious_days = float(np.mean(inf_durations)) if inf_durations else 5.0
+        # 4. Compute expected infectious duration weighted by relative infectiousness (Spec 4.2)
+        # Compute DAG traversal visit probabilities and expected infectious duration
+        # D = sum_s P(s | infection) * rel_inf_s * E[duration_s]
+        visits = np.zeros(self.n_states, dtype=np.float64)
+        visits[self.idx_E] = 1.0
+        inflow = np.zeros(self.n_states, dtype=np.float64)
+        inflow[self.idx_E] = 1.0
+
+        for _ in range(self.n_states + 2):
+            for u in range(self.n_states):
+                if inflow[u] <= 0 or self.is_absorbing[u]:
+                    continue
+                trans = self.transitions_by_from.get(u, [])
+                if not trans:
+                    continue
+                base_sum = sum(t.base_probability for t in trans)
+                cur_inflow = inflow[u]
+                inflow[u] = 0.0
+                for t in trans:
+                    v = self.name_to_idx[t.to_state]
+                    p_uv = t.base_probability / base_sum if base_sum > 0 else 1.0 / len(trans)
+                    inflow[v] += cur_inflow * p_uv
+                    visits[v] += cur_inflow * p_uv
+
+        total_d = 0.0
+        for s_idx in range(self.n_states):
+            if self.is_infectious[s_idx]:
+                trans = self.transitions_by_from.get(s_idx, [])
+                if trans:
+                    mean_dwell = float(np.mean([t.duration.mean_days for t in trans]))
+                else:
+                    mean_dwell = 5.0
+                total_d += visits[s_idx] * float(self.rel_infectiousness[s_idx]) * mean_dwell
+
+        self.mean_infectious_days = float(max(1.0, total_d))
+
+    def get_served_adverse_prob(self, state_idx: int) -> float:
+        """Derive the baseline served adverse/fatality probability from outgoing graph transitions (Spec 6.3)."""
+        transitions = self.transitions_by_from.get(state_idx, [])
+        if not transitions:
+            return 0.05
+        adverse_prob = 0.0
+        for t in transitions:
+            to_idx = self.name_to_idx.get(t.to_state, -1)
+            is_worse = (to_idx == self.idx_D) or (to_idx >= 0 and self.severity_level[to_idx] > self.severity_level[state_idx])
+            if is_worse:
+                adverse_prob += float(t.base_probability)
+        return float(np.clip(adverse_prob, 0.01, 0.99)) if adverse_prob > 0 else 0.05
+
+    def sample_state_dwell_time(
+        self,
+        state_idx: int,
+        n_samples: int,
+        rng: np.random.Generator
+    ) -> np.ndarray:
+        """Sample dwell durations in days for agents entering/residing in state_idx."""
+        if n_samples == 0:
+            return np.empty(0, dtype=np.float32)
+
+        if self.is_absorbing[state_idx]:
+            return np.full(n_samples, 99999.0, dtype=np.float32)
+
+        transitions = self.transitions_by_from.get(state_idx, [])
+        if not transitions:
+            return np.full(n_samples, 5.0, dtype=np.float32)
+
+        probs = np.array([t.base_probability for t in transitions], dtype=np.float64)
+        if probs.sum() > 0:
+            probs = probs / probs.sum()
+        else:
+            probs = np.ones(len(transitions)) / len(transitions)
+
+        chosen_t = rng.choice(len(transitions), size=n_samples, p=probs)
+        dwells = np.zeros(n_samples, dtype=np.float32)
+
+        for t_idx, trans in enumerate(transitions):
+            mask = (chosen_t == t_idx)
+            count = int(np.sum(mask))
+            if count == 0:
+                continue
+
+            dur = trans.duration
+            if dur.type == "constant":
+                dwells[mask] = np.full(count, dur.mean_days, dtype=np.float32)
+            elif dur.type == "exponential":
+                scale = max(0.1, dur.mean_days)
+                dwells[mask] = np.clip(rng.exponential(scale, size=count), 0.5, None).astype(np.float32)
+            elif dur.type == "gamma":
+                sd = dur.sd_days or (0.3 * dur.mean_days)
+                k = max(0.1, (dur.mean_days / max(0.01, sd)) ** 2)
+                theta = max(0.1, (sd ** 2) / max(0.01, dur.mean_days))
+                dwells[mask] = np.clip(rng.gamma(k, theta, size=count), 0.5, None).astype(np.float32)
+            elif dur.type == "lognormal":
+                mean = max(0.1, dur.mean_days)
+                sd = dur.sd_days or (0.3 * mean)
+                sigma2 = np.log(1.0 + (sd / mean) ** 2)
+                mu = np.log(mean) - 0.5 * sigma2
+                dwells[mask] = np.clip(rng.lognormal(mu, np.sqrt(sigma2), size=count), 0.5, None).astype(np.float32)
+            else:
+                dwells[mask] = np.full(count, dur.mean_days, dtype=np.float32)
+
+        return dwells
 
     def sample_dwell_time(
         self,
@@ -73,31 +166,30 @@ class CompiledStateGraph:
         n_samples: int,
         rng: np.random.Generator
     ) -> np.ndarray:
-        """Sample dwell durations in days for agents entering a compartment."""
+        """Sample dwell durations in days for agents transitioning into target_state_idx."""
         transitions = self.transitions_by_from.get(from_state_idx, [])
         matched = [t for t in transitions if self.name_to_idx[t.to_state] == target_state_idx]
-        if not matched:
-            return np.ones(n_samples, dtype=np.float32)
+        if matched:
+            dur = matched[0].duration
+            if dur.type == "constant":
+                return np.full(n_samples, dur.mean_days, dtype=np.float32)
+            elif dur.type == "exponential":
+                scale = max(0.1, dur.mean_days)
+                return np.clip(rng.exponential(scale, size=n_samples), 0.5, None).astype(np.float32)
+            elif dur.type == "gamma":
+                sd = dur.sd_days or (0.3 * dur.mean_days)
+                k = max(0.1, (dur.mean_days / max(0.01, sd)) ** 2)
+                theta = max(0.1, (sd ** 2) / max(0.01, dur.mean_days))
+                return np.clip(rng.gamma(k, theta, size=n_samples), 0.5, None).astype(np.float32)
+            elif dur.type == "lognormal":
+                mean = max(0.1, dur.mean_days)
+                sd = dur.sd_days or (0.3 * mean)
+                sigma2 = np.log(1.0 + (sd / mean) ** 2)
+                mu = np.log(mean) - 0.5 * sigma2
+                return np.clip(rng.lognormal(mu, np.sqrt(sigma2), size=n_samples), 0.5, None).astype(np.float32)
 
-        dur = matched[0].duration
-        if dur.type == "constant":
-            return np.full(n_samples, dur.mean_days, dtype=np.float32)
-        elif dur.type == "exponential":
-            scale = dur.mean_days
-            return np.clip(rng.exponential(scale, size=n_samples), 0.5, None).astype(np.float32)
-        elif dur.type == "gamma":
-            sd = dur.sd_days or (0.3 * dur.mean_days)
-            k = max(0.1, (dur.mean_days / sd) ** 2)
-            theta = max(0.1, (sd ** 2) / dur.mean_days)
-            return np.clip(rng.gamma(k, theta, size=n_samples), 0.5, None).astype(np.float32)
-        elif dur.type == "lognormal":
-            mean = dur.mean_days
-            sd = dur.sd_days or (0.3 * mean)
-            sigma2 = np.log(1.0 + (sd / mean) ** 2)
-            mu = np.log(mean) - 0.5 * sigma2
-            return np.clip(rng.lognormal(mu, np.sqrt(sigma2), size=n_samples), 0.5, None).astype(np.float32)
-
-        return np.full(n_samples, dur.mean_days, dtype=np.float32)
+        # Fall back to target state's dwell time
+        return self.sample_state_dwell_time(target_state_idx, n_samples, rng)
 
     def resolve_next_state(
         self,
@@ -108,21 +200,14 @@ class CompiledStateGraph:
         vulnerability_odds: Optional[np.ndarray] = None,
         adverse_prob_override: Optional[np.ndarray] = None
     ) -> Tuple[np.ndarray, np.ndarray]:
-        """Determine next states and dwell times for agents whose dwell time in current_state has expired.
-
-        Supports:
-        - Age multipliers
-        - Comorbidity multipliers
-        - Logit-scale vulnerability odds (Spec 5.1)
-        - Individual unserved adverse probability overrides (Spec 6.3)
-        """
+        """Determine next states and dwell times for agents whose dwell time in current_state has expired."""
         n_agents = len(agent_age_bands)
         if n_agents == 0:
             return np.empty(0, dtype=np.int16), np.empty(0, dtype=np.float32)
 
         transitions = self.transitions_by_from.get(current_state_idx, [])
         if not transitions:
-            return np.full(n_agents, current_state_idx, dtype=np.int16), np.full(n_agents, 9999.0, dtype=np.float32)
+            return np.full(n_agents, current_state_idx, dtype=np.int16), np.full(n_agents, 99999.0, dtype=np.float32)
 
         next_states = np.full(n_agents, current_state_idx, dtype=np.int16)
         dwell_times = np.ones(n_agents, dtype=np.float32)
@@ -147,13 +232,11 @@ class CompiledStateGraph:
                 if t.comorbidity_multipliers:
                     adj_probs[t_idx] *= c_mult
 
-                # Apply vulnerability odds on logit scale for severe/fatal progression (Spec 5.1)
                 if is_worse and v_odds != 1.0 and adj_probs[t_idx] > 0:
                     p = np.clip(adj_probs[t_idx], 1e-5, 1.0 - 1e-5)
                     logit_p = np.log(p / (1.0 - p)) + np.log(max(1e-4, float(v_odds)))
                     adj_probs[t_idx] = 1.0 / (1.0 + np.exp(-logit_p))
 
-                # Apply unserved overflow adverse probability override if provided (Spec 6.3)
                 if is_worse and adv_override is not None:
                     adj_probs[t_idx] = float(adv_override)
 
@@ -166,11 +249,11 @@ class CompiledStateGraph:
 
             next_states[i] = chosen_idx
 
-        # Draw dwell times for chosen transitions
+        # Dwell times in the NEW state are sampled from that state's duration distribution
         for to_idx in to_indices:
             mask = (next_states == to_idx)
             count = int(np.sum(mask))
             if count > 0:
-                dwell_times[mask] = self.sample_dwell_time(current_state_idx, to_idx, count, rng)
+                dwell_times[mask] = self.sample_state_dwell_time(to_idx, count, rng)
 
         return next_states, dwell_times

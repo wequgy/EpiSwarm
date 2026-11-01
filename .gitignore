@@ -50,3 +50,13 @@ desktop.ini
 # Large raw web downloads / scraped paper artifacts
 ResearchPaper.html
 ResearchPaper_files/
+
+# 3D City Diorama UI & Replay Artifacts (local only)
+src/episwarm/viz/
+docs/DIORAMA.md
+docs/REPLAY_FORMAT.md
+docs/screenshots/
+scripts/export_replay.py
+tests/test_replay_export.py
+skills-lock.json
+docs/transcripts/

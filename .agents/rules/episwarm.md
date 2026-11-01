@@ -5,14 +5,17 @@ EpiSwarm Studio is a configurable framework for outbreak simulation and response
 
 ## Honesty & Evidence rules (highest priority)
 1. **Evidence, not claims**: For every statement of the form "X works", run a command and show its real output (pytest summary line, benchmark table, screenshot or `AppTest` result).
-2. Never invent data, statistics, URLs, citations or parameter values. If unknown, leave `null` or use an obviously labeled placeholder with `status: assumed`, and list it in `ASSUMPTIONS.md`.
-3. Every parameter and every data file carries provenance: `source` (URL or citation) and `status` in {`user_supplied`, `sourced`, `assumed`, `synthetic`}. Every run report and every UI page shows the list of `assumed` and `synthetic` inputs in use.
-4. Separate what is verified (tests passed, checked against a source) from what is assumed or untested in every summary.
-5. Never claim validation that was not run. Without user-supplied observed data, every report says "UNCALIBRATED".
-6. The behavior layer (LLM-driven decisions) is not validated for any region unless the user supplies observed data to validate against. Show a persistent "behavior layer unvalidated for this region" banner by default.
-7. Synthetic fixture data exists only to build and test code. Any run using synthetic input shows a SYNTHETIC DATA banner and is never described as a result about a real place.
-8. Rumor, misinformation and compliance of the public are in scope and must be modeled.
-9. **Zero credential leakage**: Never ask the user to paste API keys into chat, ever. Keys are configured locally through `scripts/setup_keys.py` and stored only in `.env`. Never commit keys, never print or log them.
+2. **Reproduction rule**: Run the reproduction before and after every fix.
+3. **Automated documentation**: Docs and README numbers are generated from real command output, never typed by hand.
+4. **Implementation criteria**: No behavior or advisor feature is IMPLEMENTED until it is called from the engine or app and a test shows its effect on outcomes.
+5. Never invent data, statistics, URLs, citations or parameter values. If unknown, leave `null` or use an obviously labeled placeholder with `status: assumed`, and list it in `ASSUMPTIONS.md`.
+6. Every parameter and every data file carries provenance: `source` (URL or citation) and `status` in {`user_supplied`, `sourced`, `assumed`, `synthetic`}. Every run report and every UI page shows the list of `assumed` and `synthetic` inputs in use.
+7. Separate what is verified (tests passed, checked against a source) from what is assumed or untested in every summary.
+8. Never claim validation that was not run. Without user-supplied observed data, every report says "UNCALIBRATED".
+9. The behavior layer (LLM-driven decisions) is not validated for any region unless the user supplies observed data to validate against. Show a persistent "behavior layer unvalidated for this region" banner by default.
+10. Synthetic fixture data exists only to build and test code. Any run using synthetic input shows a SYNTHETIC DATA banner and is never described as a result about a real place.
+11. Rumor, misinformation and compliance of the public are in scope and must be modeled.
+12. **Zero credential leakage**: Never ask the user to paste API keys into chat, ever. Keys are configured locally through `scripts/setup_keys.py` and stored only in `.env`. Never commit keys, never print or log them.
 
 ## Generality rules
 1. No region, country, city or disease constants in `src/`. Everything comes from packs (region, disease, behavior, scenario) and config. Add a test that fails if `src/` contains hardcoded place names or disease names.

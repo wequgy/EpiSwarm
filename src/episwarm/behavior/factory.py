@@ -34,20 +34,21 @@ def create_decision_policy(cache: Optional[DecisionCache] = None) -> Tuple[Decis
         logger.info("Instantiating JevPolicy as primary backend.")
         return JevPolicy(api_key=jev_key, cache=cache), "jev"
 
-    # 2. Local LLM Check
-    local_url = os.getenv("LOCAL_LLM_BASE_URL", "http://localhost:11434").rstrip("/")
+    # 2. Local LLM Check (only if LOCAL_LLM_BASE_URL is explicitly configured)
+    local_url = os.getenv("LOCAL_LLM_BASE_URL", "").strip().rstrip("/")
     local_reachable = False
-    try:
-        resp = requests.get(f"{local_url}/api/tags", timeout=1)  # Ollama tags check
-        if resp.status_code == 200:
-            local_reachable = True
-    except Exception:
+    if local_url:
         try:
-            resp = requests.get(f"{local_url}/v1/models", timeout=1)  # OpenAI-compat check
+            resp = requests.get(f"{local_url}/api/tags", timeout=1)  # Ollama tags check
             if resp.status_code == 200:
                 local_reachable = True
         except Exception:
-            pass
+            try:
+                resp = requests.get(f"{local_url}/v1/models", timeout=1)  # OpenAI-compat check
+                if resp.status_code == 200:
+                    local_reachable = True
+            except Exception:
+                pass
 
     if local_reachable:
         logger.info("Instantiating LocalLogprobPolicy as primary backend.")

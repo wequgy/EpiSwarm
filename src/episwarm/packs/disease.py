@@ -108,11 +108,15 @@ class TransmissionConfig(BaseModel):
     r0: Optional[float] = Field(default=None, gt=0.0, le=30.0, description="Basic reproduction number R0")
     beta: Optional[float] = Field(default=None, gt=0.0, description="Per-contact transmission probability per unit time")
     overdispersion_k: float = Field(
-        default=0.16, gt=0.0, le=10.0,
+        default=0.16, gt=0.0, le=10000.0,
         description="Negative binomial dispersion parameter k for secondary transmissions (lower = more super-spreading)"
     )
     seasonality_amplitude: float = Field(default=0.0, ge=0.0, le=1.0)
     waning_immunity_days: Optional[float] = Field(default=None, gt=0.0, description="Mean days until transition from R to S")
+    mask_inward_efficacy: float = Field(default=0.50, ge=0.0, le=1.0, description="Reduction in susceptibility from wearing mask")
+    mask_outward_efficacy: float = Field(default=0.50, ge=0.0, le=1.0, description="Reduction in shedding/infectiousness from wearing mask")
+    vaccine_efficacy_acquisition: float = Field(default=0.80, ge=0.0, le=1.0, description="Reduction in susceptibility when vaccinated")
+    vaccine_efficacy_transmission: float = Field(default=0.50, ge=0.0, le=1.0, description="Reduction in transmission when vaccinated")
 
     @model_validator(mode="after")
     def check_r0_or_beta(self):

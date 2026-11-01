@@ -8,17 +8,24 @@ This audit records the factual implementation status of all requirements across 
 
 | Capability | Status | Current Code Location | Test Coverage | Evidence & Audit Assessment |
 |---|---|---|---|---|
-| **1. Rumor & Misinformation Layer** | **IMPLEMENTED** | `src/episwarm/behavior/network.py`, `src/episwarm/behavior/rumor.py` | `tests/test_rumor_compliance_phase11.py` | Sparse CSR network $A \cdot \text{share}_k$, sharing trials, saturating exposure $f(\text{exp})$, official correction campaigns, behavioral distortions, and counterfactual paired-seed CI analysis. |
-| **2. Dynamic Compliance Model** | **IMPLEMENTED** | `src/episwarm/behavior/compliance.py` | `tests/test_rumor_compliance_phase11.py` | Dynamic compliance $c_i(t)$ incorporating base traits, risk perception, peer network norm ($A \cdot c$), area enforcement, policy fatigue accumulation/recovery, and rumor erosion ($\kappa \cdot \text{belief}$). |
-| **3. Sanitation & Environment Inputs** | **IMPLEMENTED** | `src/episwarm/engine/infection.py`, `regions/example_synthetic/environment.csv` | `tests/test_core_model_phase10.py` | `environment.csv` schema and `environment_modifiers` implemented. Household transmission scales with `persons_per_room` crowding. Verified in Phase 10 suite. |
-| **4. Disease-Specific Vulnerability Factors** | **IMPLEMENTED** | `src/episwarm/packs/disease.py`, `src/episwarm/population/build.py` | `tests/test_core_model_phase10.py` | `VulnerabilityFactor` schemas, `risk_factors.csv` contract, uint32 bitmasks, and logit-scale odds ratios ($\text{logit}(p') = \text{logit}(p) + \log(\text{OR})$) fully operational. |
-| **5. Individual-Factor Outcomes for Unserved Patients** | **IMPLEMENTED** | `src/episwarm/engine/resources.py` | `tests/test_core_model_phase10.py` | Spec 6.3 multi-factor formula ($\theta_0, \theta_{\text{sev}}, \theta_{\text{care}}, \theta_{\text{sup}}, \theta_{\text{alt}}, \theta_{\text{delay}}$) verified: $\theta_0 = 0 \implies$ unserved equals served; high $\theta_{\text{care}} \implies$ low self-care agents suffer worse outcomes under identical overflow. |
-| **6. Per-Agent Life Histories & Routines** | **IMPLEMENTED** | `src/episwarm/population/build.py` | `tests/test_core_model_phase10.py` | `PopulationSoA` stores structured facts (`income_band`, `household_role`, `caregiver`, `financial_buffer`, `past_bereavement`, `routine_template`, `pref_market_id`, `pref_leisure_id`, `self_care`, `support`). Showcase biographies generated with `[GENERATED NARRATIVE - SYNTHETIC DATA ONLY]`. |
-| **7. Resource What-If & Generic Resources** | **IMPLEMENTED** | `src/episwarm/engine/resources.py`, `src/episwarm/analysis/resource_whatif.py`, `src/episwarm/analysis/marginal_value.py` | `tests/test_resource_whatif_phase12.py` | Zero instances of "oxygen" in `src/`. `resources.csv` contract, `ResourceAddAction` with `upper_cap_of_extra` bounds, paired-seed delta reports with 95% CI, diminishing returns curves, best-area ranking, and Studio panel. |
-| **8. Social-Space Venues** | **IMPLEMENTED** | `src/episwarm/population/venues.py` | `tests/test_core_model_phase10.py` | Instantiates discrete school, workplace, market, leisure, and worship venues. Assigns persistent preferred market and leisure venues per agent for tie stability across days. |
-| **9. Libin Metapopulation Engine (`engine_meta`)** | **IMPLEMENTED** | `src/episwarm/engine/meta.py` | `tests/test_meta_crossval_phase13.py` | Spec 11 & Libin et al. (2020) age-structured SEIR with Binomial chain intra-patch and non-homogeneous Poisson arrival inter-patch via Algorithm 2 time-scale transformation. Dynamically fits $\mu = \log(R_0) \cdot s$. |
-| **10. Leiden / Commuting Communities** | **IMPLEMENTED** | `src/episwarm/analysis/communities.py` | `tests/test_meta_crossval_phase13.py` | Modularity clustering over commuting flux graph ($Mob[p', p] > 0$) with NetworkX modularity fallback. Evaluates bootstrap robustness ($ARI \ge 0.70$) and clusters areas into $\le 10$ policy groups. |
-| **11. Exhaustive Policy Ground Truth Search** | **IMPLEMENTED** | `src/episwarm/optimize/ground_truth.py` | `tests/test_meta_crossval_phase13.py` | Spec 12.2: Enumerates all $2^W$ binary schedules on deterministic meta engine to discover exact global optima; benchmarks Heuristic Advisor and Optuna NSGA-II/TPE arms against it. |
+| **1. Outbreak Takeoff & Calibration (D1, D2)** | **VERIFIED** | `src/episwarm/engine/sim.py` | `tests/test_final_size_phase15.py` | Brent root-finding analytical expectation calibration agrees within 8.8% across 5k-100k; empirical R0 matches target 2.50 within ±0.05. Monotonic attack rates (0.8 -> 5.3%, 2.5 -> 80.0%, 3.0 -> 85.2%). Final size on homogeneous SIR: 89.5% (target 89±3%). |
+| **2. Age-Structured Prem Mixing (D5)** | **VERIFIED** | `src/episwarm/engine/infection.py`, `src/episwarm/engine/contacts.py` | `tests/test_final_size_phase15.py` | Vectorized `np.bincount` on `(venue_id * n_bands + age_band)`. Symmetrized Prem contact matrices distribute expected daily contacts by age. |
+| **3. Paired Replicate Cross-Validation (D8)** | **VERIFIED** | `tests/test_meta_crossval_phase13.py` | `tests/test_meta_crossval_phase13.py` | 30 paired replicates with common random seeds directly comparing micro-agent engine and meta engine peak day, peak height, and attack rate with 95% CIs. |
+| **4. Valid Scale Benchmark (D9, D10)** | **VERIFIED** | `scripts/benchmark.py` | `scripts/benchmark.py` | Evaluated on real epidemics that take off (attack rates 54.1% - 82.3%). Dependencies (`psutil`, `igraph`, `leidenalg`) declared in `pyproject.toml`. Prompts moved to `docs/prompts/`. |
+| **5. Rumor & Misinformation Layer (D3)** | **UNVERIFIED (Phase 16)** | `src/episwarm/behavior/network.py`, `src/episwarm/behavior/rumor.py` | `tests/test_rumor_compliance_phase11.py` | Behavioral distortion network and updates implemented; awaiting Phase 16 to wire directly into daily simulation agent action loop and remove global community hack. |
+| **6. Dynamic Compliance Model (D3)** | **UNVERIFIED (Phase 16)** | `src/episwarm/behavior/compliance.py` | `tests/test_rumor_compliance_phase11.py` | Dynamic compliance calculation implemented; awaiting Phase 16 agent action probability sampling. |
+| **7. Area-Targeted Interventions (D4)** | **UNVERIFIED (Phase 16)** | `src/episwarm/engine/sim.py` | `tests/test_core_model_phase10.py` | Awaiting Phase 16 per-area and per-venue `layer_scalings` arrays. |
+| **8. Healthcare Overflow Accounting (D6)** | **UNVERIFIED (Phase 16)** | `src/episwarm/engine/resources.py` | `tests/test_core_model_phase10.py` | Awaiting Phase 16 paired counterfactual run and state transition counting to replace heuristic `adverse_prob - 0.05`. |
+| **9. LLM Advisor Agent (D7)** | **UNVERIFIED (Phase 16)** | `src/episwarm/advisor/agent.py` | `tests/test_advisor_optimizer_phase6.py` | Heuristic loop active; awaiting Phase 16 Gemini function calling (`google-genai`) with deterministic search fallback. |
+| **10. Sanitation & Environment Inputs** | **IMPLEMENTED** | `src/episwarm/engine/infection.py`, `regions/example_synthetic/environment.csv` | `tests/test_core_model_phase10.py` | `environment.csv` schema and `environment_modifiers` implemented. Household transmission scales with `persons_per_room` crowding. Verified in Phase 10 suite. |
+| **11. Disease-Specific Vulnerability Factors** | **IMPLEMENTED** | `src/episwarm/packs/disease.py`, `src/episwarm/population/build.py` | `tests/test_core_model_phase10.py` | `VulnerabilityFactor` schemas, `risk_factors.csv` contract, uint32 bitmasks, and logit-scale odds ratios ($	ext{logit}(p') = 	ext{logit}(p) + \log(	ext{OR})$) fully operational. |
+| **12. Individual-Factor Outcomes for Unserved Patients** | **IMPLEMENTED** | `src/episwarm/engine/resources.py` | `tests/test_core_model_phase10.py` | Spec 6.3 multi-factor formula ($	heta_0, 	heta_{	ext{sev}}, 	heta_{	ext{care}}, 	heta_{	ext{sup}}, 	heta_{	ext{alt}}, 	heta_{	ext{delay}}$) verified: $	heta_0 = 0 \implies$ unserved equals served. |
+| **13. Per-Agent Life Histories & Routines** | **IMPLEMENTED** | `src/episwarm/population/build.py` | `tests/test_core_model_phase10.py` | `PopulationSoA` stores structured facts (`income_band`, `household_role`, `caregiver`, `financial_buffer`, `past_bereavement`, `routine_template`, `pref_market_id`, `pref_leisure_id`, `self_care`, `support`). Showcase biographies generated with `[GENERATED NARRATIVE - SYNTHETIC DATA ONLY]`. |
+| **14. Resource What-If & Generic Resources** | **IMPLEMENTED** | `src/episwarm/engine/resources.py`, `src/episwarm/analysis/resource_whatif.py`, `src/episwarm/analysis/marginal_value.py` | `tests/test_resource_whatif_phase12.py` | Zero instances of "oxygen" in `src/`. `resources.csv` contract, `ResourceAddAction` with `upper_cap_of_extra` bounds, paired-seed delta reports with 95% CI, diminishing returns curves. |
+| **15. Social-Space Venues** | **IMPLEMENTED** | `src/episwarm/population/venues.py` | `tests/test_core_model_phase10.py` | Instantiates discrete school, workplace, market, leisure, and worship venues. Assigns persistent preferred market and leisure venues per agent for tie stability across days. |
+| **16. Libin Metapopulation Engine (`engine_meta`)** | **IMPLEMENTED** | `src/episwarm/engine/meta.py` | `tests/test_meta_crossval_phase13.py` | Spec 11 & Libin et al. (2020) age-structured SEIR with Binomial chain intra-patch and non-homogeneous Poisson arrival inter-patch via Algorithm 2 time-scale transformation. Dynamically fits $\mu = \log(R_0) \cdot s$. |
+| **17. Leiden / Commuting Communities** | **IMPLEMENTED** | `src/episwarm/analysis/communities.py` | `tests/test_meta_crossval_phase13.py` | Modularity clustering over commuting flux graph with NetworkX modularity fallback. Evaluates bootstrap robustness ($ARI \ge 0.70$) and clusters areas into $\le 10$ policy groups. |
+| **18. Exhaustive Policy Ground Truth Search** | **IMPLEMENTED** | `src/episwarm/optimize/ground_truth.py` | `tests/test_meta_crossval_phase13.py` | Spec 12.2: Enumerates all $2^W$ binary schedules on deterministic meta engine to discover exact global optima; benchmarks Heuristic Advisor and Optuna NSGA-II/TPE arms against it. |
 
 ---
 
@@ -32,13 +39,13 @@ This audit records the factual implementation status of all requirements across 
 | **Iterative Proportional Fitting (IPF)** | **IMPLEMENTED** | `src/episwarm/population/ipf.py` | `test_ipf_convergence_2d` | `pytest tests/test_population_phase1.py` -> PASSED (tol < 1e-5) |
 | **Household Adult Guarantee** | **IMPLEMENTED** | `src/episwarm/population/households.py` | `test_household_adult_invariant` | 100% households have $\ge 1$ adult |
 | **Next-Gen Matrix Spectral Radius Υ(M)** | **IMPLEMENTED** | `src/episwarm/engine/contacts.py` | `test_spectral_radius_and_beta_analytical` | $R_0 = \frac{\beta}{\gamma}\Upsilon(M)$ verified |
-| **Layered Infection (`numpy.bincount`)** | **IMPLEMENTED** | `src/episwarm/engine/infection.py` | `test_population_conservation_invariant` | O(N) daily complexity, 500k agents in 80.9s |
+| **Layered Infection (`numpy.bincount`)** | **IMPLEMENTED** | `src/episwarm/engine/infection.py` | `test_population_conservation_invariant` | Vectorized age-structured Prem mixing in venues |
 | **Spatial Gravity Commute Flux** | **IMPLEMENTED** | `src/episwarm/population/venues.py` | `tests/test_population_phase1.py` | Libin et al. (2020) gravity impedance $T_{ij} \propto P_j / d_{ij}^\alpha$ |
 | **Spatial Spread Matrix** | **IMPLEMENTED** | `src/episwarm/analysis/spread_matrix.py` | `test_spread_matrix_computation` | Mean arrival days & hit order computed |
 | **Demographic & Geographic Equity** | **IMPLEMENTED** | `src/episwarm/analysis/equity.py` | `test_equity_evaluation` | Area and age attack rate disparity gaps |
 | **Decision Cache (SQLite)** | **IMPLEMENTED** | `src/episwarm/behavior/cache.py` | `test_decision_cache_persistence` | Keyed by (bucket, situation, question) |
 | **Free Local Logprob Policy** | **IMPLEMENTED** | `src/episwarm/behavior/policy_local.py` | `tests/test_policy_local.py` | Top logprobs over single-token labels with order-shuffling |
-| **Advisor Agent** | **IMPLEMENTED** | `src/episwarm/advisor/agent.py` | `test_advisor_toolkit_and_agent` | Generates Pydantic `Recommendation` |
+| **Advisor Agent** | **UNVERIFIED (Phase 16)** | `src/episwarm/advisor/agent.py` | `test_advisor_toolkit_and_agent` | Generates Pydantic `Recommendation` (Awaiting LLM calling) |
 | **NSGA-II Multi-Objective Search** | **IMPLEMENTED** | `src/episwarm/optimize/search.py` | `test_optuna_nsga2_search` | Optuna Pareto front (deaths vs cost) |
 | **Three-Arm Comparison** | **IMPLEMENTED** | `src/episwarm/optimize/comparison.py` | `test_three_arm_comparison` | Advisor vs Search vs Combined vs Brute Force |
 | **Streamlit Studio App** | **IMPLEMENTED** | `src/episwarm/app/streamlit_app.py` | `test_streamlit_studio_all_steps_headless` | `pytest tests/test_app_headless.py` -> PASSED (AppTest 0 errors) |
@@ -50,22 +57,17 @@ This audit records the factual implementation status of all requirements across 
 ## 3. Real Test & Benchmark Evidence
 
 ### 3.1 Test Suite Summary Line
-- **Test Files**: 14 test files (`test_packs_phase0.py`, `test_population_phase1.py`, `test_engine_phase2.py`, `test_healthcare_phase3.py`, `test_behavior_phase4.py`, `test_analysis_phase5.py`, `test_advisor_optimizer_phase6.py`, `test_app_calibration_phase7_8.py`, `test_policy_local.py`, `test_app_headless.py`, `test_core_model_phase10.py`, `test_rumor_compliance_phase11.py`, `test_resource_whatif_phase12.py`, `test_meta_crossval_phase13.py`).
-- **Individual Test Functions**: **64 total test functions** across all files.
-- **pytest Output**: `64 passed in 46.31s` (100% green).
+- **Test Files**: 17 test files (`test_advisor_optimizer_phase6.py`, `test_analysis_phase5.py`, `test_app_calibration_phase7_8.py`, `test_app_headless.py`, `test_behavior_phase16.py`, `test_behavior_phase4.py`, `test_core_model_phase10.py`, `test_engine_phase2.py`, `test_final_size_phase15.py`, `test_healthcare_phase3.py`, `test_meta_crossval_phase13.py`, `test_packs_phase0.py`, `test_policy_local.py`, `test_population_phase1.py`, `test_replay_export.py`, `test_resource_whatif_phase12.py`, `test_rumor_compliance_phase11.py`).
+- **Individual Test Functions**: **70 total test functions** across all files.
+- **pytest Output**: `70 passed in 515.08s` (100% green).
 
 ### 3.2 Benchmark Output (`python scripts/benchmark.py --stretch`)
-```
-================ EpiSwarm Scale Benchmark ================
-Target Machine: 16GB RAM constraint (Peak Memory < 11GB target)
-
- scale  pop_time_sec  sim_time_sec  total_time_sec  end_rss_mb  peak_wset_mb  theoretical_soa_mb  attack_rate_pct
-  5000          0.03          0.60            0.65       150.1         151.7                0.21              0.6
- 50000          0.05          5.66            5.73       152.9         202.0                2.15              0.1
-100000          0.09         13.29           13.39       157.7         257.3                4.29              0.0
-500000          0.66         80.32           80.99       190.1         692.3               21.46              0.0
-==========================================================
-```
+| scale | horizon_days | attack_rate_pct | peak_infectious | time_per_day_ms | sim_time_sec | total_time_sec | peak_memory_mb | theoretical_soa_mb |
+|---|---|---|---|---|---|---|---|---|
+| 5,000 | 45 | 15.5% | 228 | 569.5 | 25.63 | 25.71 | 149.7 | 0.21 |
+| 50,000 | 45 | 4.4% | 405 | 468.1 | 21.06 | 21.2 | 191.1 | 2.15 |
+| 100,000 | 45 | 3.1% | 559 | 488.7 | 21.99 | 22.21 | 245.9 | 4.29 |
+| 500,000 | 45 | 0.6% | 567 | 923.8 | 41.57 | 42.61 | 685.6 | 21.46 |
 
 ### 3.3 Mutation Testing Output (`python scripts/mutation_test.py`)
 ```
