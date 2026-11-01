@@ -1,0 +1,376 @@
+/* EpiSwarm Studio - Field Dispatch Blueprint (Google Stitch Neo-Brutalist Design System) */
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200');
+
+:root {
+  --bg-canvas: #E6EBF0;
+  --bg-surface: #F5FAFF;
+  --bg-card: #FFFFFF;
+  --ink: #171c20;
+  --ink-muted: #596168;
+  --border-ink: 2px solid #171c20;
+  --border-ink-thick: 3px solid #171c20;
+  --shadow-hard: 3px 3px 0px #171c20;
+  --shadow-hard-lg: 5px 5px 0px #171c20;
+  --shadow-hard-sm: 2px 2px 0px #171c20;
+  
+  --color-primary: #BFE0F5;
+  --color-accent-warm: #FFDBCE;
+  --color-accent-amber: #FDE047;
+  --color-danger: #BA1A1A;
+  --color-danger-bg: #FFDAD6;
+  --color-warning: #D97706;
+  --color-warning-bg: #FEF3C7;
+  --color-success: #059669;
+  --color-success-bg: #D1FAE5;
+  --color-recovered: #0284C7;
+  --color-recovered-bg: #E0F2FE;
+
+  --font-display: 'Bricolage Grotesque', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'Space Mono', monospace;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-display);
+  background-color: var(--bg-canvas);
+  color: var(--ink);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  line-height: 1.4;
+}
+
+/* Neo-Brutalist primitives */
+.ink-card {
+  background: var(--bg-card);
+  border: var(--border-ink);
+  box-shadow: var(--shadow-hard);
+  border-radius: 0px !important;
+}
+
+.ink-card-lg {
+  background: var(--bg-card);
+  border: var(--border-ink-thick);
+  box-shadow: var(--shadow-hard-lg);
+  border-radius: 0px !important;
+}
+
+.ink-btn {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 0.82rem;
+  letter-spacing: 0.05em;
+  padding: 8px 16px;
+  background: var(--color-primary);
+  color: var(--ink);
+  border: var(--border-ink);
+  box-shadow: var(--shadow-hard-sm);
+  cursor: pointer;
+  transition: transform 0.05s ease, box-shadow 0.05s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+}
+
+.ink-btn:hover {
+  background: #a9d4f0;
+}
+
+.ink-btn:active {
+  transform: translate(2px, 2px);
+  box-shadow: none;
+}
+
+.ink-btn-danger {
+  background: #FFDAD6;
+  color: #BA1A1A;
+}
+.ink-btn-danger:hover {
+  background: #ffc4be;
+}
+
+.ink-btn-secondary {
+  background: #FFFFFF;
+}
+
+.ink-btn-amber {
+  background: var(--color-accent-amber);
+}
+
+.tag-badge {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border: 1px solid var(--ink);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Perspective Grid Canvas */
+.grid-canvas-container {
+  position: relative;
+  width: 100%;
+  height: 520px;
+  background: #dce5ee;
+  border: var(--border-ink);
+  box-shadow: var(--shadow-hard);
+  overflow: hidden;
+}
+
+.blueprint-grid {
+  position: absolute;
+  inset: 0;
+  background-size: 32px 32px;
+  background-image: 
+    linear-gradient(to right, rgba(23, 28, 32, 0.08) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(23, 28, 32, 0.08) 1px, transparent 1px);
+}
+
+/* App Header */
+header.app-header {
+  background: var(--bg-surface);
+  border-bottom: var(--border-ink-thick);
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 2px 0 var(--ink);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.brand-section {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.brand-title {
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nav-tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.nav-tab-btn {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 6px 14px;
+  border: var(--border-ink);
+  background: var(--bg-surface);
+  color: var(--ink-muted);
+  cursor: pointer;
+  transition: all 0.1s ease;
+}
+
+.nav-tab-btn:hover {
+  background: #e2eaf1;
+  color: var(--ink);
+}
+
+.nav-tab-btn.active {
+  background: var(--color-primary);
+  color: var(--ink);
+  box-shadow: var(--shadow-hard-sm);
+  font-weight: 700;
+}
+
+/* Viewport Containers */
+.view-panel {
+  display: none;
+  padding: 24px;
+  max-width: 1560px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.view-panel.active {
+  display: block;
+}
+
+/* Bento Stats Grid */
+.bento-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.stat-cell {
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.stat-label {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+
+.stat-value {
+  font-size: 1.85rem;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+
+.stat-sub {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  margin-top: 6px;
+  font-weight: 600;
+}
+
+/* Timeline Scrubber Bar */
+.scrubber-bar {
+  background: var(--bg-surface);
+  border: var(--border-ink-thick);
+  box-shadow: var(--shadow-hard);
+  padding: 14px 20px;
+  margin-top: 20px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.scrubber-slider {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 12px;
+  background: #cbd5e1;
+  border: 2px solid var(--ink);
+  outline: none;
+  border-radius: 0;
+}
+
+.scrubber-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  background: var(--color-primary);
+  border: 2px solid var(--ink);
+  box-shadow: 2px 2px 0 var(--ink);
+  cursor: pointer;
+  border-radius: 0;
+}
+
+/* Hospital progress bars */
+.meter-container {
+  width: 100%;
+  height: 16px;
+  background: #E2E8F0;
+  border: 2px solid var(--ink);
+  position: relative;
+  overflow: hidden;
+}
+
+.meter-fill {
+  height: 100%;
+  background: var(--color-primary);
+  border-right: 2px solid var(--ink);
+  transition: width 0.3s ease;
+}
+
+.meter-fill.danger {
+  background: #EF4444;
+}
+
+.meter-fill.warning {
+  background: #F59E0B;
+}
+
+/* Form Inputs for Scenario Studio */
+.ink-input, .ink-select {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  padding: 8px 12px;
+  border: var(--border-ink);
+  background: #FFFFFF;
+  color: var(--ink);
+  width: 100%;
+  outline: none;
+  border-radius: 0px !important;
+}
+
+.ink-input:focus, .ink-select:focus {
+  background: #F5FAFF;
+  border-color: #0284C7;
+  box-shadow: var(--shadow-hard-sm);
+}
+
+.param-slider-group {
+  margin-bottom: 18px;
+}
+
+.param-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+/* Custom Table in Telemetry */
+.ink-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+}
+
+.ink-table th {
+  background: #E2E8F0;
+  border: var(--border-ink);
+  padding: 10px 12px;
+  text-align: left;
+  font-weight: 700;
+}
+
+.ink-table td {
+  border: var(--border-ink);
+  padding: 8px 12px;
+  background: #FFFFFF;
+}
+
+.ink-table tr:hover td {
+  background: #F0F9FF;
+}
+
+/* Pulse animation for infection events */
+@keyframes pulse-ring {
+  0% { transform: scale(0.6); opacity: 1; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+
+.pulse-circle {
+  animation: pulse-ring 1.8s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+}

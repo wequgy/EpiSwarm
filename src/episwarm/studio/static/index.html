@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EpiSwarm Studio // Field Dispatch Blueprint</title>
+  <link rel="stylesheet" href="studio.css">
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+
+  <!-- Top App Bar -->
+  <header class="app-header">
+    <div class="brand-section">
+      <div class="brand-title">
+        <span class="material-symbols-outlined" style="font-size: 26px; color: #BA1A1A;">grain</span>
+        <span>EPISWARM</span>
+        <span style="font-family: var(--font-mono); font-size: 0.72rem; color: #596168; font-weight: 400;">// FIELD DISPATCH BLUEPRINT</span>
+      </div>
+      <div class="tag-badge" style="background: #D1FAE5; color: #065F46;">
+        <span style="display: inline-block; width: 6px; height: 6px; background: #059669; border-radius: 50%;"></span>
+        <span>SIM ENGINE ONLINE</span>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs (Exact Stitch Screen Map) -->
+    <nav class="nav-tabs">
+      <button class="nav-tab-btn active" data-tab="viewport">[01] LIVE VIEWPORT</button>
+      <button class="nav-tab-btn" data-tab="scenario">[02] SCENARIO STUDIO</button>
+      <button class="nav-tab-btn" data-tab="agents">[03] AGENT TELEMETRY</button>
+      <button class="nav-tab-btn" data-tab="rumor">[04] RUMOR RIPPLE</button>
+      <button class="nav-tab-btn" data-tab="decision">[05] DECISION REPORT</button>
+    </nav>
+  </header>
+
+  <!-- ========================================== -->
+  <!-- SCREEN 1: LIVE SIMULATION VIEWPORT        -->
+  <!-- ========================================== -->
+  <main id="view-viewport" class="view-panel active">
+    
+    <!-- Bento Stats Grid -->
+    <div class="bento-grid">
+      <div class="ink-card stat-cell" style="border-top: 4px solid #EF4444;">
+        <div class="stat-label">Active Infections (I + H)</div>
+        <div id="stat-active-cases" class="stat-value" style="color: #BA1A1A;">--</div>
+        <div class="stat-sub" style="color: #BA1A1A;">● High Transmission Load</div>
+      </div>
+      <div class="ink-card stat-cell" style="border-top: 4px solid #64748B;">
+        <div class="stat-label">Susceptible Reservoir (S)</div>
+        <div id="stat-susceptible" class="stat-value">--</div>
+        <div class="stat-sub" style="color: #596168;">Total Unexposed Pool</div>
+      </div>
+      <div class="ink-card stat-cell" style="border-top: 4px solid #D97706;">
+        <div class="stat-label">Hospital Bed Saturation</div>
+        <div id="stat-hospital-load" class="stat-value" style="color: #D97706;">--</div>
+        <div class="stat-sub" style="color: #D97706;">ICU Bed Utilization</div>
+      </div>
+      <div class="ink-card stat-cell" style="border-top: 4px solid #0284C7;">
+        <div class="stat-label">Attack Rate</div>
+        <div id="stat-attack-rate" class="stat-value" style="color: #0284C7;">--</div>
+        <div class="stat-sub" style="color: #0284C7;">Cumulative Proportion</div>
+      </div>
+      <div class="ink-card stat-cell" style="border-top: 4px solid #171c20;">
+        <div class="stat-label">Effective R_eff</div>
+        <div id="stat-reff" class="stat-value">--</div>
+        <div class="stat-sub" style="color: #171c20;">Empirical Growth Velocity</div>
+      </div>
+    </div>
+
+    <!-- Viewport 2-Column Section -->
+    <div style="display: grid; grid-template-columns: 1fr 340px; gap: 20px;">
+      
+      <!-- Left: 2.5D Tactile Pedestal Canvas -->
+      <div class="grid-canvas-container">
+        <div class="blueprint-grid"></div>
+        <canvas id="sim-viewport-canvas"></canvas>
+        
+        <!-- Legend Overlay -->
+        <div style="position: absolute; bottom: 12px; left: 16px; background: rgba(255,255,255,0.92); border: 2px solid #171c20; padding: 8px 12px; font-family: var(--font-mono); font-size: 0.7rem; box-shadow: 2px 2px 0 #171c20;">
+          <div style="font-weight: 700; margin-bottom: 4px;">HEALTH STATES // TACTILE PEDESTALS:</div>
+          <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+            <span><span style="display: inline-block; width: 8px; height: 8px; background: #FFFFFF; border: 1px solid #000;"></span> Susceptible</span>
+            <span><span style="display: inline-block; width: 8px; height: 8px; background: #F59E0B; border: 1px solid #000;"></span> Exposed</span>
+            <span><span style="display: inline-block; width: 8px; height: 8px; background: #EF4444; border: 1px solid #000;"></span> Infectious</span>
+            <span><span style="display: inline-block; width: 8px; height: 8px; background: #38BDF8; border: 1px solid #000;"></span> Recovered</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Saturation Meters & Dispatch Alerts -->
+      <div style="display: flex; flex-direction: column; gap: 16px;">
+        
+        <!-- Hospital Capacity Meters -->
+        <div class="ink-card" style="padding: 16px;">
+          <div style="font-family: var(--font-mono); font-size: 0.78rem; font-weight: 700; margin-bottom: 12px; display: flex; justify-content: space-between;">
+            <span>HOSPITAL SATURATION METERS</span>
+            <span class="tag-badge" style="background: #FEE2E2; color: #991B1B;">CAPACITY: 85 BEDS</span>
+          </div>
+
+          <div style="margin-bottom: 12px;">
+            <div style="display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 0.72rem; margin-bottom: 4px;">
+              <span>St. Jude General (45 Beds)</span>
+              <strong id="meter-st-jude-pct">0%</strong>
+            </div>
+            <div class="meter-container"><div id="meter-st-jude" class="meter-fill" style="width: 0%;"></div></div>
+          </div>
+
+          <div style="margin-bottom: 12px;">
+            <div style="display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 0.72rem; margin-bottom: 4px;">
+              <span>Memorial Mercy (25 Beds)</span>
+              <strong id="meter-mercy-pct">0%</strong>
+            </div>
+            <div class="meter-container"><div id="meter-mercy" class="meter-fill" style="width: 0%;"></div></div>
+          </div>
+
+          <div>
+            <div style="display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 0.72rem; margin-bottom: 4px;">
+              <span>Westside Clinic (15 Beds)</span>
+              <strong id="meter-westside-pct">0%</strong>
+            </div>
+            <div class="meter-container"><div id="meter-westside" class="meter-fill" style="width: 0%;"></div></div>
+          </div>
+        </div>
+
+        <!-- Dispatch Ledger Stream -->
+        <div class="ink-card" style="flex: 1; padding: 16px; display: flex; flex-direction: column;">
+          <div style="font-family: var(--font-mono); font-size: 0.78rem; font-weight: 700; margin-bottom: 8px; border-bottom: 2px solid #171c20; padding-bottom: 4px;">
+            DISPATCH INCIDENT LOG
+          </div>
+          <div id="dispatch-ledger-stream" style="flex: 1; overflow-y: auto; max-height: 240px;">
+            <!-- Rendered by studio.js -->
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- Timeline Scrubber Bar -->
+    <div class="scrubber-bar">
+      <div id="current-day-label" style="font-family: var(--font-mono); font-weight: 800; font-size: 1.1rem; min-width: 80px;">DAY 00</div>
+      
+      <div style="display: flex; gap: 8px;">
+        <button id="btn-step-prev" class="ink-btn ink-btn-secondary" style="padding: 6px 10px;">◀</button>
+        <button id="btn-play-pause" class="ink-btn" style="min-width: 100px;">
+          <span class="material-symbols-outlined" style="font-size: 18px;">play_arrow</span> PLAY
+        </button>
+        <button id="btn-step-next" class="ink-btn ink-btn-secondary" style="padding: 6px 10px;">▶</button>
+      </div>
+
+      <input id="timeline-slider" type="range" min="0" max="29" value="0" class="scrubber-slider">
+
+      <!-- Mini Trajectory Sparkline -->
+      <div style="width: 140px; height: 36px; border: 1px solid #171c20; background: #FFFFFF; position: relative;">
+        <canvas id="sparkline-canvas" width="140" height="36"></canvas>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ========================================== -->
+  <!-- SCREEN 2: SCENARIO SETUP & PARAMETER STUDIO -->
+  <!-- ========================================== -->
+  <main id="view-scenario" class="view-panel">
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+      
+      <!-- Left Column: Disease & Transmission Parameters -->
+      <div class="ink-card-lg" style="padding: 24px;">
+        <h2 style="font-size: 1.25rem; font-weight: 800; margin-bottom: 16px; border-bottom: 2px solid #171c20; padding-bottom: 8px;">
+          TRANSMISSION & PATHOGEN DYNAMICS
+        </h2>
+
+        <div class="param-slider-group">
+          <div class="param-header">
+            <span>TARGET BASIC REPRODUCTION NUMBER (R_0)</span>
+            <span id="param-r0-val" style="color: #BA1A1A;">2.50</span>
+          </div>
+          <input id="param-r0" type="range" min="1.0" max="4.5" step="0.05" value="2.50" class="scrubber-slider" style="width: 100%;">
+          <div style="font-family: var(--font-mono); font-size: 0.68rem; color: #596168; margin-top: 4px;">
+            Calibrated against synthetic contact matrix eigenvalues.
+          </div>
+        </div>
+
+        <div class="param-slider-group">
+          <div class="param-header">
+            <span>INCUBATION PERIOD (DAYS)</span>
+            <span>4.5 DAYS</span>
+          </div>
+          <input type="range" min="2.0" max="8.0" step="0.5" value="4.5" class="scrubber-slider" style="width: 100%;">
+        </div>
+
+        <div class="param-slider-group">
+          <div class="param-header">
+            <span>INFECTIOUS DURATION (DAYS)</span>
+            <span>5.0 DAYS</span>
+          </div>
+          <input type="range" min="3.0" max="10.0" step="0.5" value="5.0" class="scrubber-slider" style="width: 100%;">
+        </div>
+
+        <div class="param-slider-group">
+          <div class="param-header">
+            <span>ASYMPTOMATIC CARRIER RATE (%)</span>
+            <span>34%</span>
+          </div>
+          <input type="range" min="10" max="60" step="2" value="34" class="scrubber-slider" style="width: 100%;">
+        </div>
+      </div>
+
+      <!-- Right Column: Behavioral & Policy Interventions -->
+      <div class="ink-card-lg" style="padding: 24px; display: flex; flex-direction: column; justify-content: space-between;">
+        <div>
+          <h2 style="font-size: 1.25rem; font-weight: 800; margin-bottom: 16px; border-bottom: 2px solid #171c20; padding-bottom: 8px;">
+            BEHAVIORAL HEURISTICS & INTERVENTIONS
+          </h2>
+
+          <div class="param-slider-group">
+            <div class="param-header">
+              <span>BASELINE POPULATION COMPLIANCE</span>
+              <span id="param-compliance-val" style="color: #0284C7;">65%</span>
+            </div>
+            <input id="param-compliance" type="range" min="0.1" max="1.0" step="0.05" value="0.65" class="scrubber-slider" style="width: 100%;">
+          </div>
+
+          <div class="param-slider-group">
+            <div class="param-header">
+              <span>SIMULATION HORIZON (DAYS)</span>
+              <span>30 DAYS</span>
+            </div>
+            <input id="param-horizon" type="range" min="15" max="60" step="5" value="30" class="scrubber-slider" style="width: 100%;">
+          </div>
+
+          <div style="margin-top: 20px;">
+            <div style="font-family: var(--font-mono); font-size: 0.78rem; font-weight: 700; margin-bottom: 10px;">ACTIVE POLICY INTERVENTIONS:</div>
+            
+            <label style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-family: var(--font-mono); font-size: 0.78rem; cursor: pointer;">
+              <input id="param-closure-school" type="checkbox" style="width: 18px; height: 18px; border: 2px solid #171c20;">
+              <span>MUNICIPAL SCHOOL CLOSURE (DAY 7 - DAY 28)</span>
+            </label>
+
+            <label style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-family: var(--font-mono); font-size: 0.78rem; cursor: pointer;">
+              <input id="param-mandate-mask" type="checkbox" checked style="width: 18px; height: 18px; border: 2px solid #171c20;">
+              <span>TRANSIT & MARKET MASK ADVISORY (DAY 5 - DAY 30)</span>
+            </label>
+          </div>
+        </div>
+
+        <button id="btn-commit-run" class="ink-btn ink-btn-amber" style="width: 100%; justify-content: center; padding: 14px; font-size: 0.95rem; margin-top: 20px;">
+          <span class="material-symbols-outlined">restart_alt</span> COMMIT & EXECUTE SIMULATION
+        </button>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- ========================================== -->
+  <!-- SCREEN 3: AGENT DEEP-DIVE TELEMETRY       -->
+  <!-- ========================================== -->
+  <main id="view-agents" class="view-panel">
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+      
+      <!-- Left: Cohort Breakdown -->
+      <div class="ink-card-lg" style="padding: 24px;">
+        <h2 style="font-size: 1.25rem; font-weight: 800; margin-bottom: 16px; border-bottom: 2px solid #171c20; padding-bottom: 8px;">
+          SYNTHETIC POPULATION DEMOGRAPHICS
+        </h2>
+        <table class="ink-table">
+          <thead>
+            <tr>
+              <th>DISTRICT</th>
+              <th>POPULATION</th>
+              <th>COMMUTERS</th>
+              <th>COMPLIANCE</th>
+              <th>ICU RISK</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>District A01</td>
+              <td>2,500</td>
+              <td>1,210</td>
+              <td>68%</td>
+              <td><span class="tag-badge" style="background: #FEE2E2; color: #991B1B;">HIGH</span></td>
+            </tr>
+            <tr>
+              <td>District A02</td>
+              <td>2,500</td>
+              <td>1,180</td>
+              <td>62%</td>
+              <td><span class="tag-badge" style="background: #FEF3C7; color: #B45309;">MED</span></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div style="margin-top: 24px; font-family: var(--font-mono); font-size: 0.75rem; background: #E2E8F0; padding: 12px; border: 1px solid #171c20;">
+          <strong>SAMPLING SPECIFICATION:</strong> Stratified representation from synthetic census microdata. Each rendered pedestal maps to 25 synthetic agents with homogeneous routine templates.
+        </div>
+      </div>
+
+      <!-- Right: Showcase Agent Narrative Cards -->
+      <div class="ink-card-lg" style="padding: 24px;">
+        <h2 style="font-size: 1.25rem; font-weight: 800; margin-bottom: 16px; border-bottom: 2px solid #171c20; padding-bottom: 8px;">
+          SHOWCASE AGENT TELEMETRY
+        </h2>
+        <div id="showcase-cards-container">
+          <!-- Filled by studio.js -->
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- ========================================== -->
+  <!-- SCREEN 4: RUMOR RIPPLE & REACTION EVENT   -->
+  <!-- ========================================== -->
+  <main id="view-rumor" class="view-panel">
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+      
+      <div class="ink-card-lg" style="padding: 24px;">
+        <h2 style="font-size: 1.25rem; font-weight: 800; margin-bottom: 16px; border-bottom: 2px solid #171c20; padding-bottom: 8px;">
+          MISINFORMATION VECTOR PROPAGATION
+        </h2>
+        <p style="font-size: 0.85rem; color: #334155; margin-bottom: 16px;">
+          Tracking information cascades across peer-to-peer social networks, institutional trust erosion, and behavioral resistance to health directives.
+        </p>
+
+        <div style="border: 2px solid #171c20; background: #FFFFFF; padding: 16px; margin-bottom: 16px;">
+          <div style="display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 0.78rem; margin-bottom: 6px;">
+            <span>PEER SKEPTICISM TRANSMISSION RATE</span>
+            <strong style="color: #D97706;">54.2%</strong>
+          </div>
+          <div class="meter-container"><div class="meter-fill warning" style="width: 54%;"></div></div>
+        </div>
+
+        <div style="border: 2px solid #171c20; background: #FFFFFF; padding: 16px;">
+          <div style="display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 0.78rem; margin-bottom: 6px;">
+            <span>INSTITUTIONAL TRUST RESILIENCE</span>
+            <strong style="color: #0284C7;">61.8%</strong>
+          </div>
+          <div class="meter-container"><div class="meter-fill" style="width: 62%;"></div></div>
+        </div>
+      </div>
+
+      <div class="ink-card-lg" style="padding: 24px;">
+        <h2 style="font-size: 1.25rem; font-weight: 800; margin-bottom: 16px; border-bottom: 2px solid #171c20; padding-bottom: 8px;">
+          BEHAVIORAL BACKLASH METRICS
+        </h2>
+        <div style="font-family: var(--font-mono); font-size: 0.78rem; line-height: 1.8;">
+          <div style="padding: 8px 0; border-bottom: 1px solid #E2E8F0;">
+            <strong>INFORMAL NETWORK VELOCITY:</strong> 3.4 interactions/agent/day
+          </div>
+          <div style="padding: 8px 0; border-bottom: 1px solid #E2E8F0;">
+            <strong>RUMOR HALO CLUSTERING:</strong> High in Civic Trade Center node
+          </div>
+          <div style="padding: 8px 0; border-bottom: 1px solid #E2E8F0;">
+            <strong>MASK ABANDONMENT RISK:</strong> +18% following misinformation burst
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- ========================================== -->
+  <!-- SCREEN 5: POST-SIMULATION DECISION REPORT -->
+  <!-- ========================================== -->
+  <main id="view-decision" class="view-panel">
+    
+    <!-- Outcome Banners -->
+    <div class="bento-grid" style="margin-bottom: 24px;">
+      <div class="ink-card stat-cell">
+        <div class="stat-label">Cumulative Infections</div>
+        <div id="dec-total-infections" class="stat-value">--</div>
+      </div>
+      <div class="ink-card stat-cell">
+        <div class="stat-label">Total Deaths</div>
+        <div id="dec-total-deaths" class="stat-value" style="color: #BA1A1A;">--</div>
+      </div>
+      <div class="ink-card stat-cell">
+        <div class="stat-label">Overflow Attributable Deaths</div>
+        <div id="dec-overflow-deaths" class="stat-value" style="color: #D97706;">--</div>
+      </div>
+      <div class="ink-card stat-cell">
+        <div class="stat-label">Final Attack Rate</div>
+        <div id="dec-attack-rate" class="stat-value" style="color: #0284C7;">--</div>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+      
+      <!-- Pareto Frontier Curve -->
+      <div class="ink-card-lg" style="padding: 24px;">
+        <h2 style="font-size: 1.25rem; font-weight: 800; margin-bottom: 12px; border-bottom: 2px solid #171c20; padding-bottom: 8px;">
+          PARETO POLICY FRONTIER
+        </h2>
+        <div style="font-family: var(--font-mono); font-size: 0.72rem; color: #596168; margin-bottom: 12px;">
+          Economic Disruption vs. Attributable Excess Mortality trade-off space.
+        </div>
+        <canvas id="decision-pareto-canvas" width="480" height="260" style="border: 2px solid #171c20; background: #FFFFFF; width: 100%;"></canvas>
+      </div>
+
+      <!-- Policy Advisor Action Box -->
+      <div class="ink-card-lg" style="padding: 24px; display: flex; flex-direction: column;">
+        <h2 style="font-size: 1.25rem; font-weight: 800; margin-bottom: 12px; border-bottom: 2px solid #171c20; padding-bottom: 8px;">
+          AI POLICY ADVISOR REASONING
+        </h2>
+        <p style="font-size: 0.85rem; color: #334155; margin-bottom: 16px;">
+          Query the Gemini Policy Advisor agent to balance hospital capacity, mortality avoidance, and socioeconomic friction across counterfactual simulations.
+        </p>
+
+        <button id="btn-trigger-advisor" class="ink-btn" style="width: 100%; justify-content: center; padding: 12px;">
+          <span class="material-symbols-outlined">psychology</span> EVALUATE COUNTERFACTUAL ADVISORY
+        </button>
+
+        <div id="advisor-output-box" style="flex: 1; margin-top: 16px;">
+          <!-- Rendered by studio.js -->
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <script src="studio.js"></script>
+</body>
+</html>
