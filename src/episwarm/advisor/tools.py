@@ -10,6 +10,8 @@ from episwarm.packs.scenario import ScenarioPack, InterventionAction
 from episwarm.engine.sim import run_simulation
 from episwarm.analysis.metrics import evaluate_single_run_objectives, ObjectiveVector
 from episwarm.advisor.memory import AdvisorMemory
+from episwarm.behavior.policy_base import DecisionPolicy
+from episwarm.behavior.policy_rules import RulePolicy
 
 
 AVAILABLE_MEASURES = [
@@ -48,12 +50,14 @@ class AdvisorToolKit:
         pop: PopulationSoA,
         disease_pack: DiseasePack,
         base_scenario: ScenarioPack,
-        memory: Optional[AdvisorMemory] = None
+        memory: Optional[AdvisorMemory] = None,
+        policy: Optional[DecisionPolicy] = None
     ):
         self.pop = pop
         self.disease_pack = disease_pack
         self.base_scenario = base_scenario
         self.memory = memory or AdvisorMemory()
+        self.policy = policy or RulePolicy()
 
     def list_measures(self) -> List[Dict[str, Any]]:
         """Return library of available intervention types, parameters, and economic costs."""
@@ -66,7 +70,7 @@ class AdvisorToolKit:
         data.update(scenario_dict)
         scen = ScenarioPack(**data)
 
-        res = run_simulation(self.pop, self.disease_pack, scen)
+        res = run_simulation(self.pop, self.disease_pack, scen, policy=self.policy)
         objs = evaluate_single_run_objectives(self.pop, res, scen)
 
         self.memory.log_run(res.run_id, scen.model_dump(), objs, time.time())

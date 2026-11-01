@@ -47,3 +47,4 @@ SITUATION_DESCRIPTIONS: Dict[str, str] = {
     "high_risk_mandates": "Local area is experiencing an active outbreak surge with government advisories/mandates in place.",
     "low_risk_baseline": "Low community transmission; routine baseline monitoring with no active restrictions.",
 }
+

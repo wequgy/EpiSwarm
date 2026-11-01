@@ -28,7 +28,7 @@ class AdvisorAgent:
     ):
         self.toolkit = toolkit
         self.run_budget = run_budget
-        self.model_name = model_name or os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
+        self.model_name = model_name or os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite")
         self.client = gemini_client
         self.transcript_dir = transcript_dir
         self.transcripts: List[Dict[str, Any]] = []

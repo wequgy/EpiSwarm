@@ -2,6 +2,7 @@
 
 import os
 import time
+import random
 from pathlib import Path
 import yaml
 import requests
@@ -578,11 +579,30 @@ elif step == "5. Simulation Engine":
 
         if "Local" in sim_policy_backend:
             if ollama_models:
-                def_idx = ollama_models.index("qwen3:4b") if "qwen3:4b" in ollama_models else 0
+                def_idx = ollama_models.index("llama3.2:3b") if "llama3.2:3b" in ollama_models else (ollama_models.index("qwen3:4b") if "qwen3:4b" in ollama_models else 0)
                 selected_ollama_model = st.selectbox("Installed Ollama Model", ollama_models, index=def_idx)
-                st.caption(f"⚡ Connected to local Ollama (`{selected_ollama_model}`). High-speed archetype inference active.")
+                col_gran, col_byp = st.columns([1.6, 1.2])
+                with col_gran:
+                    sim_granularity = st.selectbox(
+                        "Deliberation Resolution",
+                        [
+                            "🔬 High-Fidelity Demographic Deliberation (~150-250 LLM Calls, ~8-12 mins)",
+                            "⚡ Fast Archetype Preview (~10-15 LLM Calls, ~30-45s)",
+                            "🌐 Deep Exhaustive Scan (~300+ LLM Calls, ~15 mins)"
+                        ],
+                        index=0
+                    )
+                with col_byp:
+                    sim_bypass_cache = st.checkbox("🔄 Fresh Run (Bypass Cache)", value=True, help="Bypass on-disk SQLite cache to force live LLM calls for each demographic cohort.")
+                if "High-Fidelity" in sim_granularity:
+                    st.info("🔬 **High-Fidelity Mode Activated**: Deliberates across all 70+ demographic citizen cohorts under evolving transmission and mandate states (~150–250 real LLM calls). Expected runtime: ~8–12 mins on RTX 3050.")
+                elif "Exhaustive" in sim_granularity:
+                    st.warning("🌐 **Exhaustive Scan Mode**: Evaluates every permutation across all wards and household exposure states (~300+ calls, ~15 mins).")
+                st.caption(f"⚡ Connected to local Ollama (`{selected_ollama_model}`). Accelerated on NVIDIA RTX 3050.")
             else:
                 st.warning("⚠️ Ollama is not responding at http://localhost:11434. Ensure `ollama serve` is running.")
+                sim_granularity = "granular"
+                sim_bypass_cache = False
         elif "Gemini" in sim_policy_backend:
             curr_gem_key = (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or "").strip()
             gemini_model_options = ["gemini-3.1-flash-lite (Recommended / High Quota)", "gemini-3.5-flash"]
@@ -667,23 +687,77 @@ elif step == "5. Simulation Engine":
             policy_inst = GeminiPolicy(model=selected_gemini_model)
         elif "Local" in sim_policy_backend:
             from episwarm.behavior.policy_local import LocalLogprobPolicy
-            policy_inst = LocalLogprobPolicy(model=selected_ollama_model)
+            from episwarm.behavior.cache import DecisionCache
+            policy_cache = DecisionCache(":memory:") if sim_bypass_cache else None
+            policy_inst = LocalLogprobPolicy(
+                model=selected_ollama_model,
+                granularity="granular" if ("High-Fidelity" in sim_granularity or "Exhaustive" in sim_granularity) else "archetype",
+                cache=policy_cache
+            )
         else:
             from episwarm.behavior.policy_rules import RulePolicy
             policy_inst = RulePolicy()
         st.session_state.active_policy = policy_inst
 
-        # 6. Run simulation
-        with st.spinner(f"Stepping through {sim_horizon} days of epidemic propagation with {sim_policy_backend.split(' ')[0]}..."):
-            res = run_simulation(
-                pop,
-                d_pack,
-                s_pack,
-                behavior_pack=b_pack,
-                policy=policy_inst
+        # 6. Run simulation with live progress tracking & real-time deliberation feed
+        t_sim_start = time.time()
+        prog_bar = st.progress(0, text=f"Initializing epidemic propagation across {sim_horizon} days...")
+        telemetry_box = st.empty()
+        live_feed_box = st.empty()
+
+        def sim_step_cb(cur_day, total_days, metrics):
+            pct = min(100, int((cur_day + 1) / total_days * 100))
+            inf_c = metrics.get("active_infected", 0)
+            llm_c = metrics.get("llm_calls", 0)
+            c_hits = metrics.get("cache_hits", 0)
+            f_backs = metrics.get("fallbacks", 0)
+            el_s = time.time() - t_sim_start
+            el_m = int(el_s // 60)
+            el_sec = int(el_s % 60)
+
+            # ETA estimation based on progress
+            if pct > 0:
+                est_total = el_s / (pct / 100.0)
+                rem_s = max(0, est_total - el_s)
+                rem_m = int(rem_s // 60)
+                rem_sec = int(rem_s % 60)
+                eta_str = f"~{rem_m}m {rem_sec:02d}s"
+            else:
+                eta_str = "Calculating..."
+
+            prog_bar.progress(pct, text=f"Day {cur_day + 1} of {total_days} ({pct}%) | Active Cases: {inf_c:,} | Real LLM Inferences: {llm_c} | Elapsed: {el_m}m {el_sec:02d}s (Est. Rem: {eta_str})")
+            telemetry_box.markdown(
+                f"⏱️ **Runtime:** `{el_m}m {el_sec:02d}s` (ETA: `{eta_str}`) &nbsp;|&nbsp; "
+                f"🧠 **Real LLM Inferences:** `{llm_c}` &nbsp;|&nbsp; "
+                f"⚡ **Cache Hits:** `{c_hits:,}` &nbsp;|&nbsp; "
+                f"🛡️ **Fallbacks:** `{f_backs}` &nbsp;|&nbsp; "
+                f"🦠 **Active Cases:** `{inf_c:,}`"
             )
-            st.session_state.sim_results = res
-            st.success(f"Simulation completed across {sim_horizon} days for {pop.n_agents:,} synthetic agents!")
+
+            # Render latest 5 live LLM deliberations if available
+            recent = getattr(policy_inst, "recent_deliberations", [])
+            if recent:
+                latest_items = recent[-5:]
+                feed_lines = ["##### 🧠 Live LLM Citizen Deliberations (Latest Samples)"]
+                for item in reversed(latest_items):
+                    c_line = f"- **Cohort:** `{item['cohort']}`<br>&nbsp;&nbsp;↳ **Situation:** `{item['situation']}` → Mask: **{item['mask']}** | Quarantine: **{item['isolate']}** | Workplace Avoid: **{item['work_avoid']}** | Vaccine: **{item['vaccine']}**"
+                    feed_lines.append(c_line)
+                live_feed_box.markdown("\n".join(feed_lines), unsafe_allow_html=True)
+
+        res = run_simulation(
+            pop,
+            d_pack,
+            s_pack,
+            behavior_pack=b_pack,
+            policy=policy_inst,
+            step_callback=sim_step_cb
+        )
+        total_time = time.time() - t_sim_start
+        tot_m = int(total_time // 60)
+        tot_s = int(total_time % 60)
+        prog_bar.progress(100, text=f"Simulation successfully completed across {sim_horizon} days in {tot_m}m {tot_s:02d}s!")
+        st.session_state.sim_results = res
+        st.success(f"Outbreak simulation completed across {sim_horizon} days for {pop.n_agents:,} synthetic agents in {tot_m}m {tot_s:02d}s!")
 
     # SIMULATION RESULTS DASHBOARD
     if st.session_state.sim_results:
@@ -819,10 +893,13 @@ elif step == "7. Policy Advisor & Optimizer":
             with open("diseases/respiratory_generic.yaml", "r", encoding="utf-8") as f:
                 dp = DiseasePack(**yaml.safe_load(f))
             with open("scenarios/baseline.yaml", "r", encoding="utf-8") as f:
-                sc = ScenarioPack(**yaml.safe_load(f))
+                s_dict = yaml.safe_load(f)
+                s_dict["horizon_days"] = min(45, s_dict.get("horizon_days", 45))
+                sc = ScenarioPack(**s_dict)
 
             toolkit = AdvisorToolKit(st.session_state.pop_soa, dp, sc)
-            advisor = AdvisorAgent(toolkit, run_budget=4)
+            adv_model = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite")
+            advisor = AdvisorAgent(toolkit, run_budget=4, model_name=adv_model)
             with st.spinner("Advisor exploring counterfactual policy interventions..."):
                 rec = advisor.run_advisory_loop()
                 st.success("Advisory Recommendation Formulated!")
@@ -836,7 +913,9 @@ elif step == "7. Policy Advisor & Optimizer":
             with open("diseases/respiratory_generic.yaml", "r", encoding="utf-8") as f:
                 dp = DiseasePack(**yaml.safe_load(f))
             with open("scenarios/baseline.yaml", "r", encoding="utf-8") as f:
-                sc = ScenarioPack(**yaml.safe_load(f))
+                s_dict = yaml.safe_load(f)
+                s_dict["horizon_days"] = min(45, s_dict.get("horizon_days", 45))
+                sc = ScenarioPack(**s_dict)
 
             with st.spinner("Exploring Pareto front with Optuna NSGA-II..."):
                 pareto_df = run_optuna_search(st.session_state.pop_soa, dp, sc, n_trials=8)

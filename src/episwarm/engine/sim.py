@@ -244,7 +244,8 @@ def run_simulation(
     policy: Optional[DecisionPolicy] = None,
     enable_behavior: bool = True,
     unlimited_resources: bool = False,
-    compute_attributable_overflow: bool = False
+    compute_attributable_overflow: bool = False,
+    step_callback: Optional[Any] = None
 ) -> SimulationResults:
     """Execute complete multi-day epidemic simulation with generic resources, vulnerability factors, and rumor dynamics."""
     rng = np.random.default_rng(scenario_pack.random_seed)
@@ -662,6 +663,16 @@ def run_simulation(
         daily_state_counts[day, :] = np.bincount(states, minlength=n_states)[:n_states]
         daily_hospital_demand[day] = int(np.sum(state_graph.needs_bed[states] == 1))
         daily_icu_demand[day] = int(np.sum(state_graph.needs_bed[states] == 3))
+
+        if step_callback is not None:
+            symp_idx = state_graph.name_to_idx.get('I_symp', -1)
+            symp_c = int(np.sum(states == symp_idx)) if symp_idx >= 0 else int(np.sum(states != state_graph.idx_S))
+            step_callback(day, scenario_pack.horizon_days, {
+                'active_infected': symp_c,
+                'llm_calls': getattr(active_policy, 'model_calls_count', 0),
+                'cache_hits': getattr(active_policy, 'cache_hits_count', 0),
+                'fallbacks': getattr(active_policy, 'fallback_count', 0)
+            })
 
     # Restore pop baseline compliance to prevent mutative side effects
     pop.compliance = saved_compliance
