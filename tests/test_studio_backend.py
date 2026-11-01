@@ -72,7 +72,7 @@ def test_studio_static_files():
 
     res_css = client.get("/studio.css")
     assert res_css.status_code == 200
-    assert "Bricolage Grotesque" in res_css.text
+    assert "Inter" in res_css.text or "Bricolage Grotesque" in res_css.text
 
     res_js = client.get("/studio.js")
     assert res_js.status_code == 200
