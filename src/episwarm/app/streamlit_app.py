@@ -620,14 +620,23 @@ elif step == "5. Simulation Engine":
         b_raw["rumor_spread_rate"] = float(sim_rumor_rate)
         b_pack = BehaviorPack(**b_raw)
 
-        # 5. Run simulation
+        # 5. Resolve policy engine
+        policy_inst = None
+        if "Gemini" in sim_policy_backend:
+            from episwarm.behavior.policy_gemini import GeminiPolicy
+            policy_inst = GeminiPolicy()
+        elif "Local" in sim_policy_backend:
+            from episwarm.behavior.policy_local import LocalLLMPolicy
+            policy_inst = LocalLLMPolicy()
+
+        # 6. Run simulation
         with st.spinner(f"Stepping through {sim_horizon} days of epidemic propagation with {sim_policy_backend.split(' ')[0]}..."):
             res = run_simulation(
                 pop,
                 d_pack,
                 s_pack,
                 behavior_pack=b_pack,
-                random_seed=int(sim_seed)
+                policy=policy_inst
             )
             st.session_state.sim_results = res
             st.success(f"Simulation completed across {sim_horizon} days for {pop.n_agents:,} synthetic agents!")
