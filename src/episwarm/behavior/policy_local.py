@@ -225,3 +225,7 @@ class LocalLogprobPolicy(DecisionPolicy):
         except Exception:
             pass
         return None
+
+
+# Backward-compatible and intuitive alias
+LocalLLMPolicy = LocalLogprobPolicy

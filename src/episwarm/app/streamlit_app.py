@@ -626,8 +626,8 @@ elif step == "5. Simulation Engine":
             from episwarm.behavior.policy_gemini import GeminiPolicy
             policy_inst = GeminiPolicy()
         elif "Local" in sim_policy_backend:
-            from episwarm.behavior.policy_local import LocalLLMPolicy
-            policy_inst = LocalLLMPolicy()
+            from episwarm.behavior.policy_local import LocalLogprobPolicy
+            policy_inst = LocalLogprobPolicy()
 
         # 6. Run simulation
         with st.spinner(f"Stepping through {sim_horizon} days of epidemic propagation with {sim_policy_backend.split(' ')[0]}..."):
