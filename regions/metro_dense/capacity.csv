@@ -1,0 +1,13 @@
+date,hospital_id,category,nominal,effective_low,effective_high,medicine_stock,upper_cap_extra,source,status
+static,H01,general,25,20,28,adequate,6,L0_QuickRegionBuilder,assumed
+static,H01,icu,3,2,3,adequate,1,L0_QuickRegionBuilder,assumed
+static,H02,general,25,20,28,adequate,6,L0_QuickRegionBuilder,assumed
+static,H02,icu,3,2,3,adequate,1,L0_QuickRegionBuilder,assumed
+static,H03,general,25,20,28,adequate,6,L0_QuickRegionBuilder,assumed
+static,H03,icu,3,2,3,adequate,1,L0_QuickRegionBuilder,assumed
+static,H04,general,25,20,28,adequate,6,L0_QuickRegionBuilder,assumed
+static,H04,icu,3,2,3,adequate,1,L0_QuickRegionBuilder,assumed
+static,H05,general,25,20,28,adequate,6,L0_QuickRegionBuilder,assumed
+static,H05,icu,3,2,3,adequate,1,L0_QuickRegionBuilder,assumed
+static,H06,general,25,20,28,adequate,6,L0_QuickRegionBuilder,assumed
+static,H06,icu,3,2,3,adequate,1,L0_QuickRegionBuilder,assumed

@@ -28,7 +28,7 @@ class AdvisorAgent:
     ):
         self.toolkit = toolkit
         self.run_budget = run_budget
-        self.model_name = model_name or os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+        self.model_name = model_name or os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
         self.client = gemini_client
         self.transcript_dir = transcript_dir
         self.transcripts: List[Dict[str, Any]] = []
@@ -38,7 +38,12 @@ class AdvisorAgent:
         if self.client is not None:
             return self.client
 
-        api_key = os.getenv("GEMINI_API_KEY", "").strip()
+        try:
+            from dotenv import load_dotenv
+            load_dotenv()
+        except ImportError:
+            pass
+        api_key = (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or "").strip()
         if not api_key:
             return None
 

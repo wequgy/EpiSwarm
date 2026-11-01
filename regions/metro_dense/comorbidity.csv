@@ -1,0 +1,5 @@
+age_band,sex,condition,prevalence,source,status
+19-64,M,hypertension,0.2,L0_Default,assumed
+19-64,F,hypertension,0.18,L0_Default,assumed
+65+,M,diabetes,0.3,L0_Default,assumed
+65+,F,diabetes,0.28,L0_Default,assumed

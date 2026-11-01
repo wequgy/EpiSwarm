@@ -1,0 +1,7 @@
+hospital_id,name,area_id,lat,lon,sector,source,status
+H01,Hospital Area 1,A01,0.0,0.0,government,L0_QuickRegionBuilder,assumed
+H02,Hospital Area 2,A02,0.05,0.0,private,L0_QuickRegionBuilder,assumed
+H03,Hospital Area 3,A03,0.1,0.0,government,L0_QuickRegionBuilder,assumed
+H04,Hospital Area 4,A04,0.0,0.05,private,L0_QuickRegionBuilder,assumed
+H05,Hospital Area 5,A05,0.05,0.05,government,L0_QuickRegionBuilder,assumed
+H06,Hospital Area 6,A06,0.1,0.05,private,L0_QuickRegionBuilder,assumed

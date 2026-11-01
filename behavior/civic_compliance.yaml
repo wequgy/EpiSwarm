@@ -1,0 +1,61 @@
+name: civic_compliance
+context: "High civic trust metropolitan region with coordinated public health communication and rapid rumor rebuttal."
+provenance:
+  source: "EpiSwarm Behavioral Dynamics Suite"
+  status: assumed
+  notes: "Assumed high-compliance behavioral archetype with high institutional trust, low rumor vulnerability, and fast adherence."
+
+traits:
+  compliance:
+    mean: 0.82
+    std: 0.12
+  rumor_susceptibility:
+    mean: 0.18
+    std: 0.15
+  risk_tolerance:
+    mean: 0.32
+    std: 0.18
+  institutional_trust:
+    mean: 0.78
+    std: 0.15
+
+rumor_spread_rate: 0.03
+
+rumor_topics:
+  - id: mild_flu_claim
+    label: "Pathogen is a harmless seasonal flu"
+    seed_area: "ALL"
+    seed_day: 5
+    num_seeds: 15
+    credibility: 0.30
+    behavior_effects:
+      mask_reduction: 0.25
+      vaccination_reduction: 0.25
+      isolation_reduction: 0.20
+      attendance_boost: 0.10
+
+compliance_weights:
+  w_risk: 0.30
+  w_norm: 0.30
+  w_enf: 0.20
+  w_fat: 0.10
+  kappa: 0.20
+  fatigue_rate: 0.010
+  fatigue_recovery: 0.035
+
+questions:
+  - id: workplace_attendance
+    type: choice
+    options:
+      - usual
+      - reduced
+      - avoid
+    plain_instructions: "Decide whether to attend workplace as usual, work remotely, or avoid attendance."
+
+  - id: market_visits
+    type: choice
+    options:
+      - usual
+      - essential_only
+      - avoid
+    plain_instructions: "Decide whether to limit grocery trips to essentials only."

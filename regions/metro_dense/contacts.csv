@@ -1,0 +1,11 @@
+layer,age_band_i,age_band_j,contacts_per_day,source,status
+all,0-4,0-4,3.2,Prem et al. 2021 / Libin et al. 2020,assumed
+all,0-4,5-18,1.1,Prem et al. 2021 / Libin et al. 2020,assumed
+all,0-4,19-64,4.5,Prem et al. 2021 / Libin et al. 2020,assumed
+all,0-4,65+,0.7,Prem et al. 2021 / Libin et al. 2020,assumed
+all,5-18,5-18,8.1,Prem et al. 2021 / Libin et al. 2020,assumed
+all,5-18,19-64,4.8,Prem et al. 2021 / Libin et al. 2020,assumed
+all,5-18,65+,0.8,Prem et al. 2021 / Libin et al. 2020,assumed
+all,19-64,19-64,8.9,Prem et al. 2021 / Libin et al. 2020,assumed
+all,19-64,65+,1.4,Prem et al. 2021 / Libin et al. 2020,assumed
+all,65+,65+,2.5,Prem et al. 2021 / Libin et al. 2020,assumed

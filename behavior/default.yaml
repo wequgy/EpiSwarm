@@ -27,7 +27,7 @@ rumor_topics:
     seed_area: "ALL"
     seed_day: 5
     num_seeds: 25
-    credibility: 0.85
+    credibility: 0.45
     behavior_effects:
       mask_reduction: 0.45
       vaccination_reduction: 0.50

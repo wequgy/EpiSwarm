@@ -22,8 +22,13 @@ class GeminiPolicy(DecisionPolicy):
         fallback_policy: Optional[DecisionPolicy] = None
     ):
         super().__init__(cache)
-        self.api_key = api_key or os.getenv("GEMINI_API_KEY")
-        self.model = model or os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+        try:
+            from dotenv import load_dotenv
+            load_dotenv()
+        except ImportError:
+            pass
+        self.api_key = api_key or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+        self.model = model or os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
         self.fallback = fallback_policy or RulePolicy(cache=self.cache)
 
     def decide(
@@ -58,7 +63,7 @@ class GeminiPolicy(DecisionPolicy):
             f"Example format: {json.dumps({opt: round(1.0/len(question.options), 2) for opt in question.options})}"
         )
 
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent?key={self.api_key}"
+        url = f"https://generativelanguage.googleapis.com/v1/models/{self.model}:generateContent?key={self.api_key}"
         payload = {
             "contents": [{"parts": [{"text": prompt_text}]}],
             "generationConfig": {"temperature": 0.2, "responseMimeType": "application/json"}

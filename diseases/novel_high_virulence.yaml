@@ -1,0 +1,68 @@
+name: novel_high_virulence
+description: "Novel high-transmission pathogen with high ICU requirements and severe clinical presentations."
+provenance:
+  source: "EpiSwarm Synthetic Benchmark Suite"
+  status: synthetic
+  notes: "Hypothetical severe respiratory pathogen for stress-testing healthcare surge limits."
+
+transmission:
+  r0: 3.4
+  overdispersion_k: 0.12
+  generation_interval_days: 4.5
+  incubation_days: 3.2
+
+overflow:
+  bed_unavailable_mortality_multiplier: 2.8
+  icu_unavailable_mortality_multiplier: 4.5
+
+states:
+  - id: S
+    label: Susceptible
+    infectious: false
+  - id: E
+    label: Exposed
+    infectious: false
+  - id: I
+    label: Infectious
+    infectious: true
+  - id: H
+    label: Hospitalized
+    infectious: false
+  - id: ICU
+    label: Intensive Care
+    infectious: false
+  - id: R
+    label: Recovered
+    infectious: false
+  - id: D
+    label: Deceased
+    infectious: false
+
+transitions:
+  - from: S
+    to: E
+    rate: transmission_contact
+  - from: E
+    to: I
+    rate: 0.30
+  - from: I
+    to: H
+    rate: 0.08
+  - from: I
+    to: R
+    rate: 0.12
+  - from: H
+    to: ICU
+    rate: 0.04
+  - from: H
+    to: R
+    rate: 0.08
+  - from: H
+    to: D
+    rate: 0.02
+  - from: ICU
+    to: R
+    rate: 0.05
+  - from: ICU
+    to: D
+    rate: 0.06

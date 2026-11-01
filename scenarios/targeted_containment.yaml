@@ -1,0 +1,42 @@
+name: targeted_containment
+horizon_days: 90
+random_seed: 42
+objectives:
+  deaths_weight: 1.0
+  cost_weight: 0.25
+  peak_icu_weight: 1.5
+  disparity_gap_weight: 0.5
+
+interventions:
+  - id: mask_mandate
+    measure: masks
+    start_day: 7
+    end_day: 60
+    stringency: 0.80
+    compliance: 0.75
+    area: ALL
+    notes: "Universal indoor masking mandate starting on day 7."
+
+  - id: school_closure
+    measure: school_closure
+    start_day: 10
+    end_day: 45
+    stringency: 0.90
+    compliance: 0.90
+    area: ALL
+    notes: "K-12 educational closure during the accelerating phase."
+
+  - id: contact_tracing
+    measure: contact_tracing
+    start_day: 12
+    end_day: 75
+    stringency: 0.70
+    compliance: 0.80
+    area: ALL
+    notes: "Digital and manual field contact tracing teams deployed."
+
+seeding:
+  mode: fixed_count
+  initial_infected: 25
+  target_areas:
+    - ALL

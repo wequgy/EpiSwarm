@@ -97,7 +97,19 @@ class RumorDynamicsEngine:
 
             # 4. Belief update with saturating function f(exposure) = 1 - exp(-exposure)
             f_exp = 1.0 - np.exp(-exposure)
-            delta_belief = self.gullibility * self.trust_factor * (1.0 - current_b) * f_exp
+            growth = self.gullibility * self.trust_factor * (1.0 - current_b) * f_exp
+
+            # Natural memory decay and skepticism dampening (prevents unrealistic monotonic lock-in)
+            decay = (0.025 + 0.045 * (1.0 - self.gullibility) * self.pop.trust) * current_b
+
+            # Diffusion fluctuation for agents with active knowledge
+            fluctuation = np.zeros(self.n_agents, dtype=np.float32)
+            has_belief = current_b > 0.005
+            if np.any(has_belief):
+                diff_scale = np.sqrt(np.clip(current_b[has_belief] * (1.0 - current_b[has_belief]), 0.01, 0.25))
+                fluctuation[has_belief] = rng.normal(0.0, 0.015, size=int(np.sum(has_belief))).astype(np.float32) * diff_scale
+
+            delta_belief = growth - decay + fluctuation
 
             # 5. Official correction campaigns
             corr_intensity = active_corrections.get(topic.id, 0.0)

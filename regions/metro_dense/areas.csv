@@ -1,0 +1,7 @@
+area_id,name,level,parent_id,population,households,area_km2,lat,lon,source,status
+A01,Area 1,ward,Z1,10000,2778,1.25,0.0,0.0,L0_QuickRegionBuilder,assumed
+A02,Area 2,ward,Z1,10000,2778,1.25,0.05,0.0,L0_QuickRegionBuilder,assumed
+A03,Area 3,ward,Z1,10000,2778,1.25,0.1,0.0,L0_QuickRegionBuilder,assumed
+A04,Area 4,ward,Z1,10000,2778,1.25,0.0,0.05,L0_QuickRegionBuilder,assumed
+A05,Area 5,ward,Z2,10000,2778,1.25,0.05,0.05,L0_QuickRegionBuilder,assumed
+A06,Area 6,ward,Z2,10000,2778,1.25,0.1,0.05,L0_QuickRegionBuilder,assumed

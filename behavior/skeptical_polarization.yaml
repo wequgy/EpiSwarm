@@ -1,0 +1,69 @@
+name: skeptical_polarization
+context: "Metropolitan environment with high institutional skepticism, fragmented social media discourse, and prominent misinformation vectors."
+provenance:
+  source: "EpiSwarm Behavioral Dynamics Suite"
+  status: assumed
+  notes: "Assumed high-polarization behavioral archetype with elevated rumor sensitivity and lower default institutional trust."
+
+traits:
+  compliance:
+    mean: 0.50
+    std: 0.20
+  rumor_susceptibility:
+    mean: 0.45
+    std: 0.22
+  risk_tolerance:
+    mean: 0.55
+    std: 0.20
+  institutional_trust:
+    mean: 0.38
+    std: 0.22
+
+rumor_spread_rate: 0.08
+
+rumor_topics:
+  - id: mild_flu_claim
+    label: "Pathogen is a harmless seasonal flu"
+    seed_area: "ALL"
+    seed_day: 3
+    num_seeds: 40
+    credibility: 0.50
+    behavior_effects:
+      mask_reduction: 0.55
+      vaccination_reduction: 0.60
+      isolation_reduction: 0.45
+      attendance_boost: 0.30
+
+compliance_weights:
+  w_risk: 0.20
+  w_norm: 0.25
+  w_enf: 0.10
+  w_fat: 0.25
+  kappa: 0.35
+  fatigue_rate: 0.025
+  fatigue_recovery: 0.015
+
+questions:
+  - id: workplace_attendance
+    type: choice
+    options:
+      - usual
+      - reduced
+      - avoid
+    plain_instructions: "Given the current local outbreak level and public advisories, decide whether to attend workplace as usual, reduce presence, or avoid attendance."
+
+  - id: market_visits
+    type: choice
+    options:
+      - usual
+      - essential_only
+      - avoid
+    plain_instructions: "Decide your frequency of visiting busy markets and grocery centers."
+
+  - id: mask_adoption
+    type: choice
+    options:
+      - strict
+      - crowded_only
+      - none
+    plain_instructions: "Decide whether to wear a mask in indoor and transit spaces."

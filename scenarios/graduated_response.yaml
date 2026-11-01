@@ -1,0 +1,42 @@
+name: graduated_response
+horizon_days: 90
+random_seed: 42
+objectives:
+  deaths_weight: 1.0
+  cost_weight: 0.40
+  peak_icu_weight: 2.0
+  disparity_gap_weight: 0.6
+
+interventions:
+  - id: awareness_campaign
+    measure: awareness
+    start_day: 3
+    end_day: 90
+    stringency: 0.50
+    compliance: 0.85
+    area: ALL
+    notes: "Continuous public service announcements and rumor debunking."
+
+  - id: transit_capacity_limit
+    measure: transit_limit
+    start_day: 10
+    end_day: 50
+    stringency: 0.60
+    compliance: 0.70
+    area: ALL
+    notes: "Cap mass transit occupancy to 50% capacity."
+
+  - id: business_curfew
+    measure: curfew
+    start_day: 15
+    end_day: 40
+    stringency: 0.75
+    compliance: 0.65
+    area: ALL
+    notes: "Night curfew and retail hour restrictions."
+
+seeding:
+  mode: fixed_count
+  initial_infected: 30
+  target_areas:
+    - ALL
