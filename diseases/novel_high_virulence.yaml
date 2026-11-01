@@ -1,68 +1,128 @@
 name: novel_high_virulence
-description: "Novel high-transmission pathogen with high ICU requirements and severe clinical presentations."
+description: Severe novel respiratory pathogen modeled with high reproduction and elevated ICU clinical severity.
 provenance:
   source: "EpiSwarm Synthetic Benchmark Suite"
   status: synthetic
-  notes: "Hypothetical severe respiratory pathogen for stress-testing healthcare surge limits."
+  notes: "Hypothetical severe pathogen for healthcare stress testing."
 
 transmission:
+  mode: person_to_person
   r0: 3.4
   overdispersion_k: 0.12
-  generation_interval_days: 4.5
-  incubation_days: 3.2
+  seasonality_amplitude: 0.15
+  waning_immunity_days: 120.0
+
+states:
+  - name: S
+    infectious: false
+    absorbing: false
+  - name: E
+    infectious: false
+    absorbing: false
+  - name: I_asymp
+    infectious: true
+    relative_infectiousness: 0.60
+    absorbing: false
+  - name: I_symp
+    infectious: true
+    relative_infectiousness: 1.00
+    absorbing: false
+  - name: H
+    infectious: true
+    relative_infectiousness: 0.15
+    needs:
+      res_bed: 1.0
+    needs_care: true
+    severity_level: 1.5
+    absorbing: false
+  - name: ICU
+    infectious: true
+    relative_infectiousness: 0.05
+    needs:
+      res_bed: 1.0
+      res_support: 1.0
+    needs_care: true
+    severity_level: 3.0
+    absorbing: false
+  - name: R
+    infectious: false
+    absorbing: true
+  - name: D
+    infectious: false
+    absorbing: true
+
+transitions:
+  - from_state: E
+    to_state: I_asymp
+    base_probability: 0.25
+    duration:
+      type: gamma
+      mean_days: 2.5
+      sd_days: 0.8
+  - from_state: E
+    to_state: I_symp
+    base_probability: 0.75
+    duration:
+      type: gamma
+      mean_days: 2.5
+      sd_days: 0.8
+  - from_state: I_asymp
+    to_state: R
+    base_probability: 1.00
+    duration:
+      type: gamma
+      mean_days: 5.0
+      sd_days: 1.5
+  - from_state: I_symp
+    to_state: R
+    base_probability: 0.82
+    duration:
+      type: gamma
+      mean_days: 6.0
+      sd_days: 2.0
+  - from_state: I_symp
+    to_state: H
+    base_probability: 0.18
+    duration:
+      type: gamma
+      mean_days: 5.0
+      sd_days: 1.5
+  - from_state: H
+    to_state: R
+    base_probability: 0.68
+    duration:
+      type: gamma
+      mean_days: 8.0
+      sd_days: 2.5
+  - from_state: H
+    to_state: ICU
+    base_probability: 0.25
+    duration:
+      type: gamma
+      mean_days: 4.0
+      sd_days: 1.2
+  - from_state: H
+    to_state: D
+    base_probability: 0.07
+    duration:
+      type: gamma
+      mean_days: 6.0
+      sd_days: 2.0
+  - from_state: ICU
+    to_state: R
+    base_probability: 0.55
+    duration:
+      type: gamma
+      mean_days: 10.0
+      sd_days: 3.0
+  - from_state: ICU
+    to_state: D
+    base_probability: 0.45
+    duration:
+      type: gamma
+      mean_days: 7.0
+      sd_days: 2.5
 
 overflow:
   bed_unavailable_mortality_multiplier: 2.8
   icu_unavailable_mortality_multiplier: 4.5
-
-states:
-  - id: S
-    label: Susceptible
-    infectious: false
-  - id: E
-    label: Exposed
-    infectious: false
-  - id: I
-    label: Infectious
-    infectious: true
-  - id: H
-    label: Hospitalized
-    infectious: false
-  - id: ICU
-    label: Intensive Care
-    infectious: false
-  - id: R
-    label: Recovered
-    infectious: false
-  - id: D
-    label: Deceased
-    infectious: false
-
-transitions:
-  - from: S
-    to: E
-    rate: transmission_contact
-  - from: E
-    to: I
-    rate: 0.30
-  - from: I
-    to: H
-    rate: 0.08
-  - from: I
-    to: R
-    rate: 0.12
-  - from: H
-    to: ICU
-    rate: 0.04
-  - from: H
-    to: R
-    rate: 0.08
-  - from: H
-    to: D
-    rate: 0.02
-  - from: ICU
-    to: R
-    rate: 0.05
-  - from: ICU
-    to: D
-    rate: 0.06

@@ -536,9 +536,9 @@ elif step == "5. Simulation Engine":
         with col_sr2:
             sim_seed = st.number_input("Random Seed", value=int(s_raw.get("random_seed", 42)), min_value=1)
 
-        sim_mask_toggle = st.checkbox("Enforce Universal Mask Mandate", value=any(i.get("measure") == "masks" for i in s_raw.get("interventions", [])))
-        sim_school_toggle = st.checkbox("Enforce School Closure", value=any(i.get("measure") == "school_closure" for i in s_raw.get("interventions", [])))
-        sim_tracing_toggle = st.checkbox("Enforce Contact Tracing", value=any(i.get("measure") == "contact_tracing" for i in s_raw.get("interventions", [])))
+        sim_mask_toggle = st.checkbox("Enforce Universal Mask Mandate", value=any(i.get("measure_type") == "mask_mandate" for i in s_raw.get("interventions", [])))
+        sim_school_toggle = st.checkbox("Enforce School Closure", value=any(i.get("measure_type") == "school_closure" for i in s_raw.get("interventions", [])))
+        sim_curfew_toggle = st.checkbox("Enforce Movement / Curfew Restrictions", value=any(i.get("measure_type") == "curfew" for i in s_raw.get("interventions", [])))
 
     # MODULE 4: BEHAVIOR & RUMORS
     with mod4:
@@ -584,11 +584,35 @@ elif step == "5. Simulation Engine":
         s_raw["random_seed"] = int(sim_seed)
         active_interventions = []
         if sim_mask_toggle:
-            active_interventions.append(InterventionAction(id="mask_mandate", measure="masks", start_day=5, end_day=sim_horizon, stringency=0.75, compliance=0.80, area="ALL"))
+            active_interventions.append(InterventionAction(
+                name="universal_mask_mandate",
+                measure_type="mask_mandate",
+                area_id="ALL",
+                start_day=5,
+                end_day=sim_horizon,
+                stringency=0.75,
+                cost_per_day=0.5
+            ))
         if sim_school_toggle:
-            active_interventions.append(InterventionAction(id="school_closure", measure="school_closure", start_day=8, end_day=min(45, sim_horizon), stringency=0.90, compliance=0.90, area="ALL"))
-        if sim_tracing_toggle:
-            active_interventions.append(InterventionAction(id="contact_tracing", measure="contact_tracing", start_day=10, end_day=sim_horizon, stringency=0.65, compliance=0.75, area="ALL"))
+            active_interventions.append(InterventionAction(
+                name="targeted_school_closure",
+                measure_type="school_closure",
+                area_id="ALL",
+                start_day=8,
+                end_day=min(45, sim_horizon),
+                stringency=0.90,
+                cost_per_day=1.5
+            ))
+        if sim_curfew_toggle:
+            active_interventions.append(InterventionAction(
+                name="movement_curfew",
+                measure_type="curfew",
+                area_id="ALL",
+                start_day=10,
+                end_day=sim_horizon,
+                stringency=0.65,
+                cost_per_day=1.0
+            ))
         s_raw["interventions"] = active_interventions
         s_pack = ScenarioPack(**s_raw)
 
