@@ -202,12 +202,12 @@ elif step == "3. Healthcare & Capacity":
         res_df = pd.read_csv(res_file)
         st.dataframe(res_df)
         fig = px.bar(res_df, x="resource_id", y="nominal", color="area_id", barmode="group", title="Nominal Generic Resources by Area")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
     elif cap_file.exists():
         cap_df = pd.read_csv(cap_file)
         st.dataframe(cap_df)
         fig = px.bar(cap_df, x="hospital_id", y="nominal", color="category", barmode="group", title="Nominal Capacity by Facility")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
     else:
         st.info("No resources.csv or capacity.csv present. Defaulting to standard generic clinical resources.")
 
@@ -265,7 +265,7 @@ elif step == "3. Healthcare & Capacity":
                 )
                 df_mv = pd.DataFrame([{"units": p.units_added, "deaths": p.mean_deaths, "marginal_benefit": p.marginal_death_reduction} for p in m_res.curve])
                 fig_mv = px.line(df_mv, x="units", y="marginal_benefit", title="Marginal Value Curve (Diminishing Returns)")
-                st.plotly_chart(fig_mv, use_container_width=True)
+                st.plotly_chart(fig_mv, width="stretch")
                 st.write(f"**Diminishing Returns Threshold:** ~{m_res.diminishing_returns_threshold_units:.0f} units")
                 st.write(f"**Best Area Ranking for Next Unit:** {ranking}")
 
@@ -344,20 +344,20 @@ elif step == "5. Simulation Engine":
         df_curves = pd.DataFrame(res.daily_state_counts, columns=res.state_names)
         df_curves["day"] = np.arange(len(df_curves))
         fig = px.line(df_curves, x="day", y=res.state_names, title="Epidemic Compartment Dynamics (State Trajectories)")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
         if res.daily_mean_compliance is not None:
             col_b1, col_b2 = st.columns(2)
             with col_b1:
                 df_comp = pd.DataFrame({"day": np.arange(len(res.daily_mean_compliance)), "compliance": res.daily_mean_compliance})
                 fig_comp = px.line(df_comp, x="day", y="compliance", title="Public Policy Compliance Over Time (with Fatigue & Norms)")
-                st.plotly_chart(fig_comp, use_container_width=True)
+                st.plotly_chart(fig_comp, width="stretch")
             with col_b2:
                 if res.daily_rumor_beliefs:
                     df_rumor = pd.DataFrame(res.daily_rumor_beliefs)
                     df_rumor["day"] = np.arange(len(df_rumor))
                     fig_rumor = px.line(df_rumor, x="day", y=list(res.daily_rumor_beliefs.keys()), title="Mean Rumor Belief Over Time Across Social Network")
-                    st.plotly_chart(fig_rumor, use_container_width=True)
+                    st.plotly_chart(fig_rumor, width="stretch")
 
 # --- STEP 6: ANALYSIS & EQUITY ---
 elif step == "6. Analysis & Equity":
@@ -375,7 +375,7 @@ elif step == "6. Analysis & Equity":
             st.text(eq.summary())
             df_eq = pd.DataFrame(list(eq.area_attack_rates.items()), columns=["Area", "Attack_Rate"])
             fig_eq = px.bar(df_eq, x="Area", y="Attack_Rate", color="Attack_Rate", title="Attack Rate by Administrative Area")
-            st.plotly_chart(fig_eq, use_container_width=True)
+            st.plotly_chart(fig_eq, width="stretch")
 
         with tab_spread:
             if st.button("Compute Spatial Spread Matrix"):
@@ -387,7 +387,7 @@ elif step == "6. Analysis & Equity":
                     sm = compute_spread_matrix(pop, dp, sc, n_seeds=2, max_days=30)
                     st.dataframe(sm.to_dataframe())
                     fig_sm = px.imshow(sm.mean_arrival_days, x=sm.area_names, y=sm.area_names, title="Mean Days Until First Infection Arrival", labels=dict(color="Days"))
-                    st.plotly_chart(fig_sm, use_container_width=True)
+                    st.plotly_chart(fig_sm, width="stretch")
 
 # --- STEP 7: POLICY ADVISOR & OPTIMIZER ---
 elif step == "7. Policy Advisor & Optimizer":
@@ -430,7 +430,7 @@ elif step == "7. Policy Advisor & Optimizer":
                 st.dataframe(pareto_df)
                 if not pareto_df.empty:
                     fig_p = px.scatter(pareto_df, x="deaths", y="cost", size="peak_icu", color="deaths", title="Pareto Trade-off: Fatalities vs Economic Cost")
-                    st.plotly_chart(fig_p, use_container_width=True)
+                    st.plotly_chart(fig_p, width="stretch")
 
 # --- STEP 8: EXPORT AUDIT REPORT ---
 elif step == "8. Export Audit Report":
