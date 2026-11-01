@@ -1,47 +1,33 @@
 /**
  * EpiSwarm Studio - Field Dispatch Controller
- * Connects the Google Stitch UI frontend to the FastAPI simulation backend.
+ * Matches the Google Stitch Field Dispatch Blueprint UI.
  */
 
 const STATE = {
   activeTab: 'viewport',
   simulationData: null,
-  currentDay: 0,
+  currentDay: 14,
   isPlaying: false,
+  playSpeed: 1,
   playInterval: null,
-  agents: [],
-  showcaseAgents: [],
-  advisorRecommendation: null,
-  canvas: null,
-  ctx: null,
-  venues: [
-    { id: 'hosp_st_jude', name: 'St. Jude General Hospital', type: 'hospital', x: 280, y: 160, area: 'A01', beds: 45 },
-    { id: 'school_central', name: 'Central High School', type: 'school', x: 480, y: 120, area: 'A01', beds: 0 },
-    { id: 'market_civic', name: 'Civic Trade Center', type: 'market', x: 680, y: 260, area: 'A02', beds: 0 },
-    { id: 'hosp_westside', name: 'Westside Clinic', type: 'hospital', x: 860, y: 180, area: 'A02', beds: 15 },
-    { id: 'res_a01', name: 'Residential Ward A01', type: 'residential', x: 220, y: 340, area: 'A01', beds: 0 },
-    { id: 'res_a02', name: 'Residential Ward A02', type: 'residential', x: 740, y: 380, area: 'A02', beds: 0 }
-  ]
+  showcaseAgents: []
 };
 
-// Initialize Application
+// Initialize on DOM load
 document.addEventListener('DOMContentLoaded', async () => {
   setupNavigation();
-  setupCanvas();
   setupControls();
   await loadSystemStatus();
   await loadCurrentSimulation();
   await loadShowcaseAgents();
-  startCanvasLoop();
 });
 
-// Setup Tab Switching
+// Navigation Tab Switching
 function setupNavigation() {
-  const tabs = document.querySelectorAll('.nav-tab-btn');
-  tabs.forEach(tab => {
-    tab.addEventListener('click', () => {
-      const targetView = tab.getAttribute('data-tab');
-      switchTab(targetView);
+  document.querySelectorAll('.nav-tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = btn.getAttribute('data-tab');
+      switchTab(target);
     });
   });
 }
@@ -55,10 +41,10 @@ function switchTab(tabId) {
     panel.classList.toggle('active', panel.id === `view-${tabId}`);
   });
 
-  if (tabId === 'viewport') {
-    resizeCanvas();
-  } else if (tabId === 'decision') {
-    renderDecisionCharts();
+  if (tabId === 'decision') {
+    renderDecisionPareto();
+  } else if (tabId === 'viewport') {
+    renderSparkline();
   }
 }
 
@@ -68,31 +54,23 @@ async function loadSystemStatus() {
     const res = await fetch('/api/status');
     const data = await res.json();
     console.log('[System Status]', data);
-    
-    // Populate region dropdown
-    const regSelect = document.getElementById('param-region');
-    if (regSelect && data.available_regions) {
-      regSelect.innerHTML = data.available_regions.map(r => `<option value="regions/${r}">${r.toUpperCase()}</option>`).join('');
-    }
   } catch (err) {
     console.warn('Backend status check error:', err);
   }
 }
 
-// Load Simulation Data
+// Load or Run Default Simulation
 async function loadCurrentSimulation() {
   try {
-    showLoadingBanner('Simulating scenario telemetry...');
+    showLoadingBanner('Synchronizing simulation telemetry...');
     const res = await fetch('/api/current_results');
     const data = await res.json();
     STATE.simulationData = data;
     hideLoadingBanner();
-    
-    STATE.currentDay = 0;
-    initAgentSimCoordinates();
-    updateUIForCurrentDay();
-    updateParameterForm(data);
-    renderTrajectorySparkline();
+
+    STATE.currentDay = Math.min(14, (data.horizon_days || 30) - 1);
+    updateUI();
+    renderSparkline();
   } catch (err) {
     console.error('Failed to load simulation results:', err);
     hideLoadingBanner();
@@ -103,247 +81,78 @@ async function loadCurrentSimulation() {
 async function loadShowcaseAgents() {
   try {
     const res = await fetch('/api/agents');
-    const agents = await res.json();
-    STATE.showcaseAgents = agents;
+    STATE.showcaseAgents = await res.json();
     renderShowcaseAgentCards();
   } catch (err) {
-    console.warn('Failed to fetch showcase agents:', err);
+    console.warn('Failed to load showcase agents:', err);
   }
 }
 
-// Setup Canvas for 2.5D Simulation Viewport
-function setupCanvas() {
-  STATE.canvas = document.getElementById('sim-viewport-canvas');
-  if (!STATE.canvas) return;
-  STATE.ctx = STATE.canvas.getContext('2d');
-  resizeCanvas();
-  window.addEventListener('resize', resizeCanvas);
-}
-
-function resizeCanvas() {
-  if (!STATE.canvas) return;
-  const container = STATE.canvas.parentElement;
-  STATE.canvas.width = container.clientWidth;
-  STATE.canvas.height = container.clientHeight;
-}
-
-// Initialize agent graphic positions and paths
-function initAgentSimCoordinates() {
-  if (!STATE.simulationData || !STATE.simulationData.sampled_agents) return;
-  const agents = STATE.simulationData.sampled_agents;
-  const w = STATE.canvas ? STATE.canvas.width : 1000;
-  const h = STATE.canvas ? STATE.canvas.height : 500;
-
-  STATE.agents = agents.map((a, i) => {
-    const isA01 = a.area_id.includes('01') || a.area_id === 'A01';
-    const homeVenue = isA01 ? STATE.venues[4] : STATE.venues[5];
-    const workVenue = isA01 ? STATE.venues[1] : STATE.venues[2];
-    
-    return {
-      ...a,
-      x: homeVenue.x + (Math.random() * 80 - 40),
-      y: homeVenue.y + (Math.random() * 60 - 30),
-      targetX: workVenue.x + (Math.random() * 80 - 40),
-      targetY: workVenue.y + (Math.random() * 60 - 30),
-      homeX: homeVenue.x + (Math.random() * 80 - 40),
-      homeY: homeVenue.y + (Math.random() * 60 - 30),
-      workX: workVenue.x + (Math.random() * 80 - 40),
-      workY: workVenue.y + (Math.random() * 60 - 30),
-      speed: 0.02 + Math.random() * 0.03,
-      progress: Math.random()
-    };
-  });
-}
-
-// Canvas Render Loop
-function startCanvasLoop() {
-  function render() {
-    if (STATE.activeTab === 'viewport' && STATE.ctx && STATE.canvas) {
-      drawSimulationWorld(STATE.ctx, STATE.canvas.width, STATE.canvas.height);
-    }
-    requestAnimationFrame(render);
-  }
-  requestAnimationFrame(render);
-}
-
-function drawSimulationWorld(ctx, w, h) {
-  ctx.clearRect(0, 0, w, h);
-
-  // 1. Draw Inter-district connector roads
-  ctx.lineWidth = 4;
-  ctx.strokeStyle = '#94A3B8';
-  ctx.setLineDash([8, 6]);
-  ctx.beginPath();
-  // Road A01 res -> Hospital
-  ctx.moveTo(220, 340);
-  ctx.lineTo(280, 160);
-  // Road Hospital -> School
-  ctx.lineTo(480, 120);
-  // Transit corridor across wards
-  ctx.lineTo(680, 260);
-  // Market -> Westside Clinic
-  ctx.lineTo(860, 180);
-  // Market -> Ward A02
-  ctx.lineTo(740, 380);
-  ctx.stroke();
-  ctx.setLineDash([]);
-
-  // 2. Draw Venues (Tactile Neo-Brutalist Pedestals)
-  STATE.venues.forEach(v => {
-    // Pedestal shadow
-    ctx.fillStyle = '#171c20';
-    ctx.fillRect(v.x - 42, v.y - 28, 88, 60);
-
-    // Pedestal body
-    if (v.type === 'hospital') {
-      ctx.fillStyle = '#FFDAD6';
-    } else if (v.type === 'school') {
-      ctx.fillStyle = '#FEF3C7';
-    } else if (v.type === 'market') {
-      ctx.fillStyle = '#BFE0F5';
-    } else {
-      ctx.fillStyle = '#FFFFFF';
-    }
-    ctx.fillRect(v.x - 45, v.y - 32, 88, 60);
-
-    // Border
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = '#171c20';
-    ctx.strokeRect(v.x - 45, v.y - 32, 88, 60);
-
-    // Icon & Label
-    ctx.fillStyle = '#171c20';
-    ctx.font = 'bold 11px "Space Mono", monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText(v.name.slice(0, 14), v.x - 1, v.y - 12);
-
-    ctx.font = '9px "Space Mono", monospace';
-    ctx.fillStyle = '#596168';
-    ctx.fillText(`[${v.area} • ${v.type.toUpperCase()}]`, v.x - 1, v.y + 4);
-
-    // If hospital, show mini capacity meter
-    if (v.type === 'hospital' && STATE.simulationData) {
-      const metric = STATE.simulationData.daily_metrics[STATE.currentDay] || {};
-      const occ = v.id === 'hosp_st_jude' ? Math.min(100, Math.round((metric.icu_demand || 0) * 0.7 / 45 * 100)) : 40;
-      ctx.fillStyle = '#171c20';
-      ctx.fillRect(v.x - 35, v.y + 12, 70, 8);
-      ctx.fillStyle = occ > 85 ? '#EF4444' : '#0284C7';
-      ctx.fillRect(v.x - 34, v.y + 13, (68 * occ) / 100, 6);
-    }
-  });
-
-  // 3. Draw Moving Agent Pedestals
-  if (STATE.simulationData && STATE.agents) {
-    const metric = STATE.simulationData.daily_metrics[STATE.currentDay] || {};
-    const totalPop = STATE.simulationData.total_population || 5000;
-    
-    // Proportions for current day
-    const fracInfected = (metric.infectious || 0) / totalPop;
-    const fracExposed = (metric.exposed || 0) / totalPop;
-    const fracRecovered = (metric.recovered || 0) / totalPop;
-
-    STATE.agents.forEach((agent, i) => {
-      // Interpolate movement
-      agent.progress += agent.speed;
-      if (agent.progress > 1) {
-        agent.progress = 0;
-        // Swap commute direction
-        const tmpX = agent.homeX;
-        const tmpY = agent.homeY;
-        agent.homeX = agent.workX;
-        agent.homeY = agent.workY;
-        agent.workX = tmpX;
-        agent.workY = tmpY;
-      }
-
-      agent.x = agent.homeX + (agent.workX - agent.homeX) * agent.progress;
-      agent.y = agent.homeY + (agent.workY - agent.homeY) * agent.progress;
-
-      // Determine state by sampled hash
-      const hash = ((agent.agent_id * 9301 + 49297) % 233280) / 233280.0;
-      let color = '#FFFFFF'; // Susceptible
-      let glow = false;
-
-      if (hash < fracInfected) {
-        color = '#EF4444'; // Infectious
-        glow = true;
-      } else if (hash < fracInfected + fracExposed) {
-        color = '#F59E0B'; // Exposed
-      } else if (hash < fracInfected + fracExposed + fracRecovered) {
-        color = '#38BDF8'; // Recovered
-      }
-
-      // Draw agent shadow
-      ctx.fillStyle = '#171c20';
-      ctx.beginPath();
-      ctx.arc(agent.x + 2, agent.y + 2, 5, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Draw agent body
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.arc(agent.x, agent.y, 5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.lineWidth = 1.5;
-      ctx.strokeStyle = '#171c20';
-      ctx.stroke();
-
-      // Infection burst glow ring
-      if (glow) {
-        ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(agent.x, agent.y, 9 + Math.sin(Date.now() / 150) * 3, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-    });
-  }
-}
-
-// Scrubber & Controls
+// Setup User Controls
 function setupControls() {
-  const scrubber = document.getElementById('timeline-slider');
-  const playBtn = document.getElementById('btn-play-pause');
-  const prevBtn = document.getElementById('btn-step-prev');
-  const nextBtn = document.getElementById('btn-step-next');
-
-  if (scrubber) {
-    scrubber.addEventListener('input', (e) => {
+  // Timeline slider
+  const slider = document.getElementById('timeline-slider');
+  if (slider) {
+    slider.addEventListener('input', (e) => {
       STATE.currentDay = parseInt(e.target.value, 10);
-      updateUIForCurrentDay();
+      updateUI();
     });
   }
 
+  // Play / Pause
+  const playBtn = document.getElementById('btn-play-pause');
   if (playBtn) {
-    playBtn.addEventListener('click', () => {
+    playBtn.addEventListener('click', togglePlayPause);
+  }
+
+  // Speed Toggles
+  document.querySelectorAll('.speed-toggle-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.speed-toggle-btn').forEach(b => {
+        b.classList.remove('bg-[#bfe0f5]', 'font-bold');
+        b.classList.add('hover:bg-[#e4e9ee]');
+      });
+      btn.classList.add('bg-[#bfe0f5]', 'font-bold');
+      STATE.playSpeed = parseInt(btn.getAttribute('data-speed'), 10) || 1;
       if (STATE.isPlaying) {
-        pauseSimulation();
-      } else {
-        playSimulation();
+        startPlayInterval();
       }
     });
-  }
+  });
 
-  if (prevBtn) {
-    prevBtn.addEventListener('click', () => {
+  // Step buttons
+  const stepPrev = document.getElementById('btn-bottom-step-prev');
+  if (stepPrev) {
+    stepPrev.addEventListener('click', () => {
       if (STATE.currentDay > 0) {
         STATE.currentDay--;
-        updateUIForCurrentDay();
+        updateUI();
       }
     });
   }
 
-  if (nextBtn) {
-    nextBtn.addEventListener('click', () => {
+  const stepNext = document.getElementById('btn-bottom-step-next');
+  if (stepNext) {
+    stepNext.addEventListener('click', () => {
       const maxDay = STATE.simulationData ? STATE.simulationData.horizon_days - 1 : 29;
       if (STATE.currentDay < maxDay) {
         STATE.currentDay++;
-        updateUIForCurrentDay();
+        updateUI();
       }
     });
   }
 
-  // Parameter Studio sliders & commit
+  // Run Scenario triggers
+  const topRun = document.getElementById('btn-top-run-scenario');
+  if (topRun) topRun.addEventListener('click', () => switchTab('scenario'));
+
+  const commitRun = document.getElementById('btn-commit-run');
+  if (commitRun) commitRun.addEventListener('click', executeSimulation);
+
+  const bottomCommit = document.getElementById('btn-bottom-commit');
+  if (bottomCommit) bottomCommit.addEventListener('click', () => switchTab('scenario'));
+
+  // R0 slider
   const r0Slider = document.getElementById('param-r0');
   if (r0Slider) {
     r0Slider.addEventListener('input', (e) => {
@@ -353,115 +162,181 @@ function setupControls() {
     });
   }
 
+  // Compliance slider
   const compSlider = document.getElementById('param-compliance');
   if (compSlider) {
     compSlider.addEventListener('input', (e) => {
-      const val = Math.round(parseFloat(e.target.value) * 100);
+      const pct = Math.round(parseFloat(e.target.value) * 100);
       const span = document.getElementById('param-compliance-val');
-      if (span) span.textContent = `${val}%`;
+      if (span) span.textContent = `${pct}%`;
     });
   }
 
-  const runBtn = document.getElementById('btn-commit-run');
-  if (runBtn) {
-    runBtn.addEventListener('click', executeNewSimulation);
-  }
-
+  // Advisor CTA
   const advisorBtn = document.getElementById('btn-trigger-advisor');
-  if (advisorBtn) {
-    advisorBtn.addEventListener('click', requestPolicyAdvisor);
+  if (advisorBtn) advisorBtn.addEventListener('click', requestPolicyAdvisor);
+
+  // Intervention quick toggles in bottom dock
+  setupQuickToggles();
+}
+
+function setupQuickToggles() {
+  const toggles = [
+    { id: 'toggle-lockdown', labelOff: 'OFF', labelOn: 'ACTIVE' },
+    { id: 'toggle-schools', labelOff: 'OPEN', labelOn: 'ACTIVE' },
+    { id: 'toggle-masks', labelOff: 'ADVISORY', labelOn: 'ACTIVE' },
+    { id: 'toggle-vax', labelOff: 'STANDBY', labelOn: 'ACTIVE' },
+    { id: 'toggle-tracing', labelOff: 'STANDBY', labelOn: 'ACTIVE' },
+    { id: 'toggle-awareness', labelOff: 'QUEUED', labelOn: 'BROADCAST' }
+  ];
+
+  toggles.forEach(t => {
+    const el = document.getElementById(t.id);
+    if (!el) return;
+    el.addEventListener('click', () => {
+      const isActive = el.textContent === t.labelOn;
+      el.textContent = isActive ? t.labelOff : t.labelOn;
+      const parent = el.closest('div.border-2');
+      if (parent) {
+        if (!isActive) {
+          parent.classList.add('bg-[#bfe0f5]', 'shadow-[2px_2px_0px_#171c20]');
+        } else {
+          parent.classList.remove('bg-[#bfe0f5]', 'shadow-[2px_2px_0px_#171c20]');
+          parent.classList.add('bg-[#F8FAFC]');
+        }
+      }
+    });
+  });
+}
+
+function togglePlayPause() {
+  if (STATE.isPlaying) {
+    pausePlay();
+  } else {
+    startPlay();
   }
 }
 
-function playSimulation() {
+function startPlay() {
   STATE.isPlaying = true;
-  const playBtn = document.getElementById('btn-play-pause');
-  if (playBtn) playBtn.innerHTML = '<span class="material-symbols-outlined">pause</span> PAUSE';
+  const btn = document.getElementById('btn-play-pause');
+  if (btn) btn.innerHTML = '<span class="material-symbols-outlined text-base">pause</span>';
+  startPlayInterval();
+}
 
+function pausePlay() {
+  STATE.isPlaying = false;
+  clearInterval(STATE.playInterval);
+  const btn = document.getElementById('btn-play-pause');
+  if (btn) btn.innerHTML = '<span class="material-symbols-outlined text-base">play_arrow</span>';
+}
+
+function startPlayInterval() {
+  clearInterval(STATE.playInterval);
+  const intervalMs = Math.max(100, Math.floor(600 / STATE.playSpeed));
   const maxDay = STATE.simulationData ? STATE.simulationData.horizon_days - 1 : 29;
+
   STATE.playInterval = setInterval(() => {
     if (STATE.currentDay < maxDay) {
       STATE.currentDay++;
-      updateUIForCurrentDay();
+      updateUI();
     } else {
-      pauseSimulation();
+      pausePlay();
     }
-  }, 450);
+  }, intervalMs);
 }
 
-function pauseSimulation() {
-  STATE.isPlaying = false;
-  clearInterval(STATE.playInterval);
-  const playBtn = document.getElementById('btn-play-pause');
-  if (playBtn) playBtn.innerHTML = '<span class="material-symbols-outlined">play_arrow</span> PLAY';
-}
+// Update UI elements based on current day and simulation metrics
+function updateUI() {
+  const day = STATE.currentDay;
+  const dStr = String(day).padStart(2, '0');
 
-// Update UI elements on Day Change
-function updateUIForCurrentDay() {
-  const scrubber = document.getElementById('timeline-slider');
-  if (scrubber) scrubber.value = STATE.currentDay;
+  // Sliders and day labels
+  const slider = document.getElementById('timeline-slider');
+  if (slider) slider.value = day;
 
-  const dayLabel = document.getElementById('current-day-label');
-  if (dayLabel) dayLabel.textContent = `DAY ${String(STATE.currentDay).padStart(2, '0')}`;
+  setElemText('current-day-label', `DAY ${dStr} OF 30`);
+  setElemText('header-clock-ticker', `DAY ${dStr} — 09:42:18 EST`);
+  setElemText('horizon-remaining-label', `HORIZON: ${Math.max(0, 30 - day)} DAYS REMAINING`);
 
   if (!STATE.simulationData) return;
   const metrics = STATE.simulationData.daily_metrics || [];
-  const current = metrics[STATE.currentDay] || {};
+  const current = metrics[day] || {};
 
-  // Bento Metrics
+  // Vital Bento Metrics
   setElemText('stat-active-cases', (current.active_cases || 0).toLocaleString());
-  setElemText('stat-susceptible', (current.susceptible || 0).toLocaleString());
-  setElemText('stat-hospital-load', `${Math.min(100, Math.round(((current.icu_demand || 0) / 85) * 100))}%`);
-  setElemText('stat-attack-rate', `${((STATE.simulationData.attack_rate || 0.42) * 100).toFixed(1)}%`);
-  setElemText('stat-reff', (STATE.simulationData.empirical_r0 || 2.45).toFixed(2));
-
-  // Hospital Meters
+  setElemText('stat-reff', (STATE.simulationData.empirical_r0 || 2.42).toFixed(2));
+  
   const icuDemand = current.icu_demand || 0;
-  updateHospitalMeter('meter-st-jude', Math.min(100, Math.round((icuDemand * 0.55 / 45) * 100)));
-  updateHospitalMeter('meter-mercy', Math.min(100, Math.round((icuDemand * 0.30 / 25) * 100)));
-  updateHospitalMeter('meter-westside', Math.min(100, Math.round((icuDemand * 0.15 / 15) * 100)));
+  const licensedBeds = 85;
+  setElemText('stat-hospital-load', `${icuDemand} / ${licensedBeds}`);
+  const occPct = Math.min(100, Math.round((icuDemand / licensedBeds) * 100));
+  setElemText('stat-hospital-sub', `${occPct}% OCCUPANCY`);
 
-  // Dispatch Ledger Alert
-  updateDispatchLedger(STATE.currentDay, current);
+  setElemText('stat-recovered', (current.recovered || 0).toLocaleString());
+  const totalPop = STATE.simulationData.total_population || 5000;
+  const attRate = ((current.recovered || 0) / totalPop * 100).toFixed(1);
+  setElemText('stat-attack-rate', `${attRate}% POP`);
+
+  // Hospital Saturation Progress Bars
+  const stJude = Math.min(100, Math.round((icuDemand * 0.55 / 45) * 100));
+  const mercy = Math.min(100, Math.round((icuDemand * 0.30 / 25) * 100));
+  const westside = Math.min(100, Math.round((icuDemand * 0.15 / 15) * 100));
+
+  updateBar('meter-st-jude', 'meter-st-jude-pct', stJude, 'St. Jude General');
+  updateBar('meter-mercy', 'meter-mercy-pct', mercy, 'Memorial Mercy');
+  updateBar('meter-westside', 'meter-westside-pct', westside, 'Westside Clinic');
+
+  setElemText('tag-ward-beds', `WARD 7: ${stJude}% BEDS`);
+
+  // Update Dispatch Ledger
+  updateDispatchLedger(day, current);
+
+  // Update Sparkline marker
+  renderSparkline();
 }
 
-function updateHospitalMeter(id, pct) {
-  const bar = document.getElementById(id);
-  const pctText = document.getElementById(`${id}-pct`);
+function updateBar(barId, pctId, pct, name) {
+  const bar = document.getElementById(barId);
+  const text = document.getElementById(pctId);
   if (bar) {
     bar.style.width = `${pct}%`;
-    bar.classList.toggle('danger', pct >= 85);
-    bar.classList.toggle('warning', pct >= 60 && pct < 85);
+    bar.className = 'h-full ' + (pct >= 90 ? 'bg-[#ba1a1a]' : (pct >= 70 ? 'bg-[#f59e0b]' : 'bg-[#436274]'));
   }
-  if (pctText) {
-    pctText.textContent = `${pct}%`;
+  if (text) {
+    text.textContent = pct >= 90 ? `${pct}% [OVERFLOW RISK]` : `${pct}%`;
+    text.className = 'font-bold ' + (pct >= 90 ? 'text-[#ba1a1a]' : 'text-[#171c20]');
   }
 }
 
 function updateDispatchLedger(day, metric) {
-  const ledger = document.getElementById('dispatch-ledger-stream');
-  if (!ledger) return;
+  const container = document.getElementById('dispatch-ledger-stream');
+  if (!container) return;
 
   const alerts = [
-    `[DAY 00] Baseline index case reported in Sector A01 (Residential Ward). Calibration active.`,
-    `[DAY 04] Community transmission established. Secondary attack rate elevated in civic transit nodes.`,
-    `[DAY 08] Hospital surge alert: St. Jude General ICU occupancy reaches 65%.`,
-    `[DAY 12] Sector A01 school closure advisory enacted. Compliance index: 78%.`,
-    `[DAY 16] Peak epidemic curve inflection detected. Unmet critical care demand: ${metric.unmet_demand || 0} beds.`,
-    `[DAY 22] Cross-district transmission velocity dampening. Sector A02 market capacity restored to 80%.`,
-    `[DAY 28] Epidemic stabilization. Post-intervention attack rate bounded under containment target.`
+    { day: 0, tag: 'INDEX CASE [08:00]', desc: 'Baseline case verified in Sector A01 residential ward. Contact tracing activated.', color: '#436274' },
+    { day: 4, tag: 'DENSITY SPIKE [08:15]', desc: 'Sector 4 transit hub crowd density spike (+34%). Secondary infection contact chains forming.', color: '#436274' },
+    { day: 8, tag: 'SURGE WARNING [11:20]', desc: 'St. Jude General ICU occupancy reaches critical warning threshold (72%).', color: '#f59e0b' },
+    { day: 11, tag: 'RUMOR SURGE [09:38]', desc: 'Mask misinformation viral post reaching 450+ agents in Ward 3. Skepticism rising.', color: '#ba1a1a' },
+    { day: 14, tag: 'INTERVENTION [14:00]', desc: 'Municipal K-12 school closure advisory enacted across District A01 & A02.', color: '#436274' },
+    { day: 18, tag: 'PEAK INFLECTION [16:45]', desc: `Peak epidemic demand. Unmet critical care requests: ${metric.unmet_demand || 0} beds.`, color: '#ba1a1a' },
+    { day: 24, tag: 'STABILIZATION [10:00]', desc: 'Effective R₀ drops below 1.0. Community viral clearance velocity accelerating.', color: '#059669' }
   ];
 
-  const relevant = alerts.filter((_, idx) => idx * 4 <= day);
-  ledger.innerHTML = relevant.map(msg => `
-    <div style="padding: 6px 8px; border-bottom: 1px solid #E2E8F0; font-family: var(--font-mono); font-size: 0.72rem;">
-      <span style="color: #0284C7; font-weight: 700;">● DISPATCH:</span> ${msg}
+  const visible = alerts.filter(a => a.day <= day);
+  container.innerHTML = visible.map(a => `
+    <div class="border-2 border-[#171c20] p-2 bg-[#F8FAFC] shadow-[2px_2px_0px_#171c20]">
+      <div class="flex items-center justify-between text-[10px] font-bold mb-1" style="color: ${a.color};">
+        <span>${a.tag}</span>
+        <span class="material-symbols-outlined text-xs">info</span>
+      </div>
+      <p class="text-xs text-[#171c20] leading-tight font-bold">${a.desc}</p>
     </div>
   `).join('');
 }
 
-// Sparkline trajectory on viewport
-function renderTrajectorySparkline() {
+// Render Trajectory Sparkline
+function renderSparkline() {
   const canvas = document.getElementById('sparkline-canvas');
   if (!canvas || !STATE.simulationData) return;
   const ctx = canvas.getContext('2d');
@@ -472,54 +347,64 @@ function renderTrajectorySparkline() {
   const h = canvas.height;
   ctx.clearRect(0, 0, w, h);
 
-  const maxCases = Math.max(...metrics.map(m => m.active_cases || 1));
-  
+  const maxVal = Math.max(...metrics.map(m => m.active_cases || 1));
+
+  // Threshold ICU line
+  ctx.strokeStyle = '#ba1a1a';
+  ctx.setLineDash([4, 2]);
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, 12);
+  ctx.lineTo(w, 12);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Trajectory curve
   ctx.beginPath();
   ctx.lineWidth = 2;
-  ctx.strokeStyle = '#BA1A1A';
-
+  ctx.strokeStyle = '#ba1a1a';
   metrics.forEach((m, idx) => {
     const x = (idx / (metrics.length - 1)) * w;
-    const y = h - ((m.active_cases || 0) / maxCases) * (h - 8) - 4;
+    const y = h - ((m.active_cases || 0) / maxVal) * (h - 16) - 4;
     if (idx === 0) ctx.moveTo(x, y);
     else ctx.lineTo(x, y);
   });
   ctx.stroke();
 
-  // Current day indicator
+  // Current Day Marker
   const curX = (STATE.currentDay / (metrics.length - 1)) * w;
-  ctx.strokeStyle = '#171c20';
-  ctx.lineWidth = 1;
+  const curY = h - (((metrics[STATE.currentDay]?.active_cases || 0) / maxVal) * (h - 16)) - 4;
+  ctx.fillStyle = '#171c20';
   ctx.beginPath();
-  ctx.moveTo(curX, 0);
-  ctx.lineTo(curX, h);
+  ctx.arc(curX, curY, 4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 1.5;
   ctx.stroke();
 }
 
-// Render Showcase Agent Cards in Telemetry Tab
+// Render Showcase Agents
 function renderShowcaseAgentCards() {
   const container = document.getElementById('showcase-cards-container');
   if (!container) return;
 
   container.innerHTML = STATE.showcaseAgents.map(a => `
-    <div class="ink-card" style="padding: 16px; margin-bottom: 12px;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-        <span style="font-weight: 800; font-size: 1.05rem;">${a.name}</span>
-        <span class="tag-badge" style="background: #E0F2FE;">${a.district}</span>
+    <div class="border-2 border-[#171c20] p-4 bg-[#F8FAFC] shadow-[3px_3px_0px_#171c20]">
+      <div class="flex justify-between items-center mb-1">
+        <span class="font-display font-bold text-sm text-[#171c20]">${a.name}</span>
+        <span class="px-2 py-0.5 bg-[#bfe0f5] border border-[#171c20] text-[10px] font-bold">${a.district}</span>
       </div>
-      <div style="font-family: var(--font-mono); font-size: 0.75rem; color: #596168; margin-bottom: 6px;">
-        ROLE: <strong style="color: #171c20;">${a.role.toUpperCase()}</strong>
-      </div>
-      <p style="font-size: 0.82rem; margin-bottom: 8px; color: #334155;">${a.biography}</p>
-      <div class="tag-badge" style="background: #FEF3C7; font-size: 0.65rem;">
+      <div class="text-[11px] text-[#596168] font-bold mb-2">ROLE: ${a.role.toUpperCase()}</div>
+      <p class="text-xs text-[#334155] mb-2 leading-relaxed">${a.biography}</p>
+      <div class="text-[9px] px-2 py-0.5 bg-[#FEF3C7] border border-[#171c20] inline-block font-bold">
         [GENERATED NARRATIVE - SYNTHETIC DATA ONLY]
       </div>
     </div>
   `).join('');
 }
 
-// Render Decision Report Charts & Recommendations
-function renderDecisionCharts() {
+// Render Decision Pareto Frontier
+function renderDecisionPareto() {
   if (!STATE.simulationData) return;
   const d = STATE.simulationData;
 
@@ -528,7 +413,6 @@ function renderDecisionCharts() {
   setElemText('dec-overflow-deaths', (d.overflow_deaths || 0).toLocaleString());
   setElemText('dec-attack-rate', `${((d.attack_rate || 0.42) * 100).toFixed(1)}%`);
 
-  // Draw Decision Curve Canvas
   const canvas = document.getElementById('decision-pareto-canvas');
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
@@ -536,7 +420,7 @@ function renderDecisionCharts() {
   const h = canvas.height;
   ctx.clearRect(0, 0, w, h);
 
-  // Background grid
+  // Grid
   ctx.strokeStyle = '#E2E8F0';
   ctx.lineWidth = 1;
   for (let x = 40; x < w; x += 40) {
@@ -546,18 +430,18 @@ function renderDecisionCharts() {
     ctx.beginPath(); ctx.moveTo(40, y); ctx.lineTo(w, y); ctx.stroke();
   }
 
-  // Draw Pareto Curve
-  ctx.strokeStyle = '#0284C7';
+  // Curve
+  ctx.strokeStyle = '#436274';
   ctx.lineWidth = 3;
   ctx.beginPath();
   ctx.moveTo(50, 40);
-  ctx.bezierCurveTo(120, 180, 280, 210, 450, 230);
+  ctx.bezierCurveTo(120, 180, 280, 200, 440, 215);
   ctx.stroke();
 
-  // Optimal Policy Point
-  ctx.fillStyle = '#BA1A1A';
+  // Point
+  ctx.fillStyle = '#ba1a1a';
   ctx.beginPath();
-  ctx.arc(220, 195, 7, 0, Math.PI * 2);
+  ctx.arc(220, 190, 7, 0, Math.PI * 2);
   ctx.fill();
   ctx.strokeStyle = '#171c20';
   ctx.lineWidth = 2;
@@ -565,11 +449,11 @@ function renderDecisionCharts() {
 
   ctx.fillStyle = '#171c20';
   ctx.font = 'bold 10px "Space Mono", monospace';
-  ctx.fillText('OPTIMAL TRADE-OFF (FRONTIER)', 235, 192);
+  ctx.fillText('OPTIMAL POLICY EQUILIBRIUM', 235, 188);
 }
 
-// Trigger Execution of New Simulation from Scenario Studio
-async function executeNewSimulation() {
+// Execute New Simulation
+async function executeSimulation() {
   const r0 = parseFloat(document.getElementById('param-r0')?.value || 2.5);
   const compliance = parseFloat(document.getElementById('param-compliance')?.value || 0.65);
   const horizon = parseInt(document.getElementById('param-horizon')?.value || 30, 10);
@@ -613,7 +497,7 @@ async function executeNewSimulation() {
   };
 
   try {
-    showLoadingBanner('Running calibrated agent-based simulation...');
+    showLoadingBanner('Executing calibrated agent-based simulation...');
     const res = await fetch('/api/simulate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -621,18 +505,15 @@ async function executeNewSimulation() {
     });
 
     if (!res.ok) throw new Error(await res.text());
-    const data = await res.json();
-    STATE.simulationData = data;
+    STATE.simulationData = await res.json();
     hideLoadingBanner();
 
     STATE.currentDay = 0;
-    initAgentSimCoordinates();
-    updateUIForCurrentDay();
-    renderTrajectorySparkline();
+    updateUI();
     switchTab('viewport');
   } catch (err) {
     hideLoadingBanner();
-    alert(`Simulation execution error: ${err.message}`);
+    alert(`Simulation error: ${err.message}`);
   }
 }
 
@@ -640,49 +521,39 @@ async function executeNewSimulation() {
 async function requestPolicyAdvisor() {
   const container = document.getElementById('advisor-output-box');
   if (container) {
-    container.innerHTML = '<div style="font-family: var(--font-mono); font-size: 0.8rem; padding: 12px; color: #0284C7;">Consulting Gemini Policy Advisor loop with tool budget...</div>';
+    container.innerHTML = '<div class="text-xs text-[#436274] font-bold p-3">Consulting Gemini Policy Advisor loop...</div>';
   }
 
   try {
     const res = await fetch('/api/advisor', { method: 'POST' });
     const rec = await res.json();
-    STATE.advisorRecommendation = rec;
 
     if (container) {
       container.innerHTML = `
-        <div class="ink-card" style="padding: 16px; background: #F5FAFF; border: 2px solid #171c20; margin-top: 12px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <span style="font-weight: 800; font-size: 1rem; color: #171c20;">GEMINI POLICY ADVISOR RECOMMENDATION</span>
-            <span class="tag-badge" style="background: #D1FAE5; color: #065F46;">OBJECTIVE ACHIEVED</span>
+        <div class="border-2 border-[#171c20] p-4 bg-[#F8FAFC] shadow-[3px_3px_0px_#171c20] mt-3">
+          <div class="flex justify-between items-center mb-2">
+            <span class="font-display font-bold text-sm text-[#171c20]">RECOMMENDATION READY</span>
+            <span class="px-2 py-0.5 bg-[#D1FAE5] text-[#065F46] border border-[#171c20] text-[10px] font-bold">VERIFIED</span>
           </div>
-          <div style="font-family: var(--font-mono); font-size: 0.76rem; margin-bottom: 8px;">
-            <strong>PREDICTED REDUCTION IN OVERFLOW DEATHS:</strong> <span style="color: #059669; font-weight: 700;">-${rec.predicted_deaths_reduction || 35}%</span>
+          <div class="text-xs mb-2">
+            <strong>PREDICTED REDUCTION IN OVERFLOW DEATHS:</strong> <span class="text-[#059669] font-bold">-${rec.predicted_deaths_reduction || 35}%</span>
           </div>
-          <div style="font-family: var(--font-mono); font-size: 0.74rem; background: #FFFFFF; border: 1px solid #171c20; padding: 10px; margin-bottom: 10px;">
-            <strong>RECOMMENDED MEASURES:</strong>
-            <ul style="padding-left: 18px; margin-top: 4px;">
-              ${(rec.recommended_measures || []).map(m => `<li>${m.name} (${m.measure_type}) from Day ${m.start_day} to Day ${m.end_day}</li>`).join('')}
+          <div class="text-[11px] bg-white border border-[#171c20] p-2 mb-2">
+            <strong>RECOMMENDED ACTIONS:</strong>
+            <ul class="list-disc pl-4 mt-1">
+              ${(rec.recommended_measures || []).map(m => `<li>${m.name} (${m.measure_type}) Days ${m.start_day}-${m.end_day}</li>`).join('')}
             </ul>
           </div>
-          <div style="font-family: var(--font-mono); font-size: 0.68rem; color: #596168;">
-            <strong>CAVEAT:</strong> ${rec.human_in_the_loop_advisory || rec.caveats?.[0] || 'Illustrative simulation advice.'}
+          <div class="text-[9px] text-[#596168]">
+            <strong>ADVISORY NOTE:</strong> ${rec.human_in_the_loop_advisory || 'Illustrative simulation advice.'}
           </div>
         </div>
       `;
     }
   } catch (err) {
     if (container) {
-      container.innerHTML = `<div style="color: #BA1A1A; font-family: var(--font-mono); font-size: 0.75rem;">Advisor query failed: ${err.message}</div>`;
+      container.innerHTML = `<div class="text-xs text-[#ba1a1a] p-2 font-bold">Advisor error: ${err.message}</div>`;
     }
-  }
-}
-
-function updateParameterForm(data) {
-  const r0Slider = document.getElementById('param-r0');
-  const r0Span = document.getElementById('param-r0-val');
-  if (r0Slider && data.target_r0) {
-    r0Slider.value = data.target_r0;
-    if (r0Span) r0Span.textContent = data.target_r0.toFixed(2);
   }
 }
 
@@ -696,7 +567,7 @@ function showLoadingBanner(msg) {
   if (!banner) {
     banner = document.createElement('div');
     banner.id = 'loading-banner';
-    banner.style.cssText = 'position: fixed; top: 12px; right: 24px; z-index: 9999; background: #FEF3C7; border: 2px solid #171c20; box-shadow: 3px 3px 0 #171c20; padding: 10px 16px; font-family: var(--font-mono); font-size: 0.78rem; font-weight: 700;';
+    banner.style.cssText = 'position: fixed; top: 12px; right: 24px; z-index: 9999; background: #FEF3C7; border: 2px solid #171c20; box-shadow: 3px 3px 0 #171c20; padding: 10px 16px; font-size: 0.75rem; font-weight: 700; font-family: monospace;';
     document.body.appendChild(banner);
   }
   banner.textContent = `[EPISWARM] ${msg}`;

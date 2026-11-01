@@ -66,8 +66,9 @@ def test_studio_static_files():
     """Verify that static UI files (HTML, CSS, JS) are properly mounted and served."""
     res_html = client.get("/")
     assert res_html.status_code == 200
-    assert "EPISWARM" in res_html.text
-    assert "FIELD DISPATCH BLUEPRINT" in res_html.text
+    res_upper = res_html.text.upper()
+    assert "EPISWARM" in res_upper
+    assert "FIELD DISPATCH BLUEPRINT" in res_upper
 
     res_css = client.get("/studio.css")
     assert res_css.status_code == 200

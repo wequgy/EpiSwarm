@@ -1,158 +1,597 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>EpiSwarm Studio // Field Dispatch Blueprint</title>
-  <link rel="stylesheet" href="studio.css">
-  <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <title>EpiSwarm Studio — Field Dispatch Blueprint</title>
 
-  <!-- Top App Bar -->
-  <header class="app-header">
-    <div class="brand-section">
-      <div class="brand-title">
-        <span class="material-symbols-outlined" style="font-size: 26px; color: #BA1A1A;">grain</span>
-        <span>EPISWARM</span>
-        <span style="font-family: var(--font-mono); font-size: 0.72rem; color: #596168; font-weight: 400;">// FIELD DISPATCH BLUEPRINT</span>
+  <!-- Google Fonts: Bricolage Grotesque & Space Mono -->
+  <link href="https://fonts.googleapis.com" rel="preconnect"/>
+  <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;600;700;800&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet"/>
+  <!-- Material Symbols Outlined -->
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "primary": "#436274",
+            "primary-container": "#bfe0f5",
+            "on-surface": "#171c20",
+            "error": "#ba1a1a",
+            "surface": "#f5faff"
+          },
+          fontFamily: {
+            display: ["Bricolage Grotesque", "sans-serif"],
+            mono: ["Space Mono", "monospace"]
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="studio.css">
+</head>
+<body class="bg-[#E6EBF0] text-[#171c20] antialiased select-none font-mono h-screen w-screen flex flex-col overflow-hidden">
+
+  <!-- ================= TOP APP BAR ================= -->
+  <header class="flex justify-between items-center w-full px-6 py-2.5 border-b-2 border-[#171c20] bg-[#f5faff] z-50 shadow-[3px_3px_0px_#171c20] shrink-0">
+    <div class="flex items-center gap-4">
+      <!-- Wordmark Badge -->
+      <div class="flex items-center gap-1.5 border-2 border-[#171c20] bg-[#bfe0f5] px-3 py-1 shadow-[2px_2px_0px_#171c20]">
+        <span class="material-symbols-outlined text-[#436274] text-xl">hub</span>
+        <span class="font-display text-lg uppercase tracking-tight text-[#171c20] font-extrabold">EpiSwarm Studio</span>
       </div>
-      <div class="tag-badge" style="background: #D1FAE5; color: #065F46;">
-        <span style="display: inline-block; width: 6px; height: 6px; background: #059669; border-radius: 50%;"></span>
-        <span>SIM ENGINE ONLINE</span>
+
+      <!-- District Selector Dropdown -->
+      <div class="hidden md:flex items-center gap-2 border-2 border-[#171c20] bg-white px-3 py-1 text-xs shadow-[2px_2px_0px_#171c20]">
+        <span class="material-symbols-outlined text-sm">location_city</span>
+        <span class="font-mono text-xs font-bold text-[#171c20]">DISTRICT 4: NORTH HAVEN</span>
+        <span class="text-[#596168] text-xs">(POP. 84,200)</span>
       </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="hidden lg:flex items-center gap-2 ml-2">
+        <button class="nav-tab-btn active px-3 py-1 text-xs uppercase font-mono font-bold" data-tab="viewport">Simulation Canvas</button>
+        <button class="nav-tab-btn px-3 py-1 text-xs uppercase font-mono font-bold" data-tab="scenario">Scenario Studio</button>
+        <button class="nav-tab-btn px-3 py-1 text-xs uppercase font-mono font-bold" data-tab="agents">Agent Telemetry</button>
+        <button class="nav-tab-btn px-3 py-1 text-xs uppercase font-mono font-bold" data-tab="rumor">Rumor Ripple</button>
+        <button class="nav-tab-btn px-3 py-1 text-xs uppercase font-mono font-bold" data-tab="decision">Decision Report</button>
+      </nav>
     </div>
 
-    <!-- Navigation Tabs (Exact Stitch Screen Map) -->
-    <nav class="nav-tabs">
-      <button class="nav-tab-btn active" data-tab="viewport">[01] LIVE VIEWPORT</button>
-      <button class="nav-tab-btn" data-tab="scenario">[02] SCENARIO STUDIO</button>
-      <button class="nav-tab-btn" data-tab="agents">[03] AGENT TELEMETRY</button>
-      <button class="nav-tab-btn" data-tab="rumor">[04] RUMOR RIPPLE</button>
-      <button class="nav-tab-btn" data-tab="decision">[05] DECISION REPORT</button>
-    </nav>
+    <!-- Center/Right Simulation Control Suite -->
+    <div class="flex items-center gap-3">
+      <!-- Simulation Clock / Ticker -->
+      <div class="hidden sm:flex items-center gap-2 bg-[#171c20] text-[#bfe0f5] border-2 border-[#171c20] px-3 py-1 font-mono text-xs shadow-[2px_2px_0px_#171c20]">
+        <span class="w-2 h-2 rounded-full bg-[#ba1a1a] animate-ping"></span>
+        <span id="header-clock-ticker" class="tracking-wider">DAY 00 — 09:42:18 EST</span>
+      </div>
+
+      <!-- Play / Pause & Speed Toggles -->
+      <div class="flex items-center border-2 border-[#171c20] bg-white shadow-[2px_2px_0px_#171c20]">
+        <button id="btn-play-pause" class="px-2.5 py-1 border-r-2 border-[#171c20] hover:bg-[#e4e9ee] active:translate-x-[1px] active:translate-y-[1px] flex items-center" title="Play/Pause">
+          <span class="material-symbols-outlined text-base">play_arrow</span>
+        </button>
+        <button class="speed-toggle-btn px-2.5 py-1 border-r-2 border-[#171c20] bg-[#bfe0f5] text-[#171c20] text-xs font-bold" data-speed="1">1X</button>
+        <button class="speed-toggle-btn px-2.5 py-1 border-r-2 border-[#171c20] hover:bg-[#e4e9ee] text-xs" data-speed="2">2X</button>
+        <button class="speed-toggle-btn px-2.5 py-1 hover:bg-[#e4e9ee] text-xs" data-speed="5">5X</button>
+      </div>
+
+      <!-- Primary Action CTA Button -->
+      <button id="btn-top-run-scenario" class="flex items-center gap-1.5 bg-[#bfe0f5] text-[#171c20] border-2 border-[#171c20] px-4 py-1.5 text-xs font-bold uppercase shadow-[3px_3px_0px_#171c20] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none hover:bg-[#a5d2ee] transition-all">
+        <span class="material-symbols-outlined text-sm">play_arrow</span>
+        <span>Run Scenario</span>
+      </button>
+    </div>
   </header>
 
   <!-- ========================================== -->
-  <!-- SCREEN 1: LIVE SIMULATION VIEWPORT        -->
+  <!-- SCREEN 1: LIVE SIMULATION VIEWPORT (STITCH)-->
   <!-- ========================================== -->
-  <main id="view-viewport" class="view-panel active">
+  <main id="view-viewport" class="view-panel active relative flex-1 w-full h-[calc(100vh-58px)] overflow-hidden p-0 m-0 max-w-none">
     
-    <!-- Bento Stats Grid -->
-    <div class="bento-grid">
-      <div class="ink-card stat-cell" style="border-top: 4px solid #EF4444;">
-        <div class="stat-label">Active Infections (I + H)</div>
-        <div id="stat-active-cases" class="stat-value" style="color: #BA1A1A;">--</div>
-        <div class="stat-sub" style="color: #BA1A1A;">● High Transmission Load</div>
-      </div>
-      <div class="ink-card stat-cell" style="border-top: 4px solid #64748B;">
-        <div class="stat-label">Susceptible Reservoir (S)</div>
-        <div id="stat-susceptible" class="stat-value">--</div>
-        <div class="stat-sub" style="color: #596168;">Total Unexposed Pool</div>
-      </div>
-      <div class="ink-card stat-cell" style="border-top: 4px solid #D97706;">
-        <div class="stat-label">Hospital Bed Saturation</div>
-        <div id="stat-hospital-load" class="stat-value" style="color: #D97706;">--</div>
-        <div class="stat-sub" style="color: #D97706;">ICU Bed Utilization</div>
-      </div>
-      <div class="ink-card stat-cell" style="border-top: 4px solid #0284C7;">
-        <div class="stat-label">Attack Rate</div>
-        <div id="stat-attack-rate" class="stat-value" style="color: #0284C7;">--</div>
-        <div class="stat-sub" style="color: #0284C7;">Cumulative Proportion</div>
-      </div>
-      <div class="ink-card stat-cell" style="border-top: 4px solid #171c20;">
-        <div class="stat-label">Effective R_eff</div>
-        <div id="stat-reff" class="stat-value">--</div>
-        <div class="stat-sub" style="color: #171c20;">Empirical Growth Velocity</div>
-      </div>
-    </div>
+    <!-- 1. FULL-BLEED SIMULATION CANVAS FLOOR WITH PERSPECTIVE GRID & FOG -->
+    <div class="absolute inset-0 grid-perspective bg-[#E6EBF0]">
+      <!-- Radial Depth Fog overlay -->
+      <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_transparent_40%,_rgba(230,235,240,0.85)_100%)] pointer-events-none"></div>
 
-    <!-- Viewport 2-Column Section -->
-    <div style="display: grid; grid-template-columns: 1fr 340px; gap: 20px;">
-      
-      <!-- Left: 2.5D Tactile Pedestal Canvas -->
-      <div class="grid-canvas-container">
-        <div class="blueprint-grid"></div>
-        <canvas id="sim-viewport-canvas"></canvas>
-        
-        <!-- Legend Overlay -->
-        <div style="position: absolute; bottom: 12px; left: 16px; background: rgba(255,255,255,0.92); border: 2px solid #171c20; padding: 8px 12px; font-family: var(--font-mono); font-size: 0.7rem; box-shadow: 2px 2px 0 #171c20;">
-          <div style="font-weight: 700; margin-bottom: 4px;">HEALTH STATES // TACTILE PEDESTALS:</div>
-          <div style="display: flex; gap: 12px; flex-wrap: wrap;">
-            <span><span style="display: inline-block; width: 8px; height: 8px; background: #FFFFFF; border: 1px solid #000;"></span> Susceptible</span>
-            <span><span style="display: inline-block; width: 8px; height: 8px; background: #F59E0B; border: 1px solid #000;"></span> Exposed</span>
-            <span><span style="display: inline-block; width: 8px; height: 8px; background: #EF4444; border: 1px solid #000;"></span> Infectious</span>
-            <span><span style="display: inline-block; width: 8px; height: 8px; background: #38BDF8; border: 1px solid #000;"></span> Recovered</span>
+      <!-- Tactical Ground Markings & Spatial Sectors -->
+      <svg class="absolute inset-0 w-full h-full pointer-events-none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <radialGradient cx="50%" cy="50%" id="hotspot-glow" r="50%">
+            <stop offset="0%" stop-color="#ba1a1a" stop-opacity="0.25"></stop>
+            <stop offset="100%" stop-color="#ba1a1a" stop-opacity="0"></stop>
+          </radialGradient>
+          <radialGradient cx="50%" cy="50%" id="transit-glow" r="50%">
+            <stop offset="0%" stop-color="#436274" stop-opacity="0.18"></stop>
+            <stop offset="100%" stop-color="#436274" stop-opacity="0"></stop>
+          </radialGradient>
+        </defs>
+        <!-- Dynamic Hotspot Thermal Rings -->
+        <ellipse cx="48%" cy="56%" fill="url(#hotspot-glow)" rx="240" ry="110"></ellipse>
+        <ellipse cx="78%" cy="40%" fill="url(#transit-glow)" rx="180" ry="85"></ellipse>
+
+        <!-- Perspective Corridor Lines / Ground Waypoints -->
+        <g opacity="0.3" stroke="#171c20" stroke-dasharray="6 6" stroke-width="1.5">
+          <line x1="320" x2="680" y1="210" y2="440"></line>
+          <line x1="680" x2="1020" y1="440" y2="360"></line>
+          <line x1="680" x2="620" y1="440" y2="610"></line>
+          <line x1="900" x2="1140" y1="230" y2="520"></line>
+        </g>
+
+        <!-- Transmission / Rumor Inter-Agent Pulsing Vectors -->
+        <path class="pulse-link" d="M 640 430 Q 720 380 810 420" fill="none" stroke="#ba1a1a" stroke-width="2.5"></path>
+        <path class="pulse-link" d="M 540 500 Q 600 480 640 430" fill="none" stroke="#f59e0b" stroke-width="2"></path>
+        <path d="M 810 420 Q 890 460 970 410" fill="none" stroke="#436274" stroke-dasharray="3 3" stroke-width="2"></path>
+      </svg>
+
+      <!-- 2. HAND-DRAWN INK-STYLE AGENTS ON COLOURED PEDESTAL DISCS -->
+      <div class="absolute inset-0 pointer-events-auto">
+        <!-- FLOATING DISTRICT 3D PERSPECTIVE TAGS -->
+        <div class="absolute top-[22%] left-[45%] z-20 -translate-x-1/2">
+          <div class="flex items-center gap-1.5 bg-[#bfe0f5] border-2 border-[#171c20] px-3 py-1 shadow-[3px_3px_0px_#171c20] text-xs tracking-wider text-[#171c20] font-bold">
+            <span class="w-2 h-2 bg-[#ba1a1a] rounded-none border border-[#171c20]"></span>
+            <span>RUMOR CLUSTER: MARKET SQ</span>
+          </div>
+          <div class="w-0.5 h-6 bg-[#171c20] mx-auto"></div>
+        </div>
+
+        <div class="absolute top-[16%] left-[76%] z-20">
+          <div class="flex items-center gap-1.5 bg-[#bfe0f5] border-2 border-[#171c20] px-3 py-1 shadow-[3px_3px_0px_#171c20] text-xs tracking-wider text-[#171c20] font-bold">
+            <span class="material-symbols-outlined text-sm text-[#436274]">local_hospital</span>
+            <span id="tag-ward-beds">WARD 7: 92% BEDS</span>
+          </div>
+          <div class="w-0.5 h-7 bg-[#171c20] ml-6"></div>
+        </div>
+
+        <div class="absolute bottom-[36%] left-[30%] z-20">
+          <div class="flex items-center gap-1.5 bg-[#bfe0f5] border-2 border-[#171c20] px-3 py-1 shadow-[3px_3px_0px_#171c20] text-xs tracking-wider text-[#171c20] font-bold">
+            <span class="material-symbols-outlined text-sm">directions_transit</span>
+            <span>METRO TRANSIT CORRIDOR</span>
+          </div>
+          <div class="w-0.5 h-5 bg-[#171c20] ml-8"></div>
+        </div>
+
+        <div class="absolute top-[34%] right-[8%] z-20">
+          <div class="flex items-center gap-1.5 bg-[#bfe0f5] border-2 border-[#171c20] px-3 py-1 shadow-[3px_3px_0px_#171c20] text-xs tracking-wider text-[#171c20] font-bold">
+            <span class="material-symbols-outlined text-sm text-[#ba1a1a]">domain</span>
+            <span>ST. JUDE HOSPITAL ZONE</span>
+          </div>
+        </div>
+
+        <!-- AGENT 1: INFECTED SYMPTOMATIC -->
+        <div id="pedestal-agent-1" class="absolute top-[48%] left-[46%] -translate-x-1/2 -translate-y-1/2 agent-sway z-10">
+          <div class="absolute -top-12 -left-6 z-30 flex items-center gap-1 bg-[#ba1a1a] text-white px-2 py-0.5 border-2 border-[#171c20] shadow-[2px_2px_0px_#171c20] text-[10px] font-bold">
+            <span>! COUGH VECTOR</span>
+          </div>
+          <div class="relative w-28 h-36 flex flex-col items-center justify-end">
+            <div class="absolute top-8 right-1 flex gap-1">
+              <span class="w-1.5 h-1.5 bg-[#ba1a1a] rounded-full border border-[#171c20]"></span>
+              <span class="w-1 h-1 bg-[#ba1a1a] rounded-full border border-[#171c20] mt-2"></span>
+              <span class="w-2 h-2 bg-[#ba1a1a] rounded-full border border-[#171c20] -mt-1"></span>
+            </div>
+            <svg class="w-20 h-28 z-10" fill="none" stroke="#171c20" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" viewBox="0 0 100 140">
+              <ellipse cx="44" cy="28" fill="#F8FAFC" rx="16" ry="18"></ellipse>
+              <path d="M 44 34 Q 54 36 58 30"></path>
+              <path d="M 52 46 L 56 30" stroke-width="3.5"></path>
+              <circle cx="38" cy="25" fill="#171c20" r="2.5"></circle>
+              <path d="M 28 50 L 22 105 L 62 105 L 58 50 Z" fill="#EEF2F6"></path>
+              <line stroke-dasharray="4 2" x1="42" x2="42" y1="50" y2="105"></line>
+              <line stroke-width="4" x1="34" x2="34" y1="105" y2="128"></line>
+              <line stroke-width="4" x1="50" x2="52" y1="105" y2="128"></line>
+              <ellipse cx="32" cy="130" fill="#171c20" rx="7" ry="3"></ellipse>
+              <ellipse cx="54" cy="130" fill="#171c20" rx="7" ry="3"></ellipse>
+            </svg>
+            <div class="w-28 h-8 rounded-[50%] bg-[#ba1a1a] border-2 border-[#171c20] shadow-[3px_3px_0px_#171c20] -mt-3 flex items-center justify-center">
+              <span class="text-[10px] text-white font-bold tracking-widest uppercase">INFECTED</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- AGENT 2: EXPOSED / INCUBATING -->
+        <div id="pedestal-agent-2" class="absolute top-[42%] left-[58%] -translate-x-1/2 -translate-y-1/2 agent-sway-delayed z-10">
+          <div class="absolute -top-10 -right-8 z-30 bg-white text-[#171c20] px-2.5 py-0.5 border-2 border-[#171c20] shadow-[2px_2px_0px_#171c20] text-[10px] font-bold">
+            <span>"NO LOCKDOWNS!"</span>
+          </div>
+          <div class="relative w-28 h-36 flex flex-col items-center justify-end">
+            <svg class="w-20 h-28 z-10" fill="none" stroke="#171c20" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" viewBox="0 0 100 140">
+              <circle cx="50" cy="26" fill="#F8FAFC" r="16"></circle>
+              <ellipse cx="52" cy="30" fill="#171c20" rx="4" ry="5"></ellipse>
+              <circle cx="45" cy="22" fill="#171c20" r="2.5"></circle>
+              <path d="M 30 54 L 14 36" stroke-width="3.5"></path>
+              <path d="M 64 54 L 84 44" stroke-width="3.5"></path>
+              <path d="M 30 48 L 26 104 L 70 104 L 66 48 Z" fill="#dae2fd"></path>
+              <line stroke-width="4" x1="38" x2="36" y1="104" y2="128"></line>
+              <line stroke-width="4" x1="56" x2="58" y1="104" y2="128"></line>
+              <ellipse cx="34" cy="130" fill="#171c20" rx="7" ry="3"></ellipse>
+              <ellipse cx="60" cy="130" fill="#171c20" rx="7" ry="3"></ellipse>
+            </svg>
+            <div class="w-28 h-8 rounded-[50%] bg-[#f59e0b] border-2 border-[#171c20] shadow-[3px_3px_0px_#171c20] -mt-3 flex items-center justify-center">
+              <span class="text-[10px] text-[#171c20] font-bold tracking-widest uppercase">EXPOSED</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- AGENT 3: RECOVERED / IMMUNE -->
+        <div id="pedestal-agent-3" class="absolute top-[54%] left-[68%] -translate-x-1/2 -translate-y-1/2 agent-sway z-10">
+          <div class="relative w-28 h-36 flex flex-col items-center justify-end">
+            <svg class="w-20 h-28 z-10" fill="none" stroke="#171c20" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" viewBox="0 0 100 140">
+              <circle cx="50" cy="26" fill="#F8FAFC" r="16"></circle>
+              <rect fill="#bfe0f5" height="13" stroke="#171c20" stroke-width="2" width="20" x="40" y="24"></rect>
+              <line x1="40" x2="36" y1="28" y2="24"></line>
+              <line x1="60" x2="64" y1="28" y2="24"></line>
+              <circle cx="45" cy="18" fill="#171c20" r="2.5"></circle>
+              <circle cx="55" cy="18" fill="#171c20" r="2.5"></circle>
+              <path d="M 32 46 L 30 102 L 68 102 L 66 46 Z" fill="#EEF2F6"></path>
+              <line stroke-width="3.5" x1="34" x2="42" y1="52" y2="78"></line>
+              <line stroke-width="3.5" x1="64" x2="56" y1="52" y2="78"></line>
+              <line stroke-width="4" x1="40" x2="40" y1="102" y2="128"></line>
+              <line stroke-width="4" x1="58" x2="58" y1="102" y2="128"></line>
+              <ellipse cx="40" cy="130" fill="#171c20" rx="7" ry="3"></ellipse>
+              <ellipse cx="60" cy="130" fill="#171c20" rx="7" ry="3"></ellipse>
+            </svg>
+            <div class="w-28 h-8 rounded-[50%] bg-[#bfe0f5] border-2 border-[#171c20] shadow-[3px_3px_0px_#171c20] -mt-3 flex items-center justify-center">
+              <span class="text-[10px] text-[#171c20] font-bold tracking-widest uppercase">RECOVERED</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- AGENT 4: HEALTHY / SUSCEPTIBLE -->
+        <div id="pedestal-agent-4" class="absolute top-[38%] left-[36%] -translate-x-1/2 -translate-y-1/2 agent-sway-delayed z-10">
+          <div class="absolute -top-10 -left-6 z-30 bg-white border-2 border-[#171c20] p-1 shadow-[2px_2px_0px_#171c20] flex items-center gap-1 text-[10px] font-bold">
+            <span class="material-symbols-outlined text-xs text-[#ba1a1a]">trending_up</span>
+            <span>VIRAL POST VIEW</span>
+          </div>
+          <div class="relative w-28 h-36 flex flex-col items-center justify-end">
+            <svg class="w-20 h-28 z-10" fill="none" stroke="#171c20" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" viewBox="0 0 100 140">
+              <circle cx="48" cy="28" fill="#F8FAFC" r="16"></circle>
+              <ellipse cx="46" cy="30" fill="#171c20" rx="2.5" ry="3"></ellipse>
+              <path d="M 30 50 L 46 66" stroke-width="3.5"></path>
+              <path d="M 64 50 L 50 66" stroke-width="3.5"></path>
+              <rect fill="#c6e7fc" height="16" rx="1" stroke="#171c20" stroke-width="2" width="10" x="44" y="60"></rect>
+              <path d="M 28 48 L 24 102 L 68 102 L 66 48 Z" fill="#ffffff"></path>
+              <line stroke-width="4" x1="38" x2="38" y1="102" y2="128"></line>
+              <line stroke-width="4" x1="56" x2="56" y1="102" y2="128"></line>
+              <ellipse cx="38" cy="130" fill="#171c20" rx="7" ry="3"></ellipse>
+              <ellipse cx="58" cy="130" fill="#171c20" rx="7" ry="3"></ellipse>
+            </svg>
+            <div class="w-28 h-8 rounded-[50%] bg-[#FFFFFF] border-2 border-[#171c20] shadow-[3px_3px_0px_#171c20] -mt-3 flex items-center justify-center">
+              <span class="text-[10px] text-[#171c20] font-bold tracking-widest uppercase">SUSCEPTIBLE</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- AGENT 5: SKEPTICAL RESIDENT -->
+        <div id="pedestal-agent-5" class="absolute top-[60%] left-[38%] -translate-x-1/2 -translate-y-1/2 agent-sway z-10">
+          <div class="relative w-28 h-36 flex flex-col items-center justify-end">
+            <svg class="w-20 h-28 z-10" fill="none" stroke="#171c20" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" viewBox="0 0 100 140">
+              <circle cx="50" cy="24" fill="#F8FAFC" r="15"></circle>
+              <line stroke-width="2" x1="42" x2="48" y1="18" y2="21"></line>
+              <line stroke-width="2" x1="58" x2="52" y1="18" y2="21"></line>
+              <line x1="44" x2="56" y1="28" y2="27"></line>
+              <path d="M 28 50 Q 50 68 70 50" stroke-width="5"></path>
+              <rect fill="#d5dbe0" height="12" stroke="#171c20" stroke-width="2" width="28" x="36" y="52"></rect>
+              <path d="M 28 46 L 26 102 L 72 102 L 70 46 Z" fill="#eff4f9"></path>
+              <line stroke-width="4" x1="38" x2="38" y1="102" y2="128"></line>
+              <line stroke-width="4" x1="58" x2="58" y1="102" y2="128"></line>
+              <ellipse cx="38" cy="130" fill="#171c20" rx="7" ry="3"></ellipse>
+              <ellipse cx="60" cy="130" fill="#171c20" rx="7" ry="3"></ellipse>
+            </svg>
+            <div class="w-28 h-8 rounded-[50%] bg-[#FFFFFF] border-2 border-[#171c20] shadow-[3px_3px_0px_#171c20] -mt-3 flex items-center justify-center">
+              <span class="text-[10px] text-[#171c20] font-bold tracking-widest uppercase">SUSCEPTIBLE</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- AGENT 6: WORRIED RESIDENT -->
+        <div id="pedestal-agent-6" class="absolute top-[28%] left-[64%] -translate-x-1/2 -translate-y-1/2 agent-sway-delayed z-10">
+          <div class="relative w-24 h-32 flex flex-col items-center justify-end scale-90">
+            <svg class="w-18 h-26 z-10" fill="none" stroke="#171c20" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" viewBox="0 0 100 140">
+              <circle cx="50" cy="26" fill="#F8FAFC" r="15"></circle>
+              <circle cx="44" cy="24" fill="#171c20" r="2.5"></circle>
+              <circle cx="56" cy="24" fill="#171c20" r="2.5"></circle>
+              <path d="M 44 32 Q 50 28 56 32" stroke-width="2"></path>
+              <path d="M 32 50 L 38 32" stroke-width="3"></path>
+              <path d="M 68 50 L 62 32" stroke-width="3"></path>
+              <path d="M 30 48 L 26 102 L 72 102 L 68 48 Z" fill="#ffdad7"></path>
+              <line stroke-width="4" x1="38" x2="38" y1="102" y2="128"></line>
+              <line stroke-width="4" x1="58" x2="58" y1="102" y2="128"></line>
+              <ellipse cx="38" cy="130" fill="#171c20" rx="7" ry="3"></ellipse>
+              <ellipse cx="60" cy="130" fill="#171c20" rx="7" ry="3"></ellipse>
+            </svg>
+            <div class="w-24 h-7 rounded-[50%] bg-[#f59e0b] border-2 border-[#171c20] shadow-[3px_3px_0px_#171c20] -mt-3 flex items-center justify-center">
+              <span class="text-[10px] text-[#171c20] font-bold tracking-wider uppercase">EXPOSED</span>
+            </div>
           </div>
         </div>
       </div>
+    </div>
 
-      <!-- Right: Saturation Meters & Dispatch Alerts -->
-      <div style="display: flex; flex-direction: column; gap: 16px;">
-        
-        <!-- Hospital Capacity Meters -->
-        <div class="ink-card" style="padding: 16px;">
-          <div style="font-family: var(--font-mono); font-size: 0.78rem; font-weight: 700; margin-bottom: 12px; display: flex; justify-content: space-between;">
-            <span>HOSPITAL SATURATION METERS</span>
-            <span class="tag-badge" style="background: #FEE2E2; color: #991B1B;">CAPACITY: 85 BEDS</span>
+    <!-- ================= 2. LEFT FLOATING HUD: OUTBREAK OVERVIEW ================= -->
+    <aside class="absolute left-6 top-6 z-30 w-80 max-w-[calc(100vw-3rem)] pointer-events-auto">
+      <div class="bg-white border-2 border-[#171c20] shadow-[4px_4px_0px_#171c20]">
+        <!-- Panel Ink Header -->
+        <div class="flex items-center justify-between border-b-2 border-[#171c20] px-3 py-2 bg-[#EEF2F6]">
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-base text-[#436274]">coronavirus</span>
+            <span class="font-display uppercase text-[#171c20] font-bold text-sm">Outbreak Overview</span>
           </div>
+          <span class="text-[10px] px-1.5 py-0.5 bg-[#ba1a1a] text-white font-bold">CRITICAL</span>
+        </div>
 
-          <div style="margin-bottom: 12px;">
-            <div style="display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 0.72rem; margin-bottom: 4px;">
-              <span>St. Jude General (45 Beds)</span>
-              <strong id="meter-st-jude-pct">0%</strong>
+        <!-- Vital Metrics 2x2 Bento Box -->
+        <div class="p-3 border-b-2 border-[#171c20]">
+          <div class="grid grid-cols-2 gap-2">
+            <!-- Active Infected -->
+            <div class="border-2 border-[#171c20] p-2 bg-[#F8FAFC]">
+              <div class="text-[10px] text-[#596168] uppercase font-bold">Active Infected</div>
+              <div id="stat-active-cases" class="font-display text-xl font-bold text-[#ba1a1a] mt-0.5">3,412</div>
+              <div class="flex items-center gap-0.5 text-[9px] text-[#ba1a1a] font-bold mt-0.5">
+                <span class="material-symbols-outlined text-xs">arrow_upward</span>
+                <span>+18% (24H)</span>
+              </div>
             </div>
-            <div class="meter-container"><div id="meter-st-jude" class="meter-fill" style="width: 0%;"></div></div>
-          </div>
-
-          <div style="margin-bottom: 12px;">
-            <div style="display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 0.72rem; margin-bottom: 4px;">
-              <span>Memorial Mercy (25 Beds)</span>
-              <strong id="meter-mercy-pct">0%</strong>
+            <!-- Effective R0 -->
+            <div class="border-2 border-[#171c20] p-2 bg-[#F8FAFC]">
+              <div class="text-[10px] text-[#596168] uppercase font-bold">Effective R₀</div>
+              <div id="stat-reff" class="font-display text-xl font-bold text-[#171c20] mt-0.5">2.42</div>
+              <div class="text-[9px] text-[#ba1a1a] font-bold mt-0.5">EXPONENTIAL</div>
             </div>
-            <div class="meter-container"><div id="meter-mercy" class="meter-fill" style="width: 0%;"></div></div>
+            <!-- Hospitalized / ICU -->
+            <div class="border-2 border-[#171c20] p-2 bg-[#F8FAFC]">
+              <div class="text-[10px] text-[#596168] uppercase font-bold">Hospitalized / ICU</div>
+              <div id="stat-hospital-load" class="font-display text-sm font-bold text-[#171c20] mt-0.5">482 / 520</div>
+              <div id="stat-hospital-sub" class="text-[9px] text-[#ba1a1a] font-bold mt-0.5">92.6% OCCUPANCY</div>
+            </div>
+            <!-- Recovered / Immune -->
+            <div class="border-2 border-[#171c20] p-2 bg-[#F8FAFC]">
+              <div class="text-[10px] text-[#596168] uppercase font-bold">Recovered</div>
+              <div id="stat-recovered" class="font-display text-xl font-bold text-[#436274] mt-0.5">1,290</div>
+              <div id="stat-attack-rate" class="text-[9px] text-[#436274] font-bold mt-0.5">15.3% POP</div>
+            </div>
           </div>
 
+          <!-- Sparkline Infection Trajectory Chart -->
+          <div class="mt-3 border-2 border-[#171c20] bg-white p-2">
+            <div class="flex justify-between items-center mb-1">
+              <span class="text-[10px] font-bold text-[#171c20]">TRAJECTORY PROJECTION</span>
+              <span class="text-[10px] text-[#ba1a1a] font-bold">PEAK: DAY 19</span>
+            </div>
+            <div class="w-full h-12 bg-white relative">
+              <canvas id="sparkline-canvas" width="260" height="48" style="width: 100%; height: 100%;"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Hospital Bed Occupancy Bars -->
+        <div class="p-3 bg-[#F8FAFC]">
+          <div class="text-[10px] font-bold uppercase mb-2 text-[#171c20] flex justify-between">
+            <span>Hospital Bed Saturation</span>
+            <span class="text-[#ba1a1a]">1 OVERFLOW RISK</span>
+          </div>
+
+          <!-- St. Jude General -->
+          <div class="mb-2">
+            <div class="flex justify-between text-[10px] mb-0.5">
+              <span class="font-bold text-[#171c20]">St. Jude General</span>
+              <span id="meter-st-jude-pct" class="font-bold text-[#ba1a1a]">94% [OVERFLOW RISK]</span>
+            </div>
+            <div class="w-full h-2.5 border-2 border-[#171c20] bg-white overflow-hidden">
+              <div id="meter-st-jude" class="h-full bg-[#ba1a1a]" style="width: 94%;"></div>
+            </div>
+          </div>
+
+          <!-- Memorial Mercy -->
+          <div class="mb-2">
+            <div class="flex justify-between text-[10px] mb-0.5">
+              <span class="font-bold text-[#171c20]">Memorial Mercy</span>
+              <span id="meter-mercy-pct" class="font-bold text-[#171c20]">88%</span>
+            </div>
+            <div class="w-full h-2.5 border-2 border-[#171c20] bg-white overflow-hidden">
+              <div id="meter-mercy" class="h-full bg-[#f59e0b]" style="width: 88%;"></div>
+            </div>
+          </div>
+
+          <!-- Westside Clinic -->
           <div>
-            <div style="display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 0.72rem; margin-bottom: 4px;">
-              <span>Westside Clinic (15 Beds)</span>
-              <strong id="meter-westside-pct">0%</strong>
+            <div class="flex justify-between text-[10px] mb-0.5">
+              <span class="font-bold text-[#171c20]">Westside Clinic</span>
+              <span id="meter-westside-pct" class="font-bold text-[#171c20]">62%</span>
             </div>
-            <div class="meter-container"><div id="meter-westside" class="meter-fill" style="width: 0%;"></div></div>
+            <div class="w-full h-2.5 border-2 border-[#171c20] bg-white overflow-hidden">
+              <div id="meter-westside" class="h-full bg-[#436274]" style="width: 62%;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ================= 3. RIGHT FLOATING HUD: ALERT FEED & LAYER TOGGLES ================= -->
+    <aside class="absolute right-6 top-6 z-30 w-80 max-w-[calc(100vw-3rem)] pointer-events-auto">
+      <div class="space-y-4">
+        <!-- Layer Toggles Panel -->
+        <div class="bg-white border-2 border-[#171c20] shadow-[4px_4px_0px_#171c20]">
+          <div class="flex items-center justify-between border-b-2 border-[#171c20] px-3 py-2 bg-[#EEF2F6]">
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-base text-[#436274]">layers</span>
+              <span class="font-display uppercase text-[#171c20] font-bold text-sm">Telemetry Layers</span>
+            </div>
+            <span class="text-[10px] text-[#596168] font-bold">4 / 5 ACTIVE</span>
+          </div>
+          <div class="p-3 space-y-2">
+            <label class="flex items-center justify-between p-1.5 border-2 border-[#171c20] hover:bg-[#e4e9ee] cursor-pointer">
+              <span class="text-xs uppercase font-bold text-[#171c20]">Infection Heatmap</span>
+              <span class="px-2 py-0.5 bg-[#bfe0f5] border border-[#171c20] text-[10px] font-bold">ON</span>
+            </label>
+            <label class="flex items-center justify-between p-1.5 border-2 border-[#171c20] hover:bg-[#e4e9ee] cursor-pointer">
+              <span class="text-xs uppercase font-bold text-[#171c20]">Spatial Hotspots</span>
+              <span class="px-2 py-0.5 bg-[#bfe0f5] border border-[#171c20] text-[10px] font-bold">ON</span>
+            </label>
+            <label class="flex items-center justify-between p-1.5 border-2 border-[#171c20] hover:bg-[#e4e9ee] cursor-pointer">
+              <span class="text-xs uppercase font-bold text-[#171c20]">Rumor Spread Vectors</span>
+              <span class="px-2 py-0.5 bg-[#bfe0f5] border border-[#171c20] text-[10px] font-bold">ON</span>
+            </label>
+            <label class="flex items-center justify-between p-1.5 border-2 border-[#171c20] hover:bg-[#e4e9ee] cursor-pointer bg-[#F8FAFC]">
+              <span class="text-xs uppercase font-bold text-[#596168]">Mobility Flow</span>
+              <span class="px-2 py-0.5 bg-[#d5dbe0] border border-[#171c20] text-[#596168] text-[10px] font-bold">OFF</span>
+            </label>
+            <label class="flex items-center justify-between p-1.5 border-2 border-[#171c20] hover:bg-[#e4e9ee] cursor-pointer">
+              <span class="text-xs uppercase font-bold text-[#171c20]">Hospital Capacity</span>
+              <span class="px-2 py-0.5 bg-[#bfe0f5] border border-[#171c20] text-[10px] font-bold">ON</span>
+            </label>
           </div>
         </div>
 
-        <!-- Dispatch Ledger Stream -->
-        <div class="ink-card" style="flex: 1; padding: 16px; display: flex; flex-direction: column;">
-          <div style="font-family: var(--font-mono); font-size: 0.78rem; font-weight: 700; margin-bottom: 8px; border-bottom: 2px solid #171c20; padding-bottom: 4px;">
-            DISPATCH INCIDENT LOG
+        <!-- Realtime Alert Dispatch Feed -->
+        <div class="bg-white border-2 border-[#171c20] shadow-[4px_4px_0px_#171c20]">
+          <div class="flex items-center justify-between border-b-2 border-[#171c20] px-3 py-2 bg-[#EEF2F6]">
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-base text-[#ba1a1a]">campaign</span>
+              <span class="font-display uppercase text-[#171c20] font-bold text-sm">Dispatch Ledger</span>
+            </div>
+            <span class="w-2 h-2 rounded-full bg-[#ba1a1a] animate-ping"></span>
           </div>
-          <div id="dispatch-ledger-stream" style="flex: 1; overflow-y: auto; max-height: 240px;">
-            <!-- Rendered by studio.js -->
+          <div id="dispatch-ledger-stream" class="p-3 space-y-2.5 max-h-56 overflow-y-auto">
+            <!-- Dynamic alerts -->
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ================= 4. BOTTOM DOCK: INTERVENTIONS & TIMELINE SCRUBBER ================= -->
+    <div class="absolute bottom-4 left-6 right-6 z-40 pointer-events-auto">
+      <div class="bg-white border-2 border-[#171c20] shadow-[5px_5px_0px_#171c20]">
+        <!-- Header Strip: Title + Status + Commit CTA -->
+        <div class="flex items-center justify-between border-b-2 border-[#171c20] px-4 py-2 bg-[#EEF2F6]">
+          <div class="flex items-center gap-3">
+            <span class="material-symbols-outlined text-base">tune</span>
+            <span class="font-display uppercase text-[#171c20] font-bold text-sm">
+              Interventions & Timeline Scrubber
+            </span>
+            <span class="hidden sm:inline-block text-[10px] px-2 py-0.5 bg-[#bfe0f5] border border-[#171c20] text-[#171c20] font-bold">
+              SYNCHRONIZED WITH REGIONAL RECEPTORS
+            </span>
+          </div>
+          <div class="flex items-center gap-2">
+            <button id="btn-bottom-step-prev" class="flex items-center gap-1 bg-white border-2 border-[#171c20] px-3 py-1 text-xs uppercase shadow-[2px_2px_0px_#171c20] hover:bg-[#e4e9ee]">
+              <span>◀ STEP</span>
+            </button>
+            <button id="btn-bottom-step-next" class="flex items-center gap-1 bg-white border-2 border-[#171c20] px-3 py-1 text-xs uppercase shadow-[2px_2px_0px_#171c20] hover:bg-[#e4e9ee]">
+              <span>STEP ▶</span>
+            </button>
+            <button id="btn-bottom-commit" class="flex items-center gap-1 bg-[#436274] text-white border-2 border-[#171c20] px-3 py-1 text-xs uppercase shadow-[2px_2px_0px_#171c20] hover:bg-[#2b4b5c]">
+              <span class="material-symbols-outlined text-xs">done_all</span>
+              <span>Commit Parameters</span>
+            </button>
           </div>
         </div>
 
-      </div>
+        <!-- 30-Day Timeline Scrubber Track -->
+        <div class="px-4 pt-3 pb-2 border-b-2 border-[#171c20] bg-[#F8FAFC]">
+          <div class="flex justify-between items-center mb-1 text-xs">
+            <div class="flex items-center gap-2">
+              <span class="font-bold text-[#171c20]">TIMELINE SCRUBBER:</span>
+              <span id="current-day-label" class="px-2 py-0.5 bg-[#171c20] text-[#bfe0f5] font-bold">DAY 00 OF 30</span>
+            </div>
+            <span id="horizon-remaining-label" class="text-[#596168] font-bold">HORIZON: 30 DAYS REMAINING</span>
+          </div>
 
-    </div>
+          <!-- Interactive Track -->
+          <div class="relative py-2">
+            <input id="timeline-slider" type="range" min="0" max="29" value="0" class="w-full h-3 appearance-none bg-white border-2 border-[#171c20] outline-none cursor-pointer">
+            <!-- Day Milestone Ticks -->
+            <div class="flex justify-between text-[10px] text-[#596168] font-bold mt-1 px-0.5">
+              <span>DAY 00</span>
+              <span>DAY 05</span>
+              <span>DAY 10</span>
+              <span>DAY 15</span>
+              <span>DAY 20</span>
+              <span>DAY 25</span>
+              <span>DAY 30</span>
+            </div>
+          </div>
+        </div>
 
-    <!-- Timeline Scrubber Bar -->
-    <div class="scrubber-bar">
-      <div id="current-day-label" style="font-family: var(--font-mono); font-weight: 800; font-size: 1.1rem; min-width: 80px;">DAY 00</div>
-      
-      <div style="display: flex; gap: 8px;">
-        <button id="btn-step-prev" class="ink-btn ink-btn-secondary" style="padding: 6px 10px;">◀</button>
-        <button id="btn-play-pause" class="ink-btn" style="min-width: 100px;">
-          <span class="material-symbols-outlined" style="font-size: 18px;">play_arrow</span> PLAY
-        </button>
-        <button id="btn-step-next" class="ink-btn ink-btn-secondary" style="padding: 6px 10px;">▶</button>
-      </div>
+        <!-- Tactile Policy Controls & Toggle Switches -->
+        <div class="px-4 py-2.5 bg-white">
+          <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5">
+            <!-- Intervention 1: Curfew / Lockdown -->
+            <div class="border-2 border-[#171c20] p-2 bg-[#F8FAFC] flex flex-col justify-between">
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-xs uppercase font-bold text-[#171c20]">Lockdown</span>
+                <span class="w-3 h-3 border-2 border-[#171c20] bg-white"></span>
+              </div>
+              <div class="flex items-center justify-between mt-1">
+                <span class="text-[10px] text-[#596168]">22:00 - 05:00</span>
+                <button id="toggle-lockdown" class="px-2 py-0.5 border-2 border-[#171c20] bg-[#e4e9ee] text-[9px] font-bold">OFF</button>
+              </div>
+            </div>
 
-      <input id="timeline-slider" type="range" min="0" max="29" value="0" class="scrubber-slider">
+            <!-- Intervention 2: School Closure -->
+            <div class="border-2 border-[#171c20] p-2 bg-[#bfe0f5] flex flex-col justify-between shadow-[2px_2px_0px_#171c20]">
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-xs uppercase font-bold text-[#171c20]">Schools</span>
+                <span class="w-3 h-3 border-2 border-[#171c20] bg-[#171c20] flex items-center justify-center text-white text-[9px] leading-none">×</span>
+              </div>
+              <div class="flex items-center justify-between mt-1">
+                <span class="text-[10px] text-[#171c20] font-bold">K-12 CLOSED</span>
+                <button id="toggle-schools" class="px-2 py-0.5 border-2 border-[#171c20] bg-white text-[9px] font-bold">ACTIVE</button>
+              </div>
+            </div>
 
-      <!-- Mini Trajectory Sparkline -->
-      <div style="width: 140px; height: 36px; border: 1px solid #171c20; background: #FFFFFF; position: relative;">
-        <canvas id="sparkline-canvas" width="140" height="36"></canvas>
+            <!-- Intervention 3: Mandatory Mask Order -->
+            <div class="border-2 border-[#171c20] p-2 bg-[#bfe0f5] flex flex-col justify-between shadow-[2px_2px_0px_#171c20]">
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-xs uppercase font-bold text-[#171c20]">Mask Order</span>
+                <span class="w-3 h-3 border-2 border-[#171c20] bg-[#171c20] flex items-center justify-center text-white text-[9px] leading-none">×</span>
+              </div>
+              <div class="flex items-center justify-between mt-1">
+                <span class="text-[10px] text-[#171c20] font-bold">INDOORS ONLY</span>
+                <button id="toggle-masks" class="px-2 py-0.5 border-2 border-[#171c20] bg-white text-[9px] font-bold">ACTIVE</button>
+              </div>
+            </div>
+
+            <!-- Intervention 4: Vaccination Drive -->
+            <div class="border-2 border-[#171c20] p-2 bg-[#F8FAFC] flex flex-col justify-between">
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-xs uppercase font-bold text-[#171c20]">Vaccination</span>
+                <span class="w-3 h-3 border-2 border-[#171c20] bg-white"></span>
+              </div>
+              <div class="flex items-center justify-between mt-1">
+                <span class="text-[10px] text-[#596168]">Tier 1 Target</span>
+                <button id="toggle-vax" class="px-2 py-0.5 border-2 border-[#171c20] bg-[#e4e9ee] text-[9px] font-bold">STANDBY</button>
+              </div>
+            </div>
+
+            <!-- Intervention 5: Targeted Contact Tracing -->
+            <div class="border-2 border-[#171c20] p-2 bg-[#bfe0f5] flex flex-col justify-between shadow-[2px_2px_0px_#171c20]">
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-xs uppercase font-bold text-[#171c20]">Contact Tracing</span>
+                <span class="w-3 h-3 border-2 border-[#171c20] bg-[#171c20] flex items-center justify-center text-white text-[9px] leading-none">×</span>
+              </div>
+              <div class="flex items-center justify-between mt-1">
+                <span class="text-[10px] text-[#171c20] font-bold">78 FIELD AGENTS</span>
+                <button id="toggle-tracing" class="px-2 py-0.5 border-2 border-[#171c20] bg-white text-[9px] font-bold">ACTIVE</button>
+              </div>
+            </div>
+
+            <!-- Intervention 6: Public Awareness Broadcast -->
+            <div class="border-2 border-[#171c20] p-2 bg-[#F8FAFC] flex flex-col justify-between">
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-xs uppercase font-bold text-[#171c20]">Awareness Ad</span>
+                <span class="w-3 h-3 border-2 border-[#171c20] bg-white"></span>
+              </div>
+              <div class="flex items-center justify-between mt-1">
+                <span class="text-[10px] text-[#596168]">Radio &amp; SMS</span>
+                <button id="toggle-awareness" class="px-2 py-0.5 border-2 border-[#171c20] bg-[#e4e9ee] text-[9px] font-bold">QUEUED</button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -161,263 +600,254 @@
   <!-- ========================================== -->
   <!-- SCREEN 2: SCENARIO SETUP & PARAMETER STUDIO -->
   <!-- ========================================== -->
-  <main id="view-scenario" class="view-panel">
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
-      
-      <!-- Left Column: Disease & Transmission Parameters -->
-      <div class="ink-card-lg" style="padding: 24px;">
-        <h2 style="font-size: 1.25rem; font-weight: 800; margin-bottom: 16px; border-bottom: 2px solid #171c20; padding-bottom: 8px;">
-          TRANSMISSION & PATHOGEN DYNAMICS
-        </h2>
-
-        <div class="param-slider-group">
-          <div class="param-header">
-            <span>TARGET BASIC REPRODUCTION NUMBER (R_0)</span>
-            <span id="param-r0-val" style="color: #BA1A1A;">2.50</span>
-          </div>
-          <input id="param-r0" type="range" min="1.0" max="4.5" step="0.05" value="2.50" class="scrubber-slider" style="width: 100%;">
-          <div style="font-family: var(--font-mono); font-size: 0.68rem; color: #596168; margin-top: 4px;">
-            Calibrated against synthetic contact matrix eigenvalues.
-          </div>
-        </div>
-
-        <div class="param-slider-group">
-          <div class="param-header">
-            <span>INCUBATION PERIOD (DAYS)</span>
-            <span>4.5 DAYS</span>
-          </div>
-          <input type="range" min="2.0" max="8.0" step="0.5" value="4.5" class="scrubber-slider" style="width: 100%;">
-        </div>
-
-        <div class="param-slider-group">
-          <div class="param-header">
-            <span>INFECTIOUS DURATION (DAYS)</span>
-            <span>5.0 DAYS</span>
-          </div>
-          <input type="range" min="3.0" max="10.0" step="0.5" value="5.0" class="scrubber-slider" style="width: 100%;">
-        </div>
-
-        <div class="param-slider-group">
-          <div class="param-header">
-            <span>ASYMPTOMATIC CARRIER RATE (%)</span>
-            <span>34%</span>
-          </div>
-          <input type="range" min="10" max="60" step="2" value="34" class="scrubber-slider" style="width: 100%;">
-        </div>
-      </div>
-
-      <!-- Right Column: Behavioral & Policy Interventions -->
-      <div class="ink-card-lg" style="padding: 24px; display: flex; flex-direction: column; justify-content: space-between;">
-        <div>
-          <h2 style="font-size: 1.25rem; font-weight: 800; margin-bottom: 16px; border-bottom: 2px solid #171c20; padding-bottom: 8px;">
-            BEHAVIORAL HEURISTICS & INTERVENTIONS
+  <main id="view-scenario" class="view-panel overflow-y-auto">
+    <div class="max-w-6xl mx-auto p-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        
+        <!-- Left: Pathogen Dynamics -->
+        <div class="bg-white border-2 border-[#171c20] p-6 shadow-[5px_5px_0px_#171c20]">
+          <h2 class="font-display text-xl font-bold uppercase pb-3 border-b-2 border-[#171c20] mb-4">
+            Transmission & Pathogen Parameters
           </h2>
 
-          <div class="param-slider-group">
-            <div class="param-header">
-              <span>BASELINE POPULATION COMPLIANCE</span>
-              <span id="param-compliance-val" style="color: #0284C7;">65%</span>
+          <div class="mb-4">
+            <div class="flex justify-between text-xs font-bold mb-1">
+              <span>TARGET BASIC REPRODUCTION NUMBER (R_0)</span>
+              <span id="param-r0-val" class="text-[#ba1a1a]">2.50</span>
             </div>
-            <input id="param-compliance" type="range" min="0.1" max="1.0" step="0.05" value="0.65" class="scrubber-slider" style="width: 100%;">
+            <input id="param-r0" type="range" min="1.0" max="4.5" step="0.05" value="2.50" class="w-full h-3 appearance-none bg-[#e4e9ee] border-2 border-[#171c20] cursor-pointer">
+            <div class="text-[10px] text-[#596168] mt-1">Calibrated against contact matrix spectral radius.</div>
           </div>
 
-          <div class="param-slider-group">
-            <div class="param-header">
-              <span>SIMULATION HORIZON (DAYS)</span>
-              <span>30 DAYS</span>
+          <div class="mb-4">
+            <div class="flex justify-between text-xs font-bold mb-1">
+              <span>INCUBATION PERIOD (DAYS)</span>
+              <span>4.5 DAYS</span>
             </div>
-            <input id="param-horizon" type="range" min="15" max="60" step="5" value="30" class="scrubber-slider" style="width: 100%;">
+            <input type="range" min="2.0" max="8.0" step="0.5" value="4.5" class="w-full h-3 appearance-none bg-[#e4e9ee] border-2 border-[#171c20] cursor-pointer">
           </div>
 
-          <div style="margin-top: 20px;">
-            <div style="font-family: var(--font-mono); font-size: 0.78rem; font-weight: 700; margin-bottom: 10px;">ACTIVE POLICY INTERVENTIONS:</div>
-            
-            <label style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-family: var(--font-mono); font-size: 0.78rem; cursor: pointer;">
-              <input id="param-closure-school" type="checkbox" style="width: 18px; height: 18px; border: 2px solid #171c20;">
-              <span>MUNICIPAL SCHOOL CLOSURE (DAY 7 - DAY 28)</span>
-            </label>
+          <div class="mb-4">
+            <div class="flex justify-between text-xs font-bold mb-1">
+              <span>INFECTIOUS DURATION (DAYS)</span>
+              <span>5.0 DAYS</span>
+            </div>
+            <input type="range" min="3.0" max="10.0" step="0.5" value="5.0" class="w-full h-3 appearance-none bg-[#e4e9ee] border-2 border-[#171c20] cursor-pointer">
+          </div>
 
-            <label style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-family: var(--font-mono); font-size: 0.78rem; cursor: pointer;">
-              <input id="param-mandate-mask" type="checkbox" checked style="width: 18px; height: 18px; border: 2px solid #171c20;">
-              <span>TRANSIT & MARKET MASK ADVISORY (DAY 5 - DAY 30)</span>
-            </label>
+          <div class="mb-4">
+            <div class="flex justify-between text-xs font-bold mb-1">
+              <span>ASYMPTOMATIC CARRIER RATE (%)</span>
+              <span>34%</span>
+            </div>
+            <input type="range" min="10" max="60" step="2" value="34" class="w-full h-3 appearance-none bg-[#e4e9ee] border-2 border-[#171c20] cursor-pointer">
           </div>
         </div>
 
-        <button id="btn-commit-run" class="ink-btn ink-btn-amber" style="width: 100%; justify-content: center; padding: 14px; font-size: 0.95rem; margin-top: 20px;">
-          <span class="material-symbols-outlined">restart_alt</span> COMMIT & EXECUTE SIMULATION
-        </button>
-      </div>
+        <!-- Right: Behavior & Execution -->
+        <div class="bg-white border-2 border-[#171c20] p-6 shadow-[5px_5px_0px_#171c20] flex flex-col justify-between">
+          <div>
+            <h2 class="font-display text-xl font-bold uppercase pb-3 border-b-2 border-[#171c20] mb-4">
+              Behavior & Population Heuristics
+            </h2>
 
+            <div class="mb-4">
+              <div class="flex justify-between text-xs font-bold mb-1">
+                <span>BASELINE POPULATION COMPLIANCE</span>
+                <span id="param-compliance-val" class="text-[#436274]">65%</span>
+              </div>
+              <input id="param-compliance" type="range" min="0.1" max="1.0" step="0.05" value="0.65" class="w-full h-3 appearance-none bg-[#e4e9ee] border-2 border-[#171c20] cursor-pointer">
+            </div>
+
+            <div class="mb-4">
+              <div class="flex justify-between text-xs font-bold mb-1">
+                <span>SIMULATION HORIZON (DAYS)</span>
+                <span>30 DAYS</span>
+              </div>
+              <input id="param-horizon" type="range" min="15" max="60" step="5" value="30" class="w-full h-3 appearance-none bg-[#e4e9ee] border-2 border-[#171c20] cursor-pointer">
+            </div>
+
+            <div class="mt-4 pt-4 border-t-2 border-[#171c20]">
+              <div class="text-xs font-bold uppercase mb-2">Policy Presets:</div>
+              <label class="flex items-center gap-2 text-xs cursor-pointer mb-2">
+                <input id="param-closure-school" type="checkbox" checked class="w-4 h-4 border-2 border-[#171c20]">
+                <span>School Closure Advisory (Day 7 - Day 28)</span>
+              </label>
+              <label class="flex items-center gap-2 text-xs cursor-pointer">
+                <input id="param-mandate-mask" type="checkbox" checked class="w-4 h-4 border-2 border-[#171c20]">
+                <span>Indoor Public Mask Mandate (Day 5 - Day 30)</span>
+              </label>
+            </div>
+          </div>
+
+          <button id="btn-commit-run" class="w-full mt-6 bg-[#bfe0f5] text-[#171c20] border-2 border-[#171c20] py-3 font-bold uppercase shadow-[3px_3px_0px_#171c20] hover:bg-[#a5d2ee] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all">
+            Commit Parameters & Run Simulation
+          </button>
+        </div>
+
+      </div>
     </div>
   </main>
 
   <!-- ========================================== -->
   <!-- SCREEN 3: AGENT DEEP-DIVE TELEMETRY       -->
   <!-- ========================================== -->
-  <main id="view-agents" class="view-panel">
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
-      
-      <!-- Left: Cohort Breakdown -->
-      <div class="ink-card-lg" style="padding: 24px;">
-        <h2 style="font-size: 1.25rem; font-weight: 800; margin-bottom: 16px; border-bottom: 2px solid #171c20; padding-bottom: 8px;">
-          SYNTHETIC POPULATION DEMOGRAPHICS
-        </h2>
-        <table class="ink-table">
-          <thead>
-            <tr>
-              <th>DISTRICT</th>
-              <th>POPULATION</th>
-              <th>COMMUTERS</th>
-              <th>COMPLIANCE</th>
-              <th>ICU RISK</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>District A01</td>
-              <td>2,500</td>
-              <td>1,210</td>
-              <td>68%</td>
-              <td><span class="tag-badge" style="background: #FEE2E2; color: #991B1B;">HIGH</span></td>
-            </tr>
-            <tr>
-              <td>District A02</td>
-              <td>2,500</td>
-              <td>1,180</td>
-              <td>62%</td>
-              <td><span class="tag-badge" style="background: #FEF3C7; color: #B45309;">MED</span></td>
-            </tr>
-          </tbody>
-        </table>
-
-        <div style="margin-top: 24px; font-family: var(--font-mono); font-size: 0.75rem; background: #E2E8F0; padding: 12px; border: 1px solid #171c20;">
-          <strong>SAMPLING SPECIFICATION:</strong> Stratified representation from synthetic census microdata. Each rendered pedestal maps to 25 synthetic agents with homogeneous routine templates.
+  <main id="view-agents" class="view-panel overflow-y-auto">
+    <div class="max-w-6xl mx-auto p-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        
+        <div class="bg-white border-2 border-[#171c20] p-6 shadow-[5px_5px_0px_#171c20]">
+          <h2 class="font-display text-xl font-bold uppercase pb-3 border-b-2 border-[#171c20] mb-4">
+            Demographic Stratification
+          </h2>
+          <table class="w-full border-collapse border-2 border-[#171c20] text-xs">
+            <thead>
+              <tr class="bg-[#EEF2F6]">
+                <th class="border-2 border-[#171c20] p-2 text-left">DISTRICT</th>
+                <th class="border-2 border-[#171c20] p-2 text-left">POPULATION</th>
+                <th class="border-2 border-[#171c20] p-2 text-left">COMMUTERS</th>
+                <th class="border-2 border-[#171c20] p-2 text-left">COMPLIANCE</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="border-2 border-[#171c20] p-2">District A01</td>
+                <td class="border-2 border-[#171c20] p-2">2,500</td>
+                <td class="border-2 border-[#171c20] p-2">1,210</td>
+                <td class="border-2 border-[#171c20] p-2">68%</td>
+              </tr>
+              <tr>
+                <td class="border-2 border-[#171c20] p-2">District A02</td>
+                <td class="border-2 border-[#171c20] p-2">2,500</td>
+                <td class="border-2 border-[#171c20] p-2">1,180</td>
+                <td class="border-2 border-[#171c20] p-2">62%</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="mt-4 p-3 bg-[#EEF2F6] border border-[#171c20] text-[11px]">
+            <strong>SAMPLING RATIO:</strong> Calibrated against synthetic microdata. Stratified across age bands and daily routine templates.
+          </div>
         </div>
-      </div>
 
-      <!-- Right: Showcase Agent Narrative Cards -->
-      <div class="ink-card-lg" style="padding: 24px;">
-        <h2 style="font-size: 1.25rem; font-weight: 800; margin-bottom: 16px; border-bottom: 2px solid #171c20; padding-bottom: 8px;">
-          SHOWCASE AGENT TELEMETRY
-        </h2>
-        <div id="showcase-cards-container">
-          <!-- Filled by studio.js -->
+        <div class="bg-white border-2 border-[#171c20] p-6 shadow-[5px_5px_0px_#171c20]">
+          <h2 class="font-display text-xl font-bold uppercase pb-3 border-b-2 border-[#171c20] mb-4">
+            Showcase Agent Biographies
+          </h2>
+          <div id="showcase-cards-container" class="space-y-4 max-h-[500px] overflow-y-auto">
+            <!-- Populated dynamically -->
+          </div>
         </div>
-      </div>
 
+      </div>
     </div>
   </main>
 
   <!-- ========================================== -->
   <!-- SCREEN 4: RUMOR RIPPLE & REACTION EVENT   -->
   <!-- ========================================== -->
-  <main id="view-rumor" class="view-panel">
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
-      
-      <div class="ink-card-lg" style="padding: 24px;">
-        <h2 style="font-size: 1.25rem; font-weight: 800; margin-bottom: 16px; border-bottom: 2px solid #171c20; padding-bottom: 8px;">
-          MISINFORMATION VECTOR PROPAGATION
-        </h2>
-        <p style="font-size: 0.85rem; color: #334155; margin-bottom: 16px;">
-          Tracking information cascades across peer-to-peer social networks, institutional trust erosion, and behavioral resistance to health directives.
-        </p>
-
-        <div style="border: 2px solid #171c20; background: #FFFFFF; padding: 16px; margin-bottom: 16px;">
-          <div style="display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 0.78rem; margin-bottom: 6px;">
-            <span>PEER SKEPTICISM TRANSMISSION RATE</span>
-            <strong style="color: #D97706;">54.2%</strong>
+  <main id="view-rumor" class="view-panel overflow-y-auto">
+    <div class="max-w-6xl mx-auto p-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        
+        <div class="bg-white border-2 border-[#171c20] p-6 shadow-[5px_5px_0px_#171c20]">
+          <h2 class="font-display text-xl font-bold uppercase pb-3 border-b-2 border-[#171c20] mb-4">
+            Misinformation Vector Propagation
+          </h2>
+          <p class="text-xs text-[#334155] mb-4">
+            Tracking peer-to-peer rumor transmission, skepticism cascades, and behavioral compliance erosion.
+          </p>
+          <div class="border-2 border-[#171c20] p-4 bg-[#F8FAFC] mb-4">
+            <div class="flex justify-between text-xs font-bold mb-1">
+              <span>PEER SKEPTICISM TRANSMISSION RATE</span>
+              <span class="text-[#f59e0b]">54.2%</span>
+            </div>
+            <div class="w-full h-3 border-2 border-[#171c20] bg-white">
+              <div class="h-full bg-[#f59e0b]" style="width: 54%;"></div>
+            </div>
           </div>
-          <div class="meter-container"><div class="meter-fill warning" style="width: 54%;"></div></div>
+          <div class="border-2 border-[#171c20] p-4 bg-[#F8FAFC]">
+            <div class="flex justify-between text-xs font-bold mb-1">
+              <span>INSTITUTIONAL TRUST RESILIENCE</span>
+              <span class="text-[#436274]">61.8%</span>
+            </div>
+            <div class="w-full h-3 border-2 border-[#171c20] bg-white">
+              <div class="h-full bg-[#436274]" style="width: 62%;"></div>
+            </div>
+          </div>
         </div>
 
-        <div style="border: 2px solid #171c20; background: #FFFFFF; padding: 16px;">
-          <div style="display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 0.78rem; margin-bottom: 6px;">
-            <span>INSTITUTIONAL TRUST RESILIENCE</span>
-            <strong style="color: #0284C7;">61.8%</strong>
+        <div class="bg-white border-2 border-[#171c20] p-6 shadow-[5px_5px_0px_#171c20]">
+          <h2 class="font-display text-xl font-bold uppercase pb-3 border-b-2 border-[#171c20] mb-4">
+            Behavioral Backlash Dynamics
+          </h2>
+          <div class="text-xs space-y-3">
+            <div class="p-3 border-b border-[#e4e9ee]">
+              <strong>INFORMAL NETWORK VELOCITY:</strong> 3.4 interactions/agent/day
+            </div>
+            <div class="p-3 border-b border-[#e4e9ee]">
+              <strong>RUMOR HALO CLUSTERING:</strong> High in Civic Trade Center node
+            </div>
+            <div class="p-3 border-b border-[#e4e9ee]">
+              <strong>MASK ABANDONMENT RISK:</strong> +18% following viral rumor spike
+            </div>
           </div>
-          <div class="meter-container"><div class="meter-fill" style="width: 62%;"></div></div>
         </div>
+
       </div>
-
-      <div class="ink-card-lg" style="padding: 24px;">
-        <h2 style="font-size: 1.25rem; font-weight: 800; margin-bottom: 16px; border-bottom: 2px solid #171c20; padding-bottom: 8px;">
-          BEHAVIORAL BACKLASH METRICS
-        </h2>
-        <div style="font-family: var(--font-mono); font-size: 0.78rem; line-height: 1.8;">
-          <div style="padding: 8px 0; border-bottom: 1px solid #E2E8F0;">
-            <strong>INFORMAL NETWORK VELOCITY:</strong> 3.4 interactions/agent/day
-          </div>
-          <div style="padding: 8px 0; border-bottom: 1px solid #E2E8F0;">
-            <strong>RUMOR HALO CLUSTERING:</strong> High in Civic Trade Center node
-          </div>
-          <div style="padding: 8px 0; border-bottom: 1px solid #E2E8F0;">
-            <strong>MASK ABANDONMENT RISK:</strong> +18% following misinformation burst
-          </div>
-        </div>
-      </div>
-
     </div>
   </main>
 
   <!-- ========================================== -->
   <!-- SCREEN 5: POST-SIMULATION DECISION REPORT -->
   <!-- ========================================== -->
-  <main id="view-decision" class="view-panel">
-    
-    <!-- Outcome Banners -->
-    <div class="bento-grid" style="margin-bottom: 24px;">
-      <div class="ink-card stat-cell">
-        <div class="stat-label">Cumulative Infections</div>
-        <div id="dec-total-infections" class="stat-value">--</div>
-      </div>
-      <div class="ink-card stat-cell">
-        <div class="stat-label">Total Deaths</div>
-        <div id="dec-total-deaths" class="stat-value" style="color: #BA1A1A;">--</div>
-      </div>
-      <div class="ink-card stat-cell">
-        <div class="stat-label">Overflow Attributable Deaths</div>
-        <div id="dec-overflow-deaths" class="stat-value" style="color: #D97706;">--</div>
-      </div>
-      <div class="ink-card stat-cell">
-        <div class="stat-label">Final Attack Rate</div>
-        <div id="dec-attack-rate" class="stat-value" style="color: #0284C7;">--</div>
-      </div>
-    </div>
-
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+  <main id="view-decision" class="view-panel overflow-y-auto">
+    <div class="max-w-6xl mx-auto p-6">
       
-      <!-- Pareto Frontier Curve -->
-      <div class="ink-card-lg" style="padding: 24px;">
-        <h2 style="font-size: 1.25rem; font-weight: 800; margin-bottom: 12px; border-bottom: 2px solid #171c20; padding-bottom: 8px;">
-          PARETO POLICY FRONTIER
-        </h2>
-        <div style="font-family: var(--font-mono); font-size: 0.72rem; color: #596168; margin-bottom: 12px;">
-          Economic Disruption vs. Attributable Excess Mortality trade-off space.
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div class="bg-white border-2 border-[#171c20] p-4 shadow-[3px_3px_0px_#171c20]">
+          <div class="text-[10px] text-[#596168] uppercase font-bold">Cumulative Infections</div>
+          <div id="dec-total-infections" class="font-display text-2xl font-bold mt-1">--</div>
         </div>
-        <canvas id="decision-pareto-canvas" width="480" height="260" style="border: 2px solid #171c20; background: #FFFFFF; width: 100%;"></canvas>
+        <div class="bg-white border-2 border-[#171c20] p-4 shadow-[3px_3px_0px_#171c20]">
+          <div class="text-[10px] text-[#596168] uppercase font-bold">Total Deaths</div>
+          <div id="dec-total-deaths" class="font-display text-2xl font-bold text-[#ba1a1a] mt-1">--</div>
+        </div>
+        <div class="bg-white border-2 border-[#171c20] p-4 shadow-[3px_3px_0px_#171c20]">
+          <div class="text-[10px] text-[#596168] uppercase font-bold">Overflow Attributable Deaths</div>
+          <div id="dec-overflow-deaths" class="font-display text-2xl font-bold text-[#f59e0b] mt-1">--</div>
+        </div>
+        <div class="bg-white border-2 border-[#171c20] p-4 shadow-[3px_3px_0px_#171c20]">
+          <div class="text-[10px] text-[#596168] uppercase font-bold">Final Attack Rate</div>
+          <div id="dec-attack-rate" class="font-display text-2xl font-bold text-[#436274] mt-1">--</div>
+        </div>
       </div>
 
-      <!-- Policy Advisor Action Box -->
-      <div class="ink-card-lg" style="padding: 24px; display: flex; flex-direction: column;">
-        <h2 style="font-size: 1.25rem; font-weight: 800; margin-bottom: 12px; border-bottom: 2px solid #171c20; padding-bottom: 8px;">
-          AI POLICY ADVISOR REASONING
-        </h2>
-        <p style="font-size: 0.85rem; color: #334155; margin-bottom: 16px;">
-          Query the Gemini Policy Advisor agent to balance hospital capacity, mortality avoidance, and socioeconomic friction across counterfactual simulations.
-        </p>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="bg-white border-2 border-[#171c20] p-6 shadow-[5px_5px_0px_#171c20]">
+          <h2 class="font-display text-xl font-bold uppercase pb-3 border-b-2 border-[#171c20] mb-4">
+            Pareto Policy Frontier
+          </h2>
+          <canvas id="decision-pareto-canvas" width="480" height="240" class="w-full bg-white border-2 border-[#171c20]"></canvas>
+        </div>
 
-        <button id="btn-trigger-advisor" class="ink-btn" style="width: 100%; justify-content: center; padding: 12px;">
-          <span class="material-symbols-outlined">psychology</span> EVALUATE COUNTERFACTUAL ADVISORY
-        </button>
+        <div class="bg-white border-2 border-[#171c20] p-6 shadow-[5px_5px_0px_#171c20] flex flex-col justify-between">
+          <div>
+            <h2 class="font-display text-xl font-bold uppercase pb-3 border-b-2 border-[#171c20] mb-4">
+              AI Policy Advisor
+            </h2>
+            <p class="text-xs text-[#334155] mb-4">
+              Counterfactual optimization evaluating trade-offs between hospital capacity preservation, mortality reduction, and socioeconomic disruption.
+            </p>
+            <div id="advisor-output-box"></div>
+          </div>
 
-        <div id="advisor-output-box" style="flex: 1; margin-top: 16px;">
-          <!-- Rendered by studio.js -->
+          <button id="btn-trigger-advisor" class="w-full mt-4 bg-[#bfe0f5] text-[#171c20] border-2 border-[#171c20] py-3 font-bold uppercase shadow-[3px_3px_0px_#171c20] hover:bg-[#a5d2ee] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none">
+            Evaluate Policy Advisory Loop
+          </button>
         </div>
       </div>
 
     </div>
-
   </main>
 
   <script src="studio.js"></script>
