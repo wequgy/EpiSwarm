@@ -530,11 +530,19 @@ elif step == "5. Simulation Engine":
         with open(Path("scenarios") / sim_s_choice, "r", encoding="utf-8") as f:
             s_raw = yaml.safe_load(f)
 
-        col_sr1, col_sr2 = st.columns(2)
+        col_sr1, col_sr2, col_sr3 = st.columns([1, 1, 1])
         with col_sr1:
-            sim_horizon = st.number_input("Horizon (Days)", value=int(s_raw.get("horizon_days", 60)), min_value=15, max_value=180)
+            sim_horizon = st.number_input("Horizon (Days)", value=int(s_raw.get("horizon_days", 30)), min_value=15, max_value=180)
         with col_sr2:
-            sim_seed = st.number_input("Random Seed", value=int(s_raw.get("random_seed", 42)), min_value=1)
+            sim_randomize_seed = st.checkbox("🎲 Randomize Seed", value=True, help="Generate fresh stochastic seed on every execution for varied epidemic trajectories.")
+        with col_sr3:
+            base_seed = int(s_raw.get("random_seed", 42))
+            if sim_randomize_seed:
+                if "current_random_seed" not in st.session_state:
+                    st.session_state.current_random_seed = random.randint(1000, 999999)
+                sim_seed = st.number_input("Active Seed", value=st.session_state.current_random_seed, disabled=True)
+            else:
+                sim_seed = st.number_input("Fixed Seed", value=base_seed, min_value=1)
 
         sim_mask_toggle = st.checkbox("Enforce Universal Mask Mandate", value=any(i.get("measure_type") == "mask_mandate" for i in s_raw.get("interventions", [])))
         sim_school_toggle = st.checkbox("Enforce School Closure", value=any(i.get("measure_type") == "school_closure" for i in s_raw.get("interventions", [])))
@@ -549,15 +557,39 @@ elif step == "5. Simulation Engine":
             b_raw = yaml.safe_load(f)
 
         sim_rumor_rate = st.slider("Rumor Spread Rate", 0.01, 0.20, float(b_raw.get("rumor_spread_rate", 0.05)), step=0.01)
+
+        # Detect available local Ollama models
+        ollama_models = []
+        try:
+            tags_r = requests.get("http://localhost:11434/api/tags", timeout=1)
+            if tags_r.status_code == 200:
+                ollama_models = [m.get("name") for m in tags_r.json().get("models", [])]
+        except Exception:
+            pass
+
         sim_policy_backend = st.selectbox(
             "Behavior Policy Engine",
-            ["Deterministic Rules (RulePolicy - Fast)", "Google Gemini LLM (gemini-3.5-flash)", "Local LLM (Ollama)"],
-            index=0
+            ["Local LLM (Ollama)", "Google Gemini LLM", "Deterministic Rules (RulePolicy - Fast)"],
+            index=0 if ollama_models else 1
         )
-        if "Gemini" in sim_policy_backend:
+
+        selected_ollama_model = "qwen3:4b"
+        selected_gemini_model = "gemini-3.1-flash-lite"
+
+        if "Local" in sim_policy_backend:
+            if ollama_models:
+                def_idx = ollama_models.index("qwen3:4b") if "qwen3:4b" in ollama_models else 0
+                selected_ollama_model = st.selectbox("Installed Ollama Model", ollama_models, index=def_idx)
+                st.caption(f"⚡ Connected to local Ollama (`{selected_ollama_model}`). High-speed archetype inference active.")
+            else:
+                st.warning("⚠️ Ollama is not responding at http://localhost:11434. Ensure `ollama serve` is running.")
+        elif "Gemini" in sim_policy_backend:
             curr_gem_key = (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or "").strip()
+            gemini_model_options = ["gemini-3.1-flash-lite (Recommended / High Quota)", "gemini-3.5-flash"]
+            sel_gem_opt = st.selectbox("Gemini Model", gemini_model_options, index=0)
+            selected_gemini_model = sel_gem_opt.split(" ")[0]
             if curr_gem_key:
-                st.caption(f"✅ Gemini configured (Model: `{os.getenv('GEMINI_MODEL', 'gemini-3.5-flash')}`)")
+                st.caption(f"✅ Gemini configured (`{selected_gemini_model}`). Rate-safe 15 RPM batching active.")
             else:
                 st.warning("⚠️ GEMINI_API_KEY not configured. Set it in sidebar or .env.")
 
@@ -565,12 +597,20 @@ elif step == "5. Simulation Engine":
 
     # EXECUTE SIMULATION BUTTON
     if st.button("🚀 Execute Outbreak Simulation", type="primary"):
+        # 0. Resolve stochastic seed
+        if sim_randomize_seed:
+            active_seed = random.randint(1000, 999999)
+            st.session_state.current_random_seed = active_seed
+        else:
+            active_seed = int(sim_seed)
+        st.session_state.active_seed = active_seed
+
         # 1. Build or re-use PopulationSoA
-        with st.spinner("Synthesizing population Structure-of-Arrays (SoA)..."):
+        with st.spinner(f"Synthesizing population Structure-of-Arrays (SoA) [Seed: {active_seed}]..."):
             pop = build_synthetic_population(
                 st.session_state.region_dir,
                 scale_agents=int(sim_scale),
-                random_seed=int(sim_seed)
+                random_seed=active_seed
             )
             st.session_state.pop_soa = pop
 
@@ -581,7 +621,7 @@ elif step == "5. Simulation Engine":
 
         # 3. Compile ScenarioPack with overrides & active toggles
         s_raw["horizon_days"] = int(sim_horizon)
-        s_raw["random_seed"] = int(sim_seed)
+        s_raw["random_seed"] = active_seed
         active_interventions = []
         if sim_mask_toggle:
             active_interventions.append(InterventionAction(
@@ -624,10 +664,14 @@ elif step == "5. Simulation Engine":
         policy_inst = None
         if "Gemini" in sim_policy_backend:
             from episwarm.behavior.policy_gemini import GeminiPolicy
-            policy_inst = GeminiPolicy()
+            policy_inst = GeminiPolicy(model=selected_gemini_model)
         elif "Local" in sim_policy_backend:
             from episwarm.behavior.policy_local import LocalLogprobPolicy
-            policy_inst = LocalLogprobPolicy()
+            policy_inst = LocalLogprobPolicy(model=selected_ollama_model)
+        else:
+            from episwarm.behavior.policy_rules import RulePolicy
+            policy_inst = RulePolicy()
+        st.session_state.active_policy = policy_inst
 
         # 6. Run simulation
         with st.spinner(f"Stepping through {sim_horizon} days of epidemic propagation with {sim_policy_backend.split(' ')[0]}..."):
@@ -645,6 +689,32 @@ elif step == "5. Simulation Engine":
     if st.session_state.sim_results:
         res = st.session_state.sim_results
         st.markdown("### 📊 Simulation Telemetry & Epidemic Progression")
+
+        # Telemetry info banner
+        if st.session_state.get("active_policy"):
+            p = st.session_state.active_policy
+            p_name = p.__class__.__name__
+            m_calls = getattr(p, "model_calls_count", 0)
+            c_hits = getattr(p, "cache_hits_count", 0)
+            f_backs = getattr(p, "fallback_count", 0)
+            l_err = getattr(p, "last_error", "")
+            e_model = getattr(p, "model", "")
+            engine_label = f"Local Ollama (`{e_model}`)" if "Local" in p_name else (f"Google Gemini (`{e_model}`)" if "Gemini" in p_name else "Deterministic Rules")
+
+            t_c1, t_c2, t_c3, t_c4, t_c5 = st.columns(5)
+            with t_c1:
+                st.info(f"**Policy:** {engine_label}")
+            with t_c2:
+                st.info(f"**LLM Calls:** `{m_calls}`")
+            with t_c3:
+                st.info(f"**Cache Hits:** `{c_hits:,}`")
+            with t_c4:
+                st.info(f"**Fallbacks:** `{f_backs}`")
+            with t_c5:
+                st.info(f"**Active Seed:** `{st.session_state.get('active_seed', 42)}`")
+
+            if f_backs > 0:
+                st.warning(f"⚠️ Note: {f_backs} decisions fell back to calibrated RuleEngine. ({l_err or 'Latency/Quota limit'})")
 
         # Top KPI Cards
         state_idx = {name: i for i, name in enumerate(res.state_names)}
