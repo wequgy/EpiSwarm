@@ -154,3 +154,4 @@ def test_belief_band_bucketing_for_policies():
     assert get_belief_band(0.64) == "moderate"
     assert get_belief_band(0.65) == "high"
     assert get_belief_band(1.0) == "high"
+

@@ -90,3 +90,4 @@ def evaluate_resource_whatif_paired(
         "unmet_demand_delta": {"mean": u_mean, "ci_lower": u_low, "ci_upper": u_high, "samples": unmet_delta},
         "equity_gap_delta": {"mean": e_mean, "ci_lower": e_low, "ci_upper": e_high, "samples": equity_delta}
     }
+

@@ -1,3 +1,4 @@
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
@@ -21,16 +22,31 @@ share/python-wheels/
 *.egg
 MANIFEST
 
+# Ephemeral runtime databases and caches
 *.manifest
 *.sqlite
 *.sqlite3
 .cache
 .pytest_cache/
+.coverage
+htmlcov/
 
-# Environment and secrets
+# Environment and secrets (Never commit secrets!)
 .env
 *.env.local
+.env.*.local
 
-# OS files
+# OS generated files
 .DS_Store
 Thumbs.db
+desktop.ini
+
+# IDE & AI Assistant Local Directories
+.idea/
+.vscode/
+.claude/
+.agents/skills/
+
+# Large raw web downloads / scraped paper artifacts
+ResearchPaper.html
+ResearchPaper_files/

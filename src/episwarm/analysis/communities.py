@@ -170,3 +170,4 @@ def group_areas_for_policy_control(
         merged[0].extend(smallest)
 
     return {i: sorted(c) for i, c in enumerate(merged)}
+

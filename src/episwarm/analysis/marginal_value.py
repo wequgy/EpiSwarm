@@ -143,3 +143,4 @@ def rank_areas_by_marginal_benefit(
 
     ranking.sort(key=lambda x: x[1], reverse=True)
     return ranking
+

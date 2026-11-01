@@ -1,3 +1,4 @@
 area_id,safe_water_share,improved_sanitation_share,handwashing_facility_share,persons_per_room,informal_settlement_share,clean_cooking_share,green_space_share,climate_zone,extra,source,status
 A01,0.92,0.88,0.85,1.3,0.08,0.89,0.22,temperate,{},synthetic_generator,synthetic
 A02,0.76,0.70,0.65,2.4,0.28,0.68,0.11,temperate,{},synthetic_generator,synthetic
+

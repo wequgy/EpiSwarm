@@ -130,3 +130,4 @@ def build_social_network(
     adj_norm = inv_diag.dot(adj)
 
     return adj_norm.tocsr()
+

@@ -230,3 +230,4 @@ def compare_optimizer_against_ground_truth(
         },
         "total_exhaustive_search_space": len(all_scores)
     }
+

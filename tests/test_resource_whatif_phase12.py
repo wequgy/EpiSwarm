@@ -116,3 +116,4 @@ def test_resource_whatif_upper_cap_enforcement():
         evaluate_resource_whatif_paired(pop, d_pack, s_pack, [excess_action], resources_df=res_df, n_paired_seeds=2)
 
     assert "exceeds upper_cap_of_extra" in str(excinfo.value)
+

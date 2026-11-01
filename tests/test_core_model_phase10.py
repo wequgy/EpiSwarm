@@ -238,3 +238,4 @@ def test_generic_resources_allocation_and_caps():
     with pytest.raises(ValueError) as exc:
         sys.apply_resource_addition(excess_add)
     assert "exceeds upper_cap_of_extra" in str(exc.value)
+

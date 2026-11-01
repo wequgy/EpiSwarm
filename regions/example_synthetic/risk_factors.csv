@@ -9,3 +9,4 @@ ALL,M,0-4,pediatric_asthma,0.12,synthetic_generator,synthetic
 ALL,F,0-4,pediatric_asthma,0.10,synthetic_generator,synthetic
 ALL,M,5-18,pediatric_asthma,0.15,synthetic_generator,synthetic
 ALL,F,5-18,pediatric_asthma,0.12,synthetic_generator,synthetic
+
