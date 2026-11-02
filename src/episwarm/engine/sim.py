@@ -63,6 +63,12 @@ class SimulationResults:
     daily_rumor_beliefs: Dict[str, np.ndarray] = field(default_factory=dict)
     deaths_attributable_to_rumor: int = 0
 
+    # Incident daily events for surveillance & observation modeling (Phase 18)
+    daily_incident_symptomatic: Optional[np.ndarray] = None
+    daily_incident_hospitalized: Optional[np.ndarray] = None
+    daily_incident_icu: Optional[np.ndarray] = None
+    daily_incident_deaths: Optional[np.ndarray] = None
+
     manifest: Dict[str, Any] = field(default_factory=dict)
     assumptions: List[Dict[str, Any]] = field(default_factory=list)
 
@@ -438,6 +444,10 @@ def run_simulation(
     daily_area_infections = np.zeros((horizon, n_areas), dtype=np.int32)
     daily_hospital_demand = np.zeros(horizon, dtype=np.int32)
     daily_icu_demand = np.zeros(horizon, dtype=np.int32)
+    daily_incident_symptomatic = np.zeros(horizon, dtype=np.int32)
+    daily_incident_hospitalized = np.zeros(horizon, dtype=np.int32)
+    daily_incident_icu = np.zeros(horizon, dtype=np.int32)
+    daily_incident_deaths = np.zeros(horizon, dtype=np.int32)
 
     total_overflow_deaths = 0
 
@@ -663,6 +673,13 @@ def run_simulation(
                 states[group_mask] = next_st
                 dwell_remaining[group_mask] = new_dwell
 
+                if state_graph.idx_symp >= 0:
+                    daily_incident_symptomatic[day] += int(np.sum(next_st == state_graph.idx_symp))
+                daily_incident_hospitalized[day] += int(np.sum(state_graph.needs_bed[next_st] == 1))
+                daily_incident_icu[day] += int(np.sum(state_graph.needs_bed[next_st] == 3))
+                if state_graph.idx_D >= 0:
+                    daily_incident_deaths[day] += int(np.sum(next_st == state_graph.idx_D))
+
         # E. Evaluate new infections (S -> E) with behavior actions
         effective_isolating = agent_isolating.copy()
         newly_infected = evaluate_daily_infections(
@@ -766,6 +783,10 @@ def run_simulation(
         overflow_deaths=total_overflow_deaths,
         daily_mean_compliance=daily_mean_compliance,
         daily_rumor_beliefs=daily_rumor_beliefs,
+        daily_incident_symptomatic=daily_incident_symptomatic,
+        daily_incident_hospitalized=daily_incident_hospitalized,
+        daily_incident_icu=daily_incident_icu,
+        daily_incident_deaths=daily_incident_deaths,
         manifest=manifest
     )
 
