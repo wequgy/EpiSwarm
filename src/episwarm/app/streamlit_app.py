@@ -570,8 +570,8 @@ elif step == "5. Simulation Engine":
 
         sim_policy_backend = st.selectbox(
             "Behavior Policy Engine",
-            ["Local LLM (Ollama)", "Google Gemini LLM", "Deterministic Rules (RulePolicy - Fast)"],
-            index=0 if ollama_models else 1
+            ["None (Unmitigated Baseline)", "Deterministic Rules (RulePolicy - Fast)", "Local LLM (Ollama)", "Google Gemini LLM"],
+            index=0 if getattr(s_pack, 'behavior_mode', 'none') == 'none' else (1 if getattr(s_pack, 'behavior_mode', 'none') == 'rule' else 2)
         )
 
         selected_ollama_model = "qwen3:4b"
@@ -680,12 +680,18 @@ elif step == "5. Simulation Engine":
         b_raw["rumor_spread_rate"] = float(sim_rumor_rate)
         b_pack = BehaviorPack(**b_raw)
 
-        # 5. Resolve policy engine
+        # 5. Resolve policy engine and behavior mode
         policy_inst = None
-        if "Gemini" in sim_policy_backend:
+        chosen_mode = "none"
+        if "None" in sim_policy_backend:
+            chosen_mode = "none"
+            policy_inst = None
+        elif "Gemini" in sim_policy_backend:
+            chosen_mode = "llm"
             from episwarm.behavior.policy_gemini import GeminiPolicy
             policy_inst = GeminiPolicy(model=selected_gemini_model)
         elif "Local" in sim_policy_backend:
+            chosen_mode = "llm"
             from episwarm.behavior.policy_local import LocalLogprobPolicy
             from episwarm.behavior.cache import DecisionCache
             policy_cache = DecisionCache(":memory:") if sim_bypass_cache else None
@@ -695,6 +701,7 @@ elif step == "5. Simulation Engine":
                 cache=policy_cache
             )
         else:
+            chosen_mode = "rule"
             from episwarm.behavior.policy_rules import RulePolicy
             policy_inst = RulePolicy()
         st.session_state.active_policy = policy_inst
@@ -750,6 +757,7 @@ elif step == "5. Simulation Engine":
             s_pack,
             behavior_pack=b_pack,
             policy=policy_inst,
+            behavior_mode=chosen_mode,
             step_callback=sim_step_cb
         )
         total_time = time.time() - t_sim_start

@@ -60,6 +60,38 @@ class ComplianceWeights(BaseModel):
     fatigue_recovery: float = Field(default=0.02, ge=0.0, description="Fatigue recovery rate during open periods")
 
 
+class BehaviorExecutionConfig(BaseModel):
+    """Execution constants governing compliance translation and area risk bands (Phase 17 Provenance)."""
+    compliance_baseline: float = Field(
+        default=0.30, ge=0.0, le=1.0,
+        description="Baseline execution probability at zero compliance (status: assumed)"
+    )
+    compliance_slope: float = Field(
+        default=0.70, ge=0.0, le=1.0,
+        description="Compliance multiplier slope (status: assumed)"
+    )
+    compliance_acquisition_reduction: float = Field(
+        default=0.30, ge=0.0, le=1.0,
+        description="Direct transmission acquisition reduction from compliance (status: assumed)"
+    )
+    area_risk_critical_threshold: float = Field(
+        default=0.05, gt=0.0,
+        description="Incidence rate threshold for critical area risk band (status: assumed)"
+    )
+    area_risk_high_threshold: float = Field(
+        default=0.02, gt=0.0,
+        description="Incidence rate threshold for high area risk band (status: assumed)"
+    )
+    area_risk_medium_threshold: float = Field(
+        default=0.005, gt=0.0,
+        description="Incidence rate threshold for medium area risk band (status: assumed)"
+    )
+    external_inflow_fraction: float = Field(
+        default=0.05, ge=0.0, le=1.0,
+        description="External patient inflow fraction into regional hospitals (status: assumed)"
+    )
+
+
 class BehaviorPack(BaseModel):
     """Configuration bundle defining public behavior, traits, rumor network, and compliance dynamics."""
     name: str = Field(..., min_length=1)
@@ -79,4 +111,5 @@ class BehaviorPack(BaseModel):
     rumor_spread_rate: float = Field(default=0.05, ge=0.0, le=1.0)
     rumor_topics: List[RumorTopic] = Field(default_factory=list)
     compliance_weights: ComplianceWeights = Field(default_factory=ComplianceWeights)
+    execution_config: BehaviorExecutionConfig = Field(default_factory=BehaviorExecutionConfig)
     provenance: ProvenanceRecord

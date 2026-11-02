@@ -13,17 +13,36 @@ class CompiledStateGraph:
         self.pack = disease_pack
         self.age_bands = age_bands
 
-        # 1. State mappings
+        # 1. State mappings and semantic roles
         self.state_names = [s.name for s in disease_pack.states]
         self.n_states = len(self.state_names)
         self.name_to_idx = {name: i for i, name in enumerate(self.state_names)}
         self.idx_to_name = {i: name for i, name in enumerate(self.state_names)}
 
-        # Key state indices
-        self.idx_S = self.name_to_idx.get("S", 0)
-        self.idx_E = self.name_to_idx.get("E", 1 if self.n_states > 1 else 0)
-        self.idx_R = self.name_to_idx.get("R", -1)
-        self.idx_D = self.name_to_idx.get("D", -1)
+        # Map by declared semantic role
+        self.role_to_indices: Dict[str, List[int]] = {}
+        for i, s in enumerate(disease_pack.states):
+            r = getattr(s, "role", None)
+            if r:
+                self.role_to_indices.setdefault(r, []).append(i)
+
+        # Susceptible: role "susceptible" or name "S"
+        s_indices = self.role_to_indices.get("susceptible", [])
+        self.idx_S = s_indices[0] if s_indices else self.name_to_idx.get("S", 0)
+
+        # Exposed: role "exposed" or name "E"
+        e_indices = self.role_to_indices.get("exposed", [])
+        self.idx_E = e_indices[0] if e_indices else self.name_to_idx.get("E", 1 if self.n_states > 1 else 0)
+
+        # Symptomatic: role "symptomatic" or name "I_symp"
+        symp_indices = self.role_to_indices.get("symptomatic", [])
+        self.idx_symp = symp_indices[0] if symp_indices else self.name_to_idx.get("I_symp", -1)
+
+        # Recovered & Dead
+        r_indices = self.role_to_indices.get("recovered", [])
+        self.idx_R = r_indices[0] if r_indices else self.name_to_idx.get("R", -1)
+        d_indices = self.role_to_indices.get("dead", [])
+        self.idx_D = d_indices[0] if d_indices else self.name_to_idx.get("D", -1)
 
         # 2. State property vectors
         self.is_infectious = np.zeros(self.n_states, dtype=bool)
@@ -33,21 +52,22 @@ class CompiledStateGraph:
         self.severity_level = np.zeros(self.n_states, dtype=np.float32)
         self.state_needs: List[Dict[str, float]] = []
 
-        # Backward compatibility vector
+        # Generic resource category indicators
         self.needs_bed = np.zeros(self.n_states, dtype=np.int8)
 
         for i, s in enumerate(disease_pack.states):
-            self.is_infectious[i] = s.infectious
+            self.is_infectious[i] = s.infectious or (getattr(s, "role", None) in ("infectious", "symptomatic"))
             self.rel_infectiousness[i] = s.relative_infectiousness
-            self.is_absorbing[i] = s.absorbing
+            self.is_absorbing[i] = s.absorbing or (getattr(s, "role", None) in ("recovered", "dead"))
             self.needs_care[i] = s.needs_care or bool(s.needs)
             self.severity_level[i] = s.severity_level
             self.state_needs.append(dict(s.needs))
 
             needs_keys = [k.lower() for k in s.needs.keys()]
-            if any("icu" in k for k in needs_keys):
+            s_role = getattr(s, "role", "") or ""
+            if any("icu" in k for k in needs_keys) or s_role == "icu":
                 self.needs_bed[i] = 3
-            elif any("bed" in k or "general" in k for k in needs_keys) or s.needs_care:
+            elif any("bed" in k or "general" in k for k in needs_keys) or s.needs_care or s_role == "hospitalized":
                 self.needs_bed[i] = 1
 
         # 3. Transitions by source state
@@ -94,16 +114,17 @@ class CompiledStateGraph:
 
     def get_served_adverse_prob(self, state_idx: int) -> float:
         """Derive the baseline served adverse/fatality probability from outgoing graph transitions (Spec 6.3)."""
+        default_prob = float(getattr(self.pack, "default_adverse_probability", 0.05))
         transitions = self.transitions_by_from.get(state_idx, [])
         if not transitions:
-            return 0.05
+            return default_prob
         adverse_prob = 0.0
         for t in transitions:
             to_idx = self.name_to_idx.get(t.to_state, -1)
             is_worse = (to_idx == self.idx_D) or (to_idx >= 0 and self.severity_level[to_idx] > self.severity_level[state_idx])
             if is_worse:
                 adverse_prob += float(t.base_probability)
-        return float(np.clip(adverse_prob, 0.01, 0.99)) if adverse_prob > 0 else 0.05
+        return float(np.clip(adverse_prob, 0.01, 0.99)) if adverse_prob > 0 else default_prob
 
     def sample_state_dwell_time(
         self,

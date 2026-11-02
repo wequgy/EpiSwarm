@@ -1,6 +1,7 @@
 """Verification tests for Phase 16: Behavior loop, area targeting, attributable overflow, and LLM Advisor."""
 
 import json
+from pathlib import Path
 from unittest.mock import MagicMock
 import numpy as np
 import pandas as pd
@@ -37,6 +38,14 @@ def shared_behavior():
     with open("behavior/default.yaml", "r", encoding="utf-8") as f:
         data = yaml.safe_load(f)
     return BehaviorPack(**data)
+
+
+@pytest.fixture(scope="module")
+def shared_contacts():
+    p = Path("regions/example_synthetic/contacts.csv")
+    if p.exists():
+        return pd.read_csv(p)
+    return None
 
 
 @pytest.fixture(scope="module")
@@ -112,7 +121,7 @@ def test_16a_behavior_ablation(shared_pop, shared_disease, shared_scenario, shar
     assert peak_none >= peak_rule >= peak_high, f"Expected peak flattening: {peak_none} >= {peak_rule} >= {peak_high}"
 
 
-def test_16b_area_targeting(shared_pop, shared_disease, shared_scenario):
+def test_16b_area_targeting(shared_pop, shared_disease, shared_scenario, shared_contacts):
     """(b) Area targeting test: closing schools only in area A drops transmission in area A
 
     significantly more than in unclosed area B.
@@ -123,7 +132,7 @@ def test_16b_area_targeting(shared_pop, shared_disease, shared_scenario):
     scen_baseline.seeding.initial_cases_per_area = 50
     scen_baseline.interventions = []
 
-    res_baseline = run_simulation(shared_pop, shared_disease, scen_baseline, enable_behavior=False)
+    res_baseline = run_simulation(shared_pop, shared_disease, scen_baseline, contacts_df=shared_contacts, enable_behavior=False)
 
     # Area A01 school closure
     scen_a01 = scen_baseline.model_copy(deep=True)
@@ -138,7 +147,7 @@ def test_16b_area_targeting(shared_pop, shared_disease, shared_scenario):
             cost_per_day=1.0
         )
     ]
-    res_a01 = run_simulation(shared_pop, shared_disease, scen_a01, enable_behavior=False)
+    res_a01 = run_simulation(shared_pop, shared_disease, scen_a01, contacts_df=shared_contacts, enable_behavior=False)
 
     aid_0 = shared_pop.area_id_to_int["A01"]
     aid_1 = shared_pop.area_id_to_int["A02"]

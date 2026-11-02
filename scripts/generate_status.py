@@ -11,21 +11,27 @@ from scripts.benchmark import benchmark_scale
 
 
 def get_test_stats() -> tuple[int, int, float]:
-    """Run pytest and extract total passed, total collected, and duration."""
-    cmd = [sys.executable, "-m", "pytest", "-q"]
+    """Run pytest live, enforce 100% green exit code, and extract exact passed count and duration."""
+    cmd = [sys.executable, "-m", "pytest", "-v"]
+    print("Running full pytest suite live...")
     proc = subprocess.run(cmd, capture_output=True, text=True)
     out = proc.stdout + proc.stderr
-    # Look for e.g. "66 passed in 120.30s"
-    m = re.search(r"(\d+) passed in ([\d\.]+)s", out)
-    if m:
-        passed = int(m.group(1))
-        duration = float(m.group(2))
-        return passed, passed, duration
-    # Fallback to counting collected
-    collect_proc = subprocess.run([sys.executable, "-m", "pytest", "--collect-only", "-q"], capture_output=True, text=True)
-    m_col = re.search(r"(\d+) tests collected", collect_proc.stdout)
-    collected = int(m_col.group(1)) if m_col else 66
-    return collected, collected, 0.0
+
+    if proc.returncode != 0:
+        print("CRITICAL AUDIT FAILURE: pytest reported test failures or errors!")
+        print(out[-3000:])
+        print("\nAudit Rule 1: Script must fail immediately if anything is red.")
+        sys.exit(1)
+
+    m = re.search(r"(\d+) passed.*in ([\d\.]+)s", out)
+    if not m:
+        print("ERROR: Could not parse pytest summary line! Output:")
+        print(out[-1500:])
+        sys.exit(1)
+
+    passed = int(m.group(1))
+    duration = float(m.group(2))
+    return passed, passed, duration
 
 
 def run_benchmarks() -> pd.DataFrame:

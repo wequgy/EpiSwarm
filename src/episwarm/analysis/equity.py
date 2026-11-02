@@ -33,7 +33,8 @@ class EquityReport:
 
 def evaluate_equity(
     pop: PopulationSoA,
-    sim_results: SimulationResults
+    sim_results: SimulationResults,
+    age_bands: Optional[List[str]] = None
 ) -> EquityReport:
     """Evaluate outbreak outcome equity across areas and age cohorts."""
     # 1. By Area
@@ -48,31 +49,28 @@ def evaluate_equity(
         rate = float(area_cases[i] / pop_sz)
         area_rates[aid_str] = round(rate, 4)
 
-    worst_aid = max(area_rates, key=area_rates.get)
-    best_aid = min(area_rates, key=area_rates.get)
-    geo_gap = area_rates[worst_aid] - area_rates[best_aid]
+    worst_aid = max(area_rates, key=area_rates.get) if area_rates else "none"
+    best_aid = min(area_rates, key=area_rates.get) if area_rates else "none"
+    geo_gap = (area_rates[worst_aid] - area_rates[best_aid]) if area_rates else 0.0
 
-    # 2. By Age Cohort
-    age_bands = ["0-4", "5-18", "19-64", "65+"]
-    age_masks = {
-        "0-4": (pop.age < 5),
-        "5-18": (pop.age >= 5) & (pop.age <= 18),
-        "19-64": (pop.age >= 19) & (pop.age <= 64),
-        "65+": (pop.age >= 65)
-    }
+    # 2. By Age Cohort (Dynamic bands per Phase 17 Generality)
+    if not age_bands:
+        age_bands = ["0-4", "5-18", "19-64", "65+"]
+
+    from episwarm.population.age_bands import assign_age_bands
+    band_indices = assign_age_bands(pop.age, age_bands)
 
     # Approximate age cases using relative population shares
     age_rates: Dict[str, float] = {}
-    for b_name, m in age_masks.items():
-        sub_pop = int(np.sum(m))
+    for idx, b_name in enumerate(age_bands):
+        sub_pop = int(np.sum(band_indices == idx))
         if sub_pop > 0:
-            # Fraction of population
             frac = sub_pop / float(pop.n_agents)
             cases_est = sim_results.total_infections * frac
             age_rates[b_name] = round(float(cases_est / sub_pop), 4)
 
-    worst_age = max(age_rates, key=age_rates.get)
-    best_age = min(age_rates, key=age_rates.get)
+    worst_age = max(age_rates, key=age_rates.get) if age_rates else "none"
+    best_age = min(age_rates, key=age_rates.get) if age_rates else "none"
     age_gap = age_rates[worst_age] - age_rates[best_age]
 
     return EquityReport(

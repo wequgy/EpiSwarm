@@ -2,6 +2,7 @@ name: targeted_containment
 horizon_days: 90
 scale_agents: 50000
 random_seed: 42
+behavior_mode: rule
 
 seeding:
   area_id: A01

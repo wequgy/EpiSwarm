@@ -4,7 +4,7 @@ import time
 import hashlib
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Any, Set, Union
+from typing import Dict, List, Literal, Optional, Tuple, Any, Set, Union
 import numpy as np
 import pandas as pd
 
@@ -12,7 +12,9 @@ from scipy.optimize import root_scalar
 from episwarm.population.build import PopulationSoA
 from episwarm.packs.disease import DiseasePack
 from episwarm.packs.scenario import ScenarioPack, InterventionAction, ResourceAddAction
-from episwarm.packs.behavior import BehaviorPack, DecisionQuestion
+from episwarm.packs.behavior import BehaviorPack, DecisionQuestion, BehaviorExecutionConfig
+from episwarm.behavior.policy_rules import RulePolicy
+from episwarm.population.age_bands import resolve_age_bands_from_contacts, assign_age_bands
 from episwarm.engine.state_graph import CompiledStateGraph
 from episwarm.engine.infection import evaluate_daily_infections
 from episwarm.engine.contacts import parse_contact_matrix, parse_layer_contact_matrices, analytical_beta_from_r0
@@ -62,6 +64,7 @@ class SimulationResults:
     deaths_attributable_to_rumor: int = 0
 
     manifest: Dict[str, Any] = field(default_factory=dict)
+    assumptions: List[Dict[str, Any]] = field(default_factory=list)
 
     def summary_table(self) -> str:
         lines = [
@@ -88,7 +91,9 @@ def calibrate_beta_expectation(
     target_r0: float,
     rng: np.random.Generator,
     sample_size: int = 1500,
-    mc_trials: int = 2000
+    mc_trials: int = 2000,
+    age_bands: Optional[List[str]] = None,
+    compliance_acquisition_reduction: float = 0.30
 ) -> Tuple[float, float]:
     """Expectation-based calibration (deterministic, scale-invariant) per Phase 15.
 
@@ -97,13 +102,11 @@ def calibrate_beta_expectation(
     and validates via a 2,000 index Monte Carlo trial with common random numbers.
     """
     D = state_graph.mean_infectious_days
-    n_bands = 4
-    agent_age_bands = np.zeros(pop.n_agents, dtype=np.int8)
-    agent_age_bands[(pop.age >= 5) & (pop.age <= 18)] = 1
-    agent_age_bands[(pop.age >= 19) & (pop.age <= 64)] = 2
-    agent_age_bands[pop.age >= 65] = 3
+    bands = age_bands or ["0-4", "5-18", "19-64", "65+"]
+    n_bands = len(bands)
+    agent_age_bands = assign_age_bands(pop.age, bands)
 
-    mean_susc = float(np.mean(1.0 - 0.30 * pop.compliance))
+    mean_susc = float(np.mean(1.0 - compliance_acquisition_reduction * pop.compliance))
 
     # Representative sample of index cases
     sample_rng = np.random.default_rng(42)
@@ -120,7 +123,7 @@ def calibrate_beta_expectation(
     # Precompute venue structure per layer
     layer_cache = []
     for l_name, v_ids in layer_venues.items():
-        M_l = layer_matrices.get(l_name, np.eye(4) * 2.0)
+        M_l = layer_matrices.get(l_name, np.eye(n_bands) * 2.0)
         c_l = np.sum(M_l, axis=1)
         valid = (v_ids >= 0)
         if not np.any(valid):
@@ -174,7 +177,7 @@ def calibrate_beta_expectation(
     trial_secondaries = np.zeros(mc_trials, dtype=np.int32)
 
     for l_name, v_ids in layer_venues.items():
-        M_l = layer_matrices.get(l_name, np.eye(4) * 2.0)
+        M_l = layer_matrices.get(l_name, np.eye(n_bands) * 2.0)
         c_l = np.sum(M_l, axis=1)
         valid = (v_ids >= 0)
         if not np.any(valid):
@@ -242,29 +245,49 @@ def run_simulation(
     behavior_pack: Optional[BehaviorPack] = None,
     enable_rumor: bool = True,
     policy: Optional[DecisionPolicy] = None,
-    enable_behavior: bool = True,
+    enable_behavior: Optional[bool] = None,
+    behavior_mode: Optional[Literal["none", "rule", "llm"]] = None,
     unlimited_resources: bool = False,
     compute_attributable_overflow: bool = False,
     step_callback: Optional[Any] = None
 ) -> SimulationResults:
     """Execute complete multi-day epidemic simulation with generic resources, vulnerability factors, and rumor dynamics."""
     rng = np.random.default_rng(scenario_pack.random_seed)
-    age_bands = ["0-4", "5-18", "19-64", "65+"]
+    # Derive age bands dynamically without hardcoding
+    age_bands = resolve_age_bands_from_contacts(contacts_df)
     state_graph = CompiledStateGraph(disease_pack, age_bands)
+
+    # Resolve execution constants & provenance
+    exec_cfg = getattr(behavior_pack, "execution_config", None) or BehaviorExecutionConfig()
+
+    # Resolve behavior mode: explicit arguments take precedence over scenario defaults
+    if behavior_mode is not None:
+        effective_mode = behavior_mode
+        effective_enable_behavior = (effective_mode != "none")
+    elif enable_behavior is not None:
+        effective_enable_behavior = bool(enable_behavior)
+        if not effective_enable_behavior:
+            effective_mode = "none"
+        else:
+            scen_mode = getattr(scenario_pack, "behavior_mode", None)
+            effective_mode = scen_mode if (scen_mode and scen_mode != "none") else "rule"
+    else:
+        scen_mode = getattr(scenario_pack, "behavior_mode", None)
+        if scen_mode:
+            effective_mode = scen_mode
+        else:
+            effective_mode = "none" if scenario_pack.name == "baseline" else "rule"
+        effective_enable_behavior = (effective_mode != "none")
 
     if layer_weights is None:
         layer_weights = {"home": 0.35, "school": 0.25, "work": 0.25, "community": 0.15}
 
-    # 1. Contact matrix & beta calibration
-    if contacts_df is None:
-        p_contacts = Path("regions/example_synthetic/contacts.csv")
-        if p_contacts.exists():
-            contacts_df = pd.read_csv(p_contacts)
-
     layer_matrices = parse_layer_contact_matrices(contacts_df, age_bands, layer_weights)
     target_r0 = disease_pack.transmission.r0 or 2.5
     calib_beta, empirical_r0 = calibrate_beta_expectation(
-        pop, state_graph, layer_matrices, target_r0, rng
+        pop, state_graph, layer_matrices, target_r0, rng,
+        age_bands=age_bands,
+        compliance_acquisition_reduction=exec_cfg.compliance_acquisition_reduction
     )
 
     # 2. Disease-specific vulnerability factors (Spec 5.1)
@@ -301,7 +324,8 @@ def run_simulation(
         resources_df=resources_df,
         areas_df=areas_df,
         area_id_to_int=pop.area_id_to_int,
-        unserved_config=disease_pack.unserved_outcome
+        unserved_config=disease_pack.unserved_outcome,
+        external_inflow_fraction=exec_cfg.external_inflow_fraction
     )
 
     for res_add in scenario_pack.resource_adds:
@@ -350,20 +374,13 @@ def run_simulation(
     if trust_vals is None:
         trust_vals = np.full(pop.n_agents, 0.5, dtype=np.float32)
 
-    agent_age_bands = np.empty(pop.n_agents, dtype=object)
-    agent_age_bands[pop.age < 5] = "0-4"
-    agent_age_bands[(pop.age >= 5) & (pop.age <= 18)] = "5-18"
-    agent_age_bands[(pop.age >= 19) & (pop.age <= 64)] = "19-64"
-    agent_age_bands[pop.age >= 65] = "65+"
-
-    agent_age_bands_int = np.zeros(pop.n_agents, dtype=np.int8)
-    agent_age_bands_int[(pop.age >= 5) & (pop.age <= 18)] = 1
-    agent_age_bands_int[(pop.age >= 19) & (pop.age <= 64)] = 2
-    agent_age_bands_int[pop.age >= 65] = 3
+    agent_age_bands_int = assign_age_bands(pop.age, age_bands)
+    agent_age_bands_arr = np.array(age_bands, dtype=object)[agent_age_bands_int]
+    agent_age_bands = agent_age_bands_arr
 
     agent_buckets = [
         AgentBucket(
-            age_band=agent_age_bands[i],
+            age_band=agent_age_bands_arr[i],
             occupation_class=occ_classes[i],
             has_comorbidity=bool(pop.risk_factor_bits[i] > 0),
             trust_band=continuous_to_band(trust_vals[i]),
@@ -388,9 +405,16 @@ def run_simulation(
     individual_k = rng.gamma(shape=k_param, scale=1.0, size=pop.n_agents).astype(np.float32)
     individual_k /= max(1e-6, np.mean(individual_k))
 
-    # 7. Seeding
+    # 7. Seeding (Role-based without hardcoded state strings)
     seeding = scenario_pack.seeding
-    seeded_state_idx = state_graph.name_to_idx.get(seeding.seeded_state, state_graph.name_to_idx.get("I_symp", 1))
+    seeded_name = getattr(seeding, "seeded_state", None)
+    if seeded_name and seeded_name in state_graph.name_to_idx:
+        seeded_state_idx = state_graph.name_to_idx[seeded_name]
+    elif state_graph.idx_symp >= 0:
+        seeded_state_idx = state_graph.idx_symp
+    else:
+        inf_ids = np.where(state_graph.is_infectious)[0]
+        seeded_state_idx = int(inf_ids[0]) if len(inf_ids) > 0 else 1
 
     if seeding.area_id and seeding.area_id in pop.area_id_to_int:
         target_aid_int = pop.area_id_to_int[seeding.area_id]
@@ -499,18 +523,18 @@ def run_simulation(
         area_risk_bands = np.full(n_areas, "low", dtype=object)
         for aid in range(n_areas):
             rate = area_rates[aid]
-            if rate > 0.05:
+            if rate > exec_cfg.area_risk_critical_threshold:
                 area_risk_bands[aid] = "critical"
-            elif rate > 0.02:
+            elif rate > exec_cfg.area_risk_high_threshold:
                 area_risk_bands[aid] = "high"
-            elif rate > 0.005:
+            elif rate > exec_cfg.area_risk_medium_threshold:
                 area_risk_bands[aid] = "medium"
             else:
                 area_risk_bands[aid] = "low"
 
-        # Step Behavioral Decision Policy on Triggers (Spec 10 & Phase 16)
-        if enable_behavior and active_policy is not None:
-            symp_idx = state_graph.name_to_idx.get("I_symp", -1)
+        # Step Behavioral Decision Policy on Triggers (Spec 10 & Phase 17)
+        if effective_enable_behavior and active_policy is not None:
+            symp_idx = state_graph.idx_symp
             symptomatic_mask = (states == symp_idx) if symp_idx >= 0 else np.zeros(pop.n_agents, dtype=bool)
             symptomatic_households = set(pop.household_id[symptomatic_mask]) if np.any(symptomatic_mask) else set()
 
@@ -530,7 +554,14 @@ def run_simulation(
                 for idx in trig_indices:
                     a_aid = pop.area_id[idx]
                     a_st = states[idx]
-                    st_group = "symptomatic" if a_st == symp_idx else ("recovering" if a_st in (state_graph.idx_R, state_graph.idx_D) else "susceptible")
+                    if symp_idx >= 0 and a_st == symp_idx:
+                        st_group = "symptomatic"
+                    elif state_graph.is_infectious[a_st]:
+                        st_group = "symptomatic"
+                    elif a_st in (state_graph.idx_R, state_graph.idx_D):
+                        st_group = "recovering"
+                    else:
+                        st_group = "susceptible"
                     sit_b = SituationBucket(
                         health_state_group=st_group,
                         local_risk_level=area_risk_bands[a_aid],
@@ -550,18 +581,18 @@ def run_simulation(
                         probs = active_policy.decide(q, sit_b, ag_b)
                         if q.id == "wear_mask":
                             p_yes = probs.get("yes", 0.5)
-                            p_eff = np.clip(p_yes * (0.30 + 0.70 * c_arr) * (1.0 - mask_red[idx_arr]), 0.01, 0.99)
+                            p_eff = np.clip(p_yes * (exec_cfg.compliance_baseline + exec_cfg.compliance_slope * c_arr) * (1.0 - mask_red[idx_arr]), 0.01, 0.99)
                             agent_masking[idx_arr] = (rng.random(size=n_sub) < p_eff)
                         elif q.id == "isolate_symptomatic":
                             if sit_b.health_state_group == "symptomatic":
                                 p_yes = probs.get("yes", 0.7)
-                                p_eff = np.clip(p_yes * (0.30 + 0.70 * c_arr) * (1.0 - iso_red[idx_arr]), 0.01, 0.99)
+                                p_eff = np.clip(p_yes * (exec_cfg.compliance_baseline + exec_cfg.compliance_slope * c_arr) * (1.0 - iso_red[idx_arr]), 0.01, 0.99)
                                 agent_isolating[idx_arr] = (rng.random(size=n_sub) < p_eff)
                             else:
                                 agent_isolating[idx_arr] = False
                         elif q.id == "workplace_attendance":
                             p_avoid = probs.get("avoid", 0.1)
-                            p_eff = np.clip(p_avoid * (0.30 + 0.70 * c_arr), 0.01, 0.99)
+                            p_eff = np.clip(p_avoid * (exec_cfg.compliance_baseline + exec_cfg.compliance_slope * c_arr), 0.01, 0.99)
                             agent_work_avoid[idx_arr] = (rng.random(size=n_sub) < p_eff)
                         elif q.id == "accept_vaccine":
                             if vaccine_available_areas:
@@ -569,7 +600,7 @@ def run_simulation(
                                 if np.any(in_vax):
                                     vax_sub = idx_arr[in_vax]
                                     p_yes = probs.get("yes", 0.6)
-                                    p_eff = np.clip(p_yes * (0.30 + 0.70 * pop.compliance[vax_sub]) * (1.0 - vax_red[vax_sub]), 0.01, 0.99)
+                                    p_eff = np.clip(p_yes * (exec_cfg.compliance_baseline + exec_cfg.compliance_slope * pop.compliance[vax_sub]) * (1.0 - vax_red[vax_sub]), 0.01, 0.99)
                                     agent_vaccinated[vax_sub] = (rng.random(size=len(vax_sub)) < p_eff)
 
             for aid in range(n_areas):
@@ -606,7 +637,7 @@ def run_simulation(
             unserved_days[care_indices[unserved_now]] += 1
             unserved_days[care_indices[~unserved_now]] = 0
 
-            agent_adverse_probs = np.full(pop.n_agents, 0.05, dtype=np.float32)
+            agent_adverse_probs = np.full(pop.n_agents, getattr(disease_pack, 'default_adverse_probability', 0.05), dtype=np.float32)
             agent_adverse_probs[care_indices] = adverse_probs
 
         # D. Dwell time countdown and state transitions
@@ -640,12 +671,14 @@ def run_simulation(
             susceptibility_multipliers=susceptibility_mult,
             area_crowding_multipliers=area_crowding,
             agent_age_bands=agent_age_bands_int,
-            agent_masking=agent_masking if enable_behavior else None,
-            agent_vaccinated=agent_vaccinated if enable_behavior else None,
-            agent_isolating=effective_isolating if enable_behavior else None,
+            agent_masking=agent_masking if effective_enable_behavior else None,
+            agent_vaccinated=agent_vaccinated if effective_enable_behavior else None,
+            agent_isolating=effective_isolating if effective_enable_behavior else None,
             mask_inward_efficacy=disease_pack.transmission.mask_inward_efficacy,
             mask_outward_efficacy=disease_pack.transmission.mask_outward_efficacy,
-            vaccine_efficacy_acquisition=disease_pack.transmission.vaccine_efficacy_acquisition
+            vaccine_efficacy_acquisition=disease_pack.transmission.vaccine_efficacy_acquisition,
+            compliance_acquisition_reduction=exec_cfg.compliance_acquisition_reduction,
+            age_band_labels=age_bands
         )
 
         if np.any(newly_infected):
@@ -665,8 +698,8 @@ def run_simulation(
         daily_icu_demand[day] = int(np.sum(state_graph.needs_bed[states] == 3))
 
         if step_callback is not None:
-            symp_idx = state_graph.name_to_idx.get('I_symp', -1)
-            symp_c = int(np.sum(states == symp_idx)) if symp_idx >= 0 else int(np.sum(states != state_graph.idx_S))
+            symp_idx = state_graph.idx_symp
+            symp_c = int(np.sum(states == symp_idx)) if symp_idx >= 0 else int(np.sum(state_graph.is_infectious[states]))
             step_callback(day, scenario_pack.horizon_days, {
                 'active_infected': symp_c,
                 'llm_calls': getattr(active_policy, 'model_calls_count', 0),

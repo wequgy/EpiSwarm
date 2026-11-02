@@ -1,6 +1,8 @@
 """Free local logprob and generative decision policy with granular cohort deliberation and fast GPU inference."""
 
 import json
+import math
+import random
 import logging
 import os
 import re
@@ -19,6 +21,12 @@ from episwarm.behavior.archetypes import (
 
 logger = logging.getLogger(__name__)
 
+LABEL_SETS = {
+    "alphabet": ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"],
+    "binary": ["Y", "N"],
+    "score": ["0", "1", "2", "3", "4"]
+}
+
 
 class LocalLogprobPolicy(DecisionPolicy):
     """Local LLM policy (Ollama) supporting granular demographic cohort deliberation across 70+ citizen profiles."""
@@ -28,10 +36,12 @@ class LocalLogprobPolicy(DecisionPolicy):
         base_url: Optional[str] = None,
         model: Optional[str] = None,
         granularity: str = "granular",  # "granular" (70-150+ LLM calls) or "archetype" (8-15 calls)
+        shuffles: int = 1,
         cache=None,
         fallback_policy: Optional[DecisionPolicy] = None
     ):
         super().__init__(cache)
+        self.shuffles = max(1, shuffles)
         try:
             from dotenv import load_dotenv
             load_dotenv()
@@ -106,6 +116,12 @@ class LocalLogprobPolicy(DecisionPolicy):
         if cached:
             self.cache_hits_count += 1
             return cached
+
+        # 1b. If option order shuffling is explicitly configured or logprob query is patched/active
+        if self.shuffles > 1 or hasattr(self, "_force_logprob"):
+            logprob_res = self._decide_logprobs_shuffled(question, situation, bucket, context, sit_hash, buck_hash)
+            if logprob_res is not None:
+                return logprob_res
 
         # 2. Determine decision cohort key based on granularity mode
         if self.granularity == "granular":
@@ -285,6 +301,153 @@ class LocalLogprobPolicy(DecisionPolicy):
                 out_probs["market_visits"] = {"avoid": 0.05, "essential_only": 0.30, "usual": 0.65}
 
             return out_probs
+
+        return None
+
+
+    def _decide_logprobs_shuffled(
+        self,
+        question: DecisionQuestion,
+        situation: SituationBucket,
+        bucket: AgentBucket,
+        context: str,
+        sit_hash: str,
+        buck_hash: str
+    ) -> Optional[Dict[str, float]]:
+        """Option-order shuffling with single-token logprob query to remove position bias."""
+        opts = question.options
+        n_opts = len(opts)
+        q_type = getattr(question, "type", None)
+        type_str = getattr(q_type, "value", str(q_type)) if q_type else ""
+
+        if type_str == "noul" and n_opts == 2:
+            labels = LABEL_SETS["binary"]
+        elif type_str == "score" and n_opts <= 5:
+            labels = LABEL_SETS["score"][:n_opts]
+        else:
+            labels = LABEL_SETS["alphabet"][:n_opts]
+
+        permutations = []
+        base_indices = list(range(n_opts))
+        permutations.append(base_indices)
+        if self.shuffles > 1:
+            reversed_indices = list(reversed(base_indices))
+            permutations.append(reversed_indices)
+            for _ in range(self.shuffles - 2):
+                shuffled = base_indices.copy()
+                random.shuffle(shuffled)
+                permutations.append(shuffled)
+
+        accumulated_probs: Dict[str, float] = {opt: 0.0 for opt in opts}
+        success = False
+
+        for perm in permutations:
+            perm_opts = [opts[idx] for idx in perm]
+            prompt = self._build_single_prompt(question, situation, bucket, perm_opts, labels, context)
+            perm_logprobs = self._query_next_token_logprobs(prompt, labels)
+
+            if perm_logprobs is None:
+                break
+
+            success = True
+            self.model_calls_count += 1
+
+            unnorm_probs = [math.exp(perm_logprobs.get(lbl, -15.0)) for lbl in labels]
+            total_mass = sum(unnorm_probs)
+            if total_mass <= 0:
+                total_mass = 1e-12
+
+            for i, opt_name in enumerate(perm_opts):
+                p_norm = unnorm_probs[i] / total_mass
+                accumulated_probs[opt_name] += p_norm
+
+        if not success:
+            return None
+
+        n_perms = len(permutations)
+        averaged_probs = {opt: round(accumulated_probs[opt] / n_perms, 4) for opt in opts}
+        tot = sum(averaged_probs.values())
+        if tot > 0:
+            averaged_probs = {opt: round(v / tot, 4) for opt, v in averaged_probs.items()}
+            diff = 1.0 - sum(averaged_probs.values())
+            averaged_probs[opts[0]] = round(averaged_probs[opts[0]] + diff, 4)
+
+        self.cache.put("local_logprob", question.id, sit_hash, buck_hash, averaged_probs)
+        return averaged_probs
+
+    def _build_single_prompt(
+        self,
+        question: DecisionQuestion,
+        situation: SituationBucket,
+        bucket: AgentBucket,
+        options: List[str],
+        labels: List[str],
+        context: str
+    ) -> str:
+        options_text = "\n".join([f"{labels[i]}. {options[i]}" for i in range(len(options))])
+        prompt = (
+            f"Context: {context}\n"
+            f"Resident Profile: Age {bucket.age_band}, occupation {bucket.occupation_class}, "
+            f"comorbidity: {'yes' if bucket.has_comorbidity else 'no'}, trust: {bucket.trust_band}, risk tolerance: {bucket.risk_tolerance_band}.\n"
+            f"Situation: Health: {situation.health_state_group}, local outbreak: {situation.local_risk_level}, "
+            f"measures: {situation.active_measures}, household member ill: {'yes' if situation.household_member_sick else 'no'}.\n\n"
+            f"Task: {getattr(question, 'plain_instructions', question.id)}\n\n"
+            f"Choices:\n{options_text}\n\n"
+            f"Choose exactly one label ({', '.join(labels)}) that best describes the decision. Respond ONLY with the single uppercase label:"
+        )
+        return prompt
+
+    def _query_next_token_logprobs(self, prompt: str, target_labels: List[str]) -> Optional[Dict[str, float]]:
+        """Query local engine (Ollama or OpenAI-compatible) for next-token top_logprobs."""
+        try:
+            # 1. Try OpenAI-compatible endpoint
+            url = f"{self.base_url}/v1/chat/completions"
+            payload = {
+                "model": self.model,
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 1,
+                "temperature": 0.0,
+                "logprobs": True,
+                "top_logprobs": max(5, len(target_labels))
+            }
+            resp = requests.post(url, json=payload, timeout=3)
+            if resp.status_code == 200:
+                data = resp.json()
+                choice = data["choices"][0]
+                logprob_content = choice.get("logprobs", {}).get("content", [])
+                if logprob_content:
+                    top_list = logprob_content[0].get("top_logprobs", [])
+                    label_map: Dict[str, float] = {}
+                    for item in top_list:
+                        token_str = item.get("token", "").strip().upper()
+                        if token_str in target_labels:
+                            label_map[token_str] = float(item.get("logprob", -15.0))
+                    for lbl in target_labels:
+                        if lbl not in label_map:
+                            label_map[lbl] = -15.0
+                    return label_map
+        except Exception:
+            pass
+
+        try:
+            # 2. Try Ollama generate endpoint
+            url = f"{self.base_url}/api/generate"
+            payload = {
+                "model": self.model,
+                "prompt": prompt,
+                "options": {"num_predict": 1, "temperature": 0.0},
+                "stream": False
+            }
+            resp = requests.post(url, json=payload, timeout=3)
+            if resp.status_code == 200:
+                data = resp.json()
+                token = data.get("response", "").strip().upper()
+                label_map = {lbl: -15.0 for lbl in target_labels}
+                if token in target_labels:
+                    label_map[token] = 0.0
+                return label_map
+        except Exception:
+            pass
 
         return None
 

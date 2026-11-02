@@ -46,3 +46,13 @@ EpiSwarm Studio is a configurable framework for outbreak simulation and response
 1. Work phase by phase. Start each phase with an implementation plan and task list, end it with a walkthrough (built, verified with evidence, assumed, deferred) and STOP for review and approval.
 2. Read the current official documentation before using any external API. Do not guess request shapes.
 3. If the plan changes, update the plan artifact before changing code.
+
+## Trust, Validation & Hardening Rules (Phases 17-24)
+1. **Evidence before claims**: For every bug or feature, demonstrate a failing reproduction, the exact change made, and passing real numbers. Add a dedicated regression test. STATUS and README numbers must be computed by a live script running pytest and benchmarks that fails on any red.
+2. **Never loosen tolerances**: Do not widen assert intervals to force a test to pass. Investigate and fix root causes; any tolerance update requires written mathematical justification and explicit user approval.
+3. **Replicates everywhere**: Comparative assertions, evaluations, and benchmarks must use at least 30 paired replicates with common random numbers and reported confidence intervals. Single seeds may only serve as labeled visual illustrations.
+4. **Strict data isolation (No data leakage)**: Held-out time horizons or regions must never be touched during calibration, hyperparameter tuning, model architecture selection, or debugging. Every evaluation on held-out data must be logged.
+5. **Pre-registration**: Before inspecting or evaluating held-out data, author and commit `docs/validation/PROTOCOL.md` defining datasets, splits, calibration parameters, error metrics, and pre-set passing thresholds.
+6. **Strict generality**: No hardcoded disease names, compartment states, age bands, venue layers, or geographic identifiers in `src/`. All structures must be dynamically driven by pack definitions and verified with generalized invariant tests.
+7. **Complete provenance & config-driven constants**: Every parameter, coefficient, and dataset must specify its `source` and `status` (`user_supplied`, `sourced`, `assumed`, `synthetic`). Zero unsourced magic numbers in engine code.
+

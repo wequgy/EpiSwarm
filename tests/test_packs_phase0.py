@@ -134,7 +134,10 @@ def test_scenario_pack_parsing():
     pack = ScenarioPack(**data)
     assert pack.name == "baseline"
     assert pack.horizon_days == 90
-    assert len(pack.interventions) == 2
+    assert len(pack.interventions) == 0
+    with open("scenarios/targeted_containment.yaml", "r", encoding="utf-8") as f_tgt:
+        tgt_pack = ScenarioPack(**yaml.safe_load(f_tgt))
+    assert len(tgt_pack.interventions) >= 1
 
 
 def test_generality_rule_no_hardcoded_places_or_diseases():

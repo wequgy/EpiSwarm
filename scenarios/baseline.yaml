@@ -2,6 +2,7 @@ name: baseline
 horizon_days: 90
 scale_agents: 50000
 random_seed: 42
+behavior_mode: none
 
 seeding:
   area_id: A01
@@ -9,23 +10,7 @@ seeding:
   initial_cases_per_area: 25
   seeded_state: I_symp
 
-interventions:
-  - name: proactive_school_closure
-    measure_type: school_closure
-    area_id: ALL
-    start_day: 15
-    end_day: 45
-    stringency: 1.0
-    cost_per_day: 1.0
-  - name: surge_icu_capacity
-    measure_type: surge_beds
-    area_id: ALL
-    start_day: 20
-    end_day: 90
-    stringency: 0.5
-    cost_per_day: 2.5
-    parameters:
-      extra_icu_capacity: 10.0
+interventions: []
 
 objectives:
   max_deaths: 150
@@ -35,4 +20,4 @@ objectives:
 provenance:
   source: "EpiSwarm Reference Scenario Benchmark"
   status: assumed
-  notes: "Standard 90-day benchmark scenario."
+  notes: "Unmitigated 90-day baseline scenario without interventions or behavioral suppression."

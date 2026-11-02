@@ -38,6 +38,10 @@ class UnservedOutcomeConfig(BaseModel):
 class DiseaseState(BaseModel):
     """A compartment in the disease progression state graph."""
     name: str = Field(..., min_length=1, description="Identifier for this health state (e.g. S, E, I_asymp, I_symp, H, ICU, R, D)")
+    role: Optional[Literal["susceptible", "exposed", "infectious", "symptomatic", "recovered", "dead", "hospitalized", "icu"]] = Field(
+        default=None,
+        description="Standardized semantic role of the health state for behavior, interventions, and metrics"
+    )
     infectious: bool = Field(default=False, description="Whether individuals in this state can transmit pathogen")
     relative_infectiousness: float = Field(
         default=0.0, ge=0.0, le=10.0,
@@ -159,6 +163,10 @@ class DiseasePack(BaseModel):
     sanitation_sensitivity: float = Field(
         default=0.0, ge=0.0, le=1.0,
         description="Pathogen sensitivity to environmental sanitation deficits"
+    )
+    default_adverse_probability: float = Field(
+        default=0.05, ge=0.0, le=1.0,
+        description="Baseline adverse probability for clinical states if outgoing graph transitions omit it (status: assumed)"
     )
     disease_specific_risks: Dict[str, float] = Field(default_factory=dict)
 

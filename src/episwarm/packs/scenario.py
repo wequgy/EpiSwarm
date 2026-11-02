@@ -82,6 +82,10 @@ class ScenarioPack(BaseModel):
     horizon_days: int = Field(default=90, gt=0, le=730, description="Simulation duration in days")
     scale_agents: int = Field(default=50000, gt=0, description="Total synthetic agents to instantiate")
     random_seed: int = Field(default=42, description="Master random seed for full reproducibility")
+    behavior_mode: Literal["none", "rule", "llm"] = Field(
+        default="none",
+        description="Behavior decision engine mode: 'none' (pure unmitigated transmission), 'rule' (rule-based archetypes), or 'llm' (local/hosted LLM policy)"
+    )
     seeding: SeedingConfig
     interventions: List[InterventionAction] = Field(default_factory=list)
     resource_adds: List[ResourceAddAction] = Field(default_factory=list)

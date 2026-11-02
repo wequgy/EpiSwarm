@@ -1,6 +1,6 @@
 """Layered transmission engine utilizing numpy.bincount with Prem-style age-structured mixing (Spec 4.1 & 5.2)."""
 
-from typing import Dict, Optional, Tuple, Any, Union
+from typing import Dict, List, Optional, Tuple, Any, Union
 import numpy as np
 import pandas as pd
 
@@ -24,6 +24,7 @@ def compute_age_structured_layer_lambda(
     if beta <= 0.0 or (isinstance(active_scaling, (int, float)) and active_scaling <= 0.0):
         return np.zeros(len(venue_assignments), dtype=np.float32)
 
+    n_bands = M_layer.shape[0] if M_layer.size > 0 else n_bands
     valid_mask = (venue_assignments >= 0)
     if not np.any(valid_mask):
         return np.zeros(len(venue_assignments), dtype=np.float32)
@@ -138,7 +139,9 @@ def evaluate_daily_infections(
     agent_isolating: Optional[np.ndarray] = None,
     mask_inward_efficacy: float = 0.50,
     mask_outward_efficacy: float = 0.50,
-    vaccine_efficacy_acquisition: float = 0.80
+    vaccine_efficacy_acquisition: float = 0.80,
+    compliance_acquisition_reduction: float = 0.30,
+    age_band_labels: Optional[List[str]] = None
 ) -> np.ndarray:
     """Determine which susceptible agents contract infection on the current simulation day (Spec 4.1, 5.1, 5.2)."""
     susceptible_mask = (current_states == state_graph.idx_S)
@@ -161,12 +164,11 @@ def evaluate_daily_infections(
     if not np.any(agent_is_inf):
         return np.zeros(pop.n_agents, dtype=bool)
 
-    # 2. Derive agent age bands if not supplied
+    # 2. Derive agent age bands dynamically if not supplied
     if agent_age_bands is None:
-        agent_age_bands = np.zeros(pop.n_agents, dtype=np.int8)
-        agent_age_bands[(pop.age >= 5) & (pop.age <= 18)] = 1
-        agent_age_bands[(pop.age >= 19) & (pop.age <= 64)] = 2
-        agent_age_bands[pop.age >= 65] = 3
+        from episwarm.population.age_bands import assign_age_bands
+        bands = age_band_labels or ["0-4", "5-18", "19-64", "65+"]
+        agent_age_bands = assign_age_bands(pop.age, bands)
 
     # Resolve per-agent layer scalings from float or per-area arrays
     resolved_scalings: Dict[str, Union[float, np.ndarray]] = {}
@@ -253,7 +255,7 @@ def evaluate_daily_infections(
     total_lambda = lambda_home + lambda_school + lambda_work + lambda_comm
 
     # Individual behavioral compliance reduction
-    compliance_factor = 1.0 - (0.30 * pop.compliance)
+    compliance_factor = 1.0 - (compliance_acquisition_reduction * pop.compliance)
     effective_lambda = total_lambda * compliance_factor
 
     # Inward protections: mask wearing and vaccination
