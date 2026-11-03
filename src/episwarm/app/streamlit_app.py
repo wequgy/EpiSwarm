@@ -586,7 +586,7 @@ elif step == "5. Simulation Engine":
         sim_policy_backend = st.selectbox(
             "Behavior Policy Engine",
             ["None (Unmitigated Baseline)", "Deterministic Rules (RulePolicy - Fast)", "Local LLM (Ollama)", "Google Gemini LLM"],
-            index=0 if getattr(s_pack, 'behavior_mode', 'none') == 'none' else (1 if getattr(s_pack, 'behavior_mode', 'none') == 'rule' else 2)
+            index=0 if s_raw.get('behavior_mode', 'none') == 'none' else (1 if s_raw.get('behavior_mode', 'none') == 'rule' else 2)
         )
 
         selected_ollama_model = "qwen3:4b"
