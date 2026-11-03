@@ -121,6 +121,10 @@ class TransmissionConfig(BaseModel):
     mask_outward_efficacy: float = Field(default=0.50, ge=0.0, le=1.0, description="Reduction in shedding/infectiousness from wearing mask")
     vaccine_efficacy_acquisition: float = Field(default=0.80, ge=0.0, le=1.0, description="Reduction in susceptibility when vaccinated")
     vaccine_efficacy_transmission: float = Field(default=0.50, ge=0.0, le=1.0, description="Reduction in transmission when vaccinated")
+    age_susceptibility: Dict[str, float] = Field(
+        default_factory=dict,
+        description="Relative susceptibility multiplier per age band (Spec 5.2 / F9)"
+    )
 
     @model_validator(mode="after")
     def check_r0_or_beta(self):

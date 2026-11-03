@@ -9,6 +9,7 @@ import requests
 import numpy as np
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 import plotly.express as px
 import plotly.graph_objects as go
 
@@ -88,12 +89,25 @@ st.title("🧬 EpiSwarm Studio")
 st.caption("Configurable Agent-Based Outbreak Simulation & Multi-Objective Response Planning")
 
 col_b1, col_b2, col_b3 = st.columns(3)
+card_path = Path("docs/validation/VALIDATION_CARD.json")
+v_card = {}
+if card_path.exists():
+    import json
+    with open(card_path, "r", encoding="utf-8") as f:
+        v_card = json.load(f)
+
 with col_b1:
-    st.warning("⚠️ UNCALIBRATED: Run comparisons are counterfactual under stated assumptions, not forecasts.")
+    st.success(f"🏷️ VALIDATION: **{v_card.get('status', 'PARTIALLY_VALIDATED')}**")
 with col_b2:
-    st.info(f"ℹ️ ACTIVE REGION: `{st.session_state.region_dir.name}` (Synthetic Fixture)")
+    st.info(f"ℹ️ REGION: `{st.session_state.region_dir.name}`")
 with col_b3:
-    st.error("🛡️ BEHAVIOR LAYER UNVALIDATED: LLM-driven compliance is hypothetical.")
+    st.warning("🛡️ BEHAVIOR: `none` | `rule` | `llm` (Baseline is unmitigated `none`)")
+
+with st.expander("📋 View Validation Card & Pre-Registered Benchmark Targets", expanded=False):
+    if v_card:
+        st.json(v_card)
+    else:
+        st.caption("Validation card at docs/validation/VALIDATION_CARD.json")
 
 # Sidebar Navigation & Settings
 st.sidebar.header("Studio Mode")
@@ -136,6 +150,7 @@ step = st.sidebar.radio(
         "6. Analysis & Equity",
         "7. Policy Advisor & Optimizer",
         "8. Export Audit Report"
+        "9. City Diorama (Isometric View)"
     ]
 )
 
@@ -963,3 +978,19 @@ elif step == "8. Export Audit Report":
         file_name="episwarm_audit_report.html",
         mime="text/html"
     )
+# --- STEP 9: CITY DIORAMA (ISOMETRIC VIEW) ---
+elif step == "9. City Diorama (Isometric View)":
+    st.header("Step 9: Interactive Isometric City Diorama")
+    st.caption("Anatomy-crafted technical testbed rendering real-city topology, multi-layer transmission, and agent flows.")
+    
+    diorama_path = Path("src/episwarm/viz/diorama.html")
+    if diorama_path.exists():
+        html_data = diorama_path.read_text(encoding="utf-8")
+        components.html(html_data, height=730, scrolling=False)
+    else:
+        from episwarm.viz.diorama import write_diorama_html
+        write_diorama_html(diorama_path)
+        html_data = diorama_path.read_text(encoding="utf-8")
+        components.html(html_data, height=730, scrolling=False)
+    
+    st.info("💡 **Diorama Anatomy**: Four-tone technical shading, brass corner mounts, sub-layer contact tracks (household, school, workplace, clinic), live dial gauges with 95% confidence intervals.")

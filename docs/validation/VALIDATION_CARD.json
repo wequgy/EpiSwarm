@@ -1,0 +1,38 @@
+{
+  "status": "PARTIALLY_VALIDATED",
+  "region": "Greater London (33 Local Authorities)",
+  "calibration_window": "Wave 1 (March 1 - May 31, 2020)",
+  "held_out_window": "Wave 2 (September 1 - November 30, 2020)",
+  "targets_passed": "3/5",
+  "targets": {
+    "hospital_admissions": {
+      "passed": false,
+      "peak_timing_error": "7 days",
+      "peak_ratio": 0.42,
+      "cumulative_error": "81.5%",
+      "crps": 187.64
+    },
+    "deaths": {
+      "passed": false,
+      "peak_timing_error": "17 days",
+      "peak_ratio": 0.97,
+      "cumulative_error": "72.0%",
+      "crps": 56.35
+    },
+    "spatial_arrival_order": {
+      "passed": true,
+      "rank_correlation_rho": 1.0,
+      "threshold": ">= 0.60"
+    },
+    "healthcare_overflow": {
+      "passed": true,
+      "overflow_duration_days": "Sim=21, Obs=24",
+      "error": "3 days"
+    },
+    "behavior_contact_reduction": {
+      "passed": true,
+      "simulated_reduction": "70.5%",
+      "comix_survey_target": "72% [68%, 76%]"
+    }
+  }
+}

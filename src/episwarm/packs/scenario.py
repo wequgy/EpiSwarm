@@ -86,6 +86,7 @@ class ScenarioPack(BaseModel):
         default="none",
         description="Behavior decision engine mode: 'none' (pure unmitigated transmission), 'rule' (rule-based archetypes), or 'llm' (local/hosted LLM policy)"
     )
+    enable_day_of_week: bool = Field(default=False, description="Enable weekend/weekday transmission modulation")
     seeding: SeedingConfig
     interventions: List[InterventionAction] = Field(default_factory=list)
     resource_adds: List[ResourceAddAction] = Field(default_factory=list)

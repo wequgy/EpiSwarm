@@ -79,3 +79,4 @@ If any pre-registered threshold is missed during held-out validation:
 1. The model status in EpiSwarm Studio UI and documentation will remain **`PARTIALLY VALIDATED`** or **`UNCALIBRATED`**.
 2. An honest discrepancy audit will identify the epidemiological mechanism responsible (e.g., absence of age-varying susceptibility, lack of school-term structure, or spatial commuting variance).
 3. Adjustments will follow Phase 22 rules: one change at a time, justified by diagnostics, evaluated exclusively on the training window.
+

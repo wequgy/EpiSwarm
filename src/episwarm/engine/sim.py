@@ -25,6 +25,7 @@ from episwarm.behavior.compliance import DynamicComplianceEngine
 from episwarm.behavior.buckets import AgentBucket, SituationBucket, continuous_to_band
 from episwarm.behavior.policy_base import DecisionPolicy
 from episwarm.behavior.factory import create_decision_policy
+from episwarm.behavior.hierarchical import compute_individual_probabilities
 
 
 @dataclass
@@ -261,6 +262,7 @@ def run_simulation(
     rng = np.random.default_rng(scenario_pack.random_seed)
     # Derive age bands dynamically without hardcoding
     age_bands = resolve_age_bands_from_contacts(contacts_df)
+    agent_age_bands_int = assign_age_bands(pop.age, age_bands)
     state_graph = CompiledStateGraph(disease_pack, age_bands)
 
     # Resolve execution constants & provenance
@@ -306,6 +308,12 @@ def run_simulation(
         if np.any(has_bit):
             susceptibility_mult[has_bit] *= float(vf.effects.susceptibility)
             severity_odds[has_bit] *= float(vf.effects.severity_odds)
+
+    # Age-specific susceptibility (Spec 5.2 / Phase 22)
+    if hasattr(disease_pack.transmission, "age_susceptibility") and disease_pack.transmission.age_susceptibility:
+        for b_idx, b_label in enumerate(age_bands):
+            mult = float(disease_pack.transmission.age_susceptibility.get(b_label, 1.0))
+            susceptibility_mult[agent_age_bands_int == b_idx] *= mult
 
     # 3. Environment & Sanitation modifiers (Spec 5.2)
     n_areas = len(pop.int_to_area_id)
@@ -460,6 +468,13 @@ def run_simulation(
             "work": np.ones(n_areas, dtype=np.float32),
             "community": np.ones(n_areas, dtype=np.float32)
         }
+        # Day-of-week layer adjustment (Phase 22 / F9): weekend closures & home shifts
+        dow = day % 7
+        if getattr(scenario_pack, 'enable_day_of_week', False) and dow in (5, 6):
+            layer_scalings["school"] *= 0.0
+            layer_scalings["work"] *= 0.25
+            layer_scalings["home"] *= 1.20
+            layer_scalings["community"] *= 1.15
         active_corrections: Dict[str, float] = {}
         area_enforcements = np.zeros(n_areas, dtype=np.float32)
         area_active_measures: Dict[int, List[str]] = {aid: [] for aid in range(n_areas)}
@@ -585,32 +600,64 @@ def run_simulation(
 
                 for (ag_b, sit_b), idx_list in bucket_groups.items():
                     idx_arr = np.array(idx_list, dtype=np.int32)
-                    c_arr = pop.compliance[idx_arr]
                     n_sub = len(idx_arr)
                     for q in decision_questions:
                         probs = active_policy.decide(q, sit_b, ag_b)
                         if q.id == "wear_mask":
                             p_yes = probs.get("yes", 0.5)
-                            p_eff = np.clip(p_yes * (exec_cfg.compliance_baseline + exec_cfg.compliance_slope * c_arr) * (1.0 - mask_red[idx_arr]), 0.01, 0.99)
+                            p_ind = compute_individual_probabilities(
+                                base_prior=p_yes,
+                                question_id="wear_mask",
+                                pop=pop,
+                                agent_indices=idx_arr,
+                                rumor_beliefs=mask_red,
+                                peer_social_norm=float(np.mean(agent_masking)) if day > 0 else 0.5,
+                                fatigue_level=float(day) / float(max(1, horizon)) * 0.5,
+                            )
+                            p_eff = np.clip(p_ind * (1.0 - mask_red[idx_arr]), 0.01, 0.99)
                             agent_masking[idx_arr] = (rng.random(size=n_sub) < p_eff)
                         elif q.id == "isolate_symptomatic":
                             if sit_b.health_state_group == "symptomatic":
                                 p_yes = probs.get("yes", 0.7)
-                                p_eff = np.clip(p_yes * (exec_cfg.compliance_baseline + exec_cfg.compliance_slope * c_arr) * (1.0 - iso_red[idx_arr]), 0.01, 0.99)
+                                p_ind = compute_individual_probabilities(
+                                    base_prior=p_yes,
+                                    question_id="isolate_symptomatic",
+                                    pop=pop,
+                                    agent_indices=idx_arr,
+                                    rumor_beliefs=iso_red,
+                                    peer_social_norm=0.5,
+                                    fatigue_level=float(day) / float(max(1, horizon)) * 0.5,
+                                )
+                                p_eff = np.clip(p_ind * (1.0 - iso_red[idx_arr]), 0.01, 0.99)
                                 agent_isolating[idx_arr] = (rng.random(size=n_sub) < p_eff)
                             else:
                                 agent_isolating[idx_arr] = False
                         elif q.id == "workplace_attendance":
                             p_avoid = probs.get("avoid", 0.1)
-                            p_eff = np.clip(p_avoid * (exec_cfg.compliance_baseline + exec_cfg.compliance_slope * c_arr), 0.01, 0.99)
-                            agent_work_avoid[idx_arr] = (rng.random(size=n_sub) < p_eff)
+                            p_ind = compute_individual_probabilities(
+                                base_prior=p_avoid,
+                                question_id="workplace_attendance",
+                                pop=pop,
+                                agent_indices=idx_arr,
+                                peer_social_norm=0.5,
+                                fatigue_level=float(day) / float(max(1, horizon)) * 0.5,
+                            )
+                            agent_work_avoid[idx_arr] = (rng.random(size=n_sub) < p_ind)
                         elif q.id == "accept_vaccine":
                             if vaccine_available_areas:
                                 in_vax = np.isin(pop.area_id[idx_arr], list(vaccine_available_areas)) & (~agent_vaccinated[idx_arr])
                                 if np.any(in_vax):
                                     vax_sub = idx_arr[in_vax]
                                     p_yes = probs.get("yes", 0.6)
-                                    p_eff = np.clip(p_yes * (exec_cfg.compliance_baseline + exec_cfg.compliance_slope * pop.compliance[vax_sub]) * (1.0 - vax_red[vax_sub]), 0.01, 0.99)
+                                    p_ind = compute_individual_probabilities(
+                                        base_prior=p_yes,
+                                        question_id="accept_vaccine",
+                                        pop=pop,
+                                        agent_indices=vax_sub,
+                                        peer_social_norm=float(np.mean(agent_vaccinated)) if day > 0 else 0.5,
+                                        fatigue_level=0.1,
+                                    )
+                                    p_eff = np.clip(p_ind * (1.0 - vax_red[vax_sub]), 0.01, 0.99)
                                     agent_vaccinated[vax_sub] = (rng.random(size=len(vax_sub)) < p_eff)
 
             for aid in range(n_areas):
