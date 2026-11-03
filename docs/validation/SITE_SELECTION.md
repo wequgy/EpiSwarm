@@ -79,3 +79,4 @@ We recommend validating EpiSwarm against **Greater London (33 Local Authorities)
 
 Upon confirmation:
 - Proceed to **Phase 20**: Build the automated download and ingestion scripts transforming ONS Census, UKHSA Dashboard, NHS Hospital Activity, NOMIS commuting, and CoMix contact matrices into the standardized `regions/london` RegionPack with complete checksums and validation.
+

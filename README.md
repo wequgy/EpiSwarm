@@ -1,7 +1,7 @@
 # EpiSwarm Studio
 
 [![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/release/python-3110/)
-[![Tests](https://img.shields.io/badge/pytest-80%20passed-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/pytest-83%20passed-brightgreen.svg)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 **EpiSwarm Studio** is an agent-based and spatial-flux epidemic simulation and response planning framework. It integrates micro-simulation using NumPy Structure-of-Arrays (SoA) vectorization with the spatial multi-patch epidemiology methods established in **Libin et al. (2020)** (*Deep reinforcement learning for large-scale epidemic control*, arXiv:2003.13676v1).
@@ -24,7 +24,7 @@
 
 3. **High-Performance Structure-of-Arrays (SoA)**:
    - Pure contiguous NumPy array memory representation (zero per-agent Python objects).
-   - Peak RAM at 100,000 agents: **239.0 MB** (70x below the 11 GB hardware budget).
+   - Peak RAM at 100,000 agents: **239.1 MB** (70x below the 11 GB hardware budget).
    - Population synthesis speed: **0.10s** for 100,000 agents.
 
 4. **Healthcare Overflow Model**:

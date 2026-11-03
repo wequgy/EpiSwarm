@@ -1,0 +1,10 @@
+date_start,date_end,measure,stringency,area_id,source,status
+2020-03-20,2020-06-01,school_closure,1.0,ALL,"UK Statutory Instruments (SI 2020/350, SI 2020/1200) / OxCGRT England",real
+2020-03-23,2020-05-13,workplace_reduction,0.9,ALL,"UK Statutory Instruments (SI 2020/350, SI 2020/1200) / OxCGRT England",real
+2020-03-23,2020-05-13,curfew,1.0,ALL,"UK Statutory Instruments (SI 2020/350, SI 2020/1200) / OxCGRT England",real
+2020-05-13,2020-07-04,workplace_reduction,0.6,ALL,"UK Statutory Instruments (SI 2020/350, SI 2020/1200) / OxCGRT England",real
+2020-06-15,2020-12-31,mask_mandate,0.85,ALL,"UK Statutory Instruments (SI 2020/350, SI 2020/1200) / OxCGRT England",real
+2020-09-01,2020-10-23,school_closure,0.0,ALL,"UK Statutory Instruments (SI 2020/350, SI 2020/1200) / OxCGRT England",real
+2020-10-17,2020-11-04,curfew,0.5,ALL,"UK Statutory Instruments (SI 2020/350, SI 2020/1200) / OxCGRT England",real
+2020-11-05,2020-12-02,workplace_reduction,0.8,ALL,"UK Statutory Instruments (SI 2020/350, SI 2020/1200) / OxCGRT England",real
+2020-11-05,2020-12-02,curfew,0.8,ALL,"UK Statutory Instruments (SI 2020/350, SI 2020/1200) / OxCGRT England",real

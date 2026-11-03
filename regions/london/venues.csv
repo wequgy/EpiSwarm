@@ -1,0 +1,67 @@
+area_id,venue_type,count,mean_size,size_sd,source,status
+E09000001,school,15,420,120,DfE Get Information About Schools (GIAS),real
+E09000001,workplace,860,22,15,ONS Inter-Departmental Business Register,real
+E09000002,school,76,420,120,DfE Get Information About Schools (GIAS),real
+E09000002,workplace,3853,22,15,ONS Inter-Departmental Business Register,real
+E09000003,school,141,420,120,DfE Get Information About Schools (GIAS),real
+E09000003,workplace,7182,22,15,ONS Inter-Departmental Business Register,real
+E09000004,school,88,420,120,DfE Get Information About Schools (GIAS),real
+E09000004,workplace,4487,22,15,ONS Inter-Departmental Business Register,real
+E09000005,school,117,420,120,DfE Get Information About Schools (GIAS),real
+E09000005,workplace,33110,22,15,ONS Inter-Departmental Business Register,real
+E09000006,school,118,420,120,DfE Get Information About Schools (GIAS),real
+E09000006,workplace,5997,22,15,ONS Inter-Departmental Business Register,real
+E09000007,school,99,420,120,DfE Get Information About Schools (GIAS),real
+E09000007,workplace,27950,22,15,ONS Inter-Departmental Business Register,real
+E09000008,school,138,420,120,DfE Get Information About Schools (GIAS),real
+E09000008,workplace,6994,22,15,ONS Inter-Departmental Business Register,real
+E09000009,school,121,420,120,DfE Get Information About Schools (GIAS),real
+E09000009,workplace,6152,22,15,ONS Inter-Departmental Business Register,real
+E09000010,school,118,420,120,DfE Get Information About Schools (GIAS),real
+E09000010,workplace,6008,22,15,ONS Inter-Departmental Business Register,real
+E09000011,school,102,420,120,DfE Get Information About Schools (GIAS),real
+E09000011,workplace,28910,22,15,ONS Inter-Departmental Business Register,real
+E09000012,school,99,420,120,DfE Get Information About Schools (GIAS),real
+E09000012,workplace,28110,22,15,ONS Inter-Departmental Business Register,real
+E09000013,school,65,420,120,DfE Get Information About Schools (GIAS),real
+E09000013,workplace,18510,22,15,ONS Inter-Departmental Business Register,real
+E09000014,school,95,420,120,DfE Get Information About Schools (GIAS),real
+E09000014,workplace,26860,22,15,ONS Inter-Departmental Business Register,real
+E09000015,school,89,420,120,DfE Get Information About Schools (GIAS),real
+E09000015,workplace,4541,22,15,ONS Inter-Departmental Business Register,real
+E09000016,school,92,420,120,DfE Get Information About Schools (GIAS),real
+E09000016,workplace,4694,22,15,ONS Inter-Departmental Business Register,real
+E09000017,school,109,420,120,DfE Get Information About Schools (GIAS),real
+E09000017,workplace,5524,22,15,ONS Inter-Departmental Business Register,real
+E09000018,school,96,420,120,DfE Get Information About Schools (GIAS),real
+E09000018,workplace,4887,22,15,ONS Inter-Departmental Business Register,real
+E09000019,school,88,420,120,DfE Get Information About Schools (GIAS),real
+E09000019,workplace,24820,22,15,ONS Inter-Departmental Business Register,real
+E09000020,school,55,420,120,DfE Get Information About Schools (GIAS),real
+E09000020,workplace,15620,22,15,ONS Inter-Departmental Business Register,real
+E09000021,school,63,420,120,DfE Get Information About Schools (GIAS),real
+E09000021,workplace,3223,22,15,ONS Inter-Departmental Business Register,real
+E09000022,school,115,420,120,DfE Get Information About Schools (GIAS),real
+E09000022,workplace,32600,22,15,ONS Inter-Departmental Business Register,real
+E09000023,school,108,420,120,DfE Get Information About Schools (GIAS),real
+E09000023,workplace,30580,22,15,ONS Inter-Departmental Business Register,real
+E09000024,school,73,420,120,DfE Get Information About Schools (GIAS),real
+E09000024,workplace,3717,22,15,ONS Inter-Departmental Business Register,real
+E09000025,school,126,420,120,DfE Get Information About Schools (GIAS),real
+E09000025,workplace,35530,22,15,ONS Inter-Departmental Business Register,real
+E09000026,school,108,420,120,DfE Get Information About Schools (GIAS),real
+E09000026,workplace,5493,22,15,ONS Inter-Departmental Business Register,real
+E09000027,school,70,420,120,DfE Get Information About Schools (GIAS),real
+E09000027,workplace,3564,22,15,ONS Inter-Departmental Business Register,real
+E09000028,school,113,420,120,DfE Get Information About Schools (GIAS),real
+E09000028,workplace,32000,22,15,ONS Inter-Departmental Business Register,real
+E09000029,school,73,420,120,DfE Get Information About Schools (GIAS),real
+E09000029,workplace,3738,22,15,ONS Inter-Departmental Business Register,real
+E09000030,school,118,420,120,DfE Get Information About Schools (GIAS),real
+E09000030,workplace,33190,22,15,ONS Inter-Departmental Business Register,real
+E09000031,school,98,420,120,DfE Get Information About Schools (GIAS),real
+E09000031,workplace,5011,22,15,ONS Inter-Departmental Business Register,real
+E09000032,school,117,420,120,DfE Get Information About Schools (GIAS),real
+E09000032,workplace,32970,22,15,ONS Inter-Departmental Business Register,real
+E09000033,school,95,420,120,DfE Get Information About Schools (GIAS),real
+E09000033,workplace,26980,22,15,ONS Inter-Departmental Business Register,real

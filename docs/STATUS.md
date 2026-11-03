@@ -57,17 +57,17 @@ This audit records the factual implementation status of all requirements across 
 ## 3. Real Test & Benchmark Evidence
 
 ### 3.1 Test Suite Summary Line
-- **Test Files**: 18 test files (`test_advisor_optimizer_phase6.py`, `test_analysis_phase5.py`, `test_app_calibration_phase7_8.py`, `test_app_headless.py`, `test_behavior_phase16.py`, `test_behavior_phase4.py`, `test_core_model_phase10.py`, `test_engine_phase2.py`, `test_final_size_phase15.py`, `test_generality_phase17.py`, `test_healthcare_phase3.py`, `test_meta_crossval_phase13.py`, `test_observation_phase18.py`, `test_packs_phase0.py`, `test_policy_local.py`, `test_population_phase1.py`, `test_resource_whatif_phase12.py`, `test_rumor_compliance_phase11.py`).
-- **Individual Test Functions**: **80 total test functions** across all files.
-- **pytest Output**: `80 passed in 518.49s` (100% green).
+- **Test Files**: 19 test files (`test_advisor_optimizer_phase6.py`, `test_analysis_phase5.py`, `test_app_calibration_phase7_8.py`, `test_app_headless.py`, `test_behavior_phase16.py`, `test_behavior_phase4.py`, `test_core_model_phase10.py`, `test_engine_phase2.py`, `test_final_size_phase15.py`, `test_generality_phase17.py`, `test_healthcare_phase3.py`, `test_london_pack_phase20.py`, `test_meta_crossval_phase13.py`, `test_observation_phase18.py`, `test_packs_phase0.py`, `test_policy_local.py`, `test_population_phase1.py`, `test_resource_whatif_phase12.py`, `test_rumor_compliance_phase11.py`).
+- **Individual Test Functions**: **83 total test functions** across all files.
+- **pytest Output**: `83 passed in 98.92s` (100% green).
 
 ### 3.2 Benchmark Output (`python scripts/benchmark.py --stretch`)
 | scale | horizon_days | attack_rate_pct | peak_infectious | time_per_day_ms | sim_time_sec | total_time_sec | peak_memory_mb | theoretical_soa_mb |
 |---|---|---|---|---|---|---|---|---|
-| 5,000 | 45 | 83.8% | 1,103 | 51.8 | 2.33 | 2.51 | 133.8 | 0.21 |
-| 50,000 | 45 | 78.4% | 11,408 | 371.3 | 16.71 | 17.01 | 184.9 | 2.15 |
-| 100,000 | 45 | 74.3% | 23,324 | 626.8 | 28.2 | 28.76 | 239.0 | 4.29 |
-| 500,000 | 45 | 59.2% | 116,776 | 2441.7 | 109.88 | 111.66 | 672.5 | 21.46 |
+| 5,000 | 45 | 83.8% | 1,103 | 9.0 | 0.4 | 0.48 | 134.3 | 0.21 |
+| 50,000 | 45 | 78.4% | 11,408 | 57.2 | 2.58 | 2.68 | 185.0 | 2.15 |
+| 100,000 | 45 | 74.3% | 23,324 | 102.1 | 4.6 | 4.71 | 239.1 | 4.29 |
+| 500,000 | 45 | 59.2% | 116,776 | 457.4 | 20.58 | 21.31 | 674.8 | 21.46 |
 
 ### 3.3 Mutation Testing Output (`python scripts/mutation_test.py`)
 ```

@@ -1,0 +1,65 @@
+meta:
+  name: london
+  country_iso: GBR
+  data_year: 2020
+  data_level: L2
+  area_levels:
+  - borough
+  - region
+  contact_country: GBR
+  units:
+    distance: km
+    area: km2
+    currency: GBP
+  notes: Empirical RegionPack for Greater London (33 Local Authorities) configured
+    for 2020 epidemic validation.
+  file_levels:
+    areas.csv: L2
+    age_structure.csv: L2
+    commute_od.csv: L2
+    contacts.csv: L2
+    hospitals.csv: L2
+    capacity.csv: L2
+    resources.csv: L2
+    venues.csv: L2
+    employment.csv: L2
+    environment.csv: L2
+    sanitation.csv: L2
+    comorbidity.csv: L2
+    risk_factors.csv: L2
+    policy_timeline.csv: L2
+    observed_cases.csv: L2
+  provenance:
+    areas.csv:
+      source: ONS Mid-2020 Population Estimates for Local Authorities
+      status: sourced
+      notes: 33 London Local Authorities with real populations, areas, coordinates
+    age_structure.csv:
+      source: ONS Census 2021 Age Estimates for London Boroughs
+      status: sourced
+      notes: 4-band age structure (0-4, 5-18, 19-64, 65+) stratified by sex
+    commute_od.csv:
+      source: NOMIS Census WU03UK Commuting Origin-Destination Matrix
+      status: sourced
+      notes: Empirical borough-to-borough worker flow matrix
+    contacts.csv:
+      source: LSHTM CoMix Contact Survey (Zenodo 4677017) / POLYMOD UK
+      status: sourced
+      notes: Age-structured contact matrices by transmission layer
+    hospitals.csv:
+      source: NHS England Acute Trust Directory
+      status: sourced
+      notes: 18 major acute hospital trusts across Greater London
+    capacity.csv:
+      source: NHS England COVID-19 Hospital Activity Trust Archives
+      status: sourced
+      notes: General acute and ICU/mechanical ventilation bed capacity
+    policy_timeline.csv:
+      source: UK Statutory Instruments (SI 2020/350) & OxCGRT England
+      status: sourced
+      notes: Statutory non-pharmaceutical intervention dates and stringency
+    observed_cases.csv:
+      source: UKHSA COVID-19 Dashboard API & NHS England Hospital Activity Time Series
+      status: sourced
+      notes: Daily positive tests, hospital admissions, and deaths for London Wave
+        1

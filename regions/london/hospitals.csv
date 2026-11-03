@@ -1,0 +1,19 @@
+hospital_id,name,area_id,lat,lon,sector,source,status
+R1H,Barts Health NHS Trust,E09000030,51.519,-0.0594,public,NHS England Acute Trust Directory,real
+RYJ,Imperial College Healthcare NHS Trust,E09000033,51.5173,-0.1741,public,NHS England Acute Trust Directory,real
+RJ1,Guy's and St Thomas' NHS Foundation Trust,E09000022,51.4988,-0.1186,public,NHS England Acute Trust Directory,real
+RJZ,King's College Hospital NHS Foundation Trust,E09000028,51.4682,-0.0932,public,NHS England Acute Trust Directory,real
+RAL,Royal Free London NHS Foundation Trust,E09000007,51.551,-0.1656,public,NHS England Acute Trust Directory,real
+RJ7,St George's University Hospitals NHS Foundation Trust,E09000032,51.4277,-0.175,public,NHS England Acute Trust Directory,real
+RQM,Chelsea and Westminster Hospital NHS Foundation Trust,E09000020,51.4842,-0.1819,public,NHS England Acute Trust Directory,real
+R1K,London North West University Healthcare NHS Trust,E09000005,51.5794,-0.3228,public,NHS England Acute Trust Directory,real
+RJ2,Lewisham and Greenwich NHS Trust,E09000023,51.4552,-0.016,public,NHS England Acute Trust Directory,real
+RF4,"Barking, Havering and Redbridge University Hospitals",E09000016,51.5701,0.179,public,NHS England Acute Trust Directory,real
+RJ6,Croydon Health Services NHS Trust,E09000008,51.3887,-0.1102,public,NHS England Acute Trust Directory,real
+RVR,Epsom and St Helier University Hospitals,E09000029,51.3814,-0.1889,public,NHS England Acute Trust Directory,real
+RAX,Kingston Hospital NHS Foundation Trust,E09000021,51.4137,-0.2764,public,NHS England Acute Trust Directory,real
+RQX,Homerton University Hospital NHS Foundation Trust,E09000012,51.5518,-0.0435,public,NHS England Acute Trust Directory,real
+RAP,North Middlesex University Hospital NHS Trust,E09000010,51.6146,-0.0766,public,NHS England Acute Trust Directory,real
+RKE,Whittington Health NHS Trust,E09000019,51.5662,-0.1386,public,NHS England Acute Trust Directory,real
+RAS,The Hillingdon Hospitals NHS Foundation Trust,E09000017,51.5284,-0.4578,public,NHS England Acute Trust Directory,real
+RG3,Bromley Healthcare / Princess Royal University Hospital,E09000006,51.3694,0.0575,public,NHS England Acute Trust Directory,real
