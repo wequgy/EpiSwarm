@@ -149,7 +149,7 @@ step = st.sidebar.radio(
         "5. Simulation Engine",
         "6. Analysis & Equity",
         "7. Policy Advisor & Optimizer",
-        "8. Export Audit Report"
+        "8. Export Audit Report",
         "9. City Diorama (Isometric View)"
     ]
 )
