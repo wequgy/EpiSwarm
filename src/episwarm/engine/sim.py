@@ -29,6 +29,40 @@ from episwarm.behavior.hierarchical import compute_individual_probabilities
 
 
 @dataclass
+class SimulationCheckpoint:
+    """Complete serialized snapshot of simulation state allowing seamless pause & resume."""
+    day: int
+    states: np.ndarray
+    dwell_remaining: np.ndarray
+    individual_k: np.ndarray
+    susceptibility_mult: np.ndarray
+    severity_odds: np.ndarray
+    agent_masking: np.ndarray
+    agent_isolating: np.ndarray
+    agent_vaccinated: np.ndarray
+    agent_work_avoid: np.ndarray
+    saved_compliance: np.ndarray
+    pop_compliance: np.ndarray
+    daily_state_counts: np.ndarray
+    daily_area_infections: np.ndarray
+    daily_hospital_demand: np.ndarray
+    daily_icu_demand: np.ndarray
+    daily_incident_symptomatic: np.ndarray
+    daily_incident_hospitalized: np.ndarray
+    daily_incident_icu: np.ndarray
+    daily_incident_deaths: np.ndarray
+    daily_mean_compliance: np.ndarray
+    daily_rumor_beliefs: Dict[str, np.ndarray]
+    n_seed: int
+    calib_beta: float
+    empirical_r0: float
+    target_r0: float
+    rng_state: Any
+    total_overflow_deaths: int = 0
+    event_logs: List[str] = field(default_factory=list)
+
+
+@dataclass
 class SimulationResults:
     """Outcomes and time-series telemetry from a simulation run."""
     run_id: str
@@ -72,6 +106,10 @@ class SimulationResults:
 
     manifest: Dict[str, Any] = field(default_factory=dict)
     assumptions: List[Dict[str, Any]] = field(default_factory=list)
+    is_paused: bool = False
+    current_day: int = 0
+    checkpoint: Optional[SimulationCheckpoint] = None
+    event_logs: List[str] = field(default_factory=list)
 
     def summary_table(self) -> str:
         lines = [
@@ -256,7 +294,9 @@ def run_simulation(
     behavior_mode: Optional[Literal["none", "rule", "llm"]] = None,
     unlimited_resources: bool = False,
     compute_attributable_overflow: bool = False,
-    step_callback: Optional[Any] = None
+    step_callback: Optional[Any] = None,
+    checkpoint: Optional[SimulationCheckpoint] = None,
+    pause_at_day: Optional[int] = None
 ) -> SimulationResults:
     """Execute complete multi-day epidemic simulation with generic resources, vulnerability factors, and rumor dynamics."""
     rng = np.random.default_rng(scenario_pack.random_seed)
@@ -410,57 +450,106 @@ def run_simulation(
     prev_area_measures_desc = {aid: "none" for aid in range(n_areas)}
     prev_area_risk_bands = np.full(n_areas, "low", dtype=object)
 
-    # 6. Initialize agent states & dwell times
-    states = np.full(pop.n_agents, state_graph.idx_S, dtype=np.int16)
-    dwell_remaining = np.zeros(pop.n_agents, dtype=np.float32)
+    n_states = state_graph.n_states
+    is_paused = False
+    checkpoint_obj: Optional[SimulationCheckpoint] = None
     unserved_days = np.zeros(pop.n_agents, dtype=np.int16)
 
-    k_param = disease_pack.transmission.overdispersion_k
-    individual_k = rng.gamma(shape=k_param, scale=1.0, size=pop.n_agents).astype(np.float32)
-    individual_k /= max(1e-6, np.mean(individual_k))
+    if checkpoint is None:
+        start_day = 0
+        states = np.full(pop.n_agents, state_graph.idx_S, dtype=np.int16)
+        dwell_remaining = np.zeros(pop.n_agents, dtype=np.float32)
 
-    # 7. Seeding (Role-based without hardcoded state strings)
-    seeding = scenario_pack.seeding
-    seeded_name = getattr(seeding, "seeded_state", None)
-    if seeded_name and seeded_name in state_graph.name_to_idx:
-        seeded_state_idx = state_graph.name_to_idx[seeded_name]
-    elif state_graph.idx_symp >= 0:
-        seeded_state_idx = state_graph.idx_symp
+        k_param = disease_pack.transmission.overdispersion_k
+        individual_k = rng.gamma(shape=k_param, scale=1.0, size=pop.n_agents).astype(np.float32)
+        individual_k /= max(1e-6, np.mean(individual_k))
+
+        # 7. Seeding (Role-based without hardcoded state strings)
+        seeding = scenario_pack.seeding
+        seeded_name = getattr(seeding, "seeded_state", None)
+        if seeded_name and seeded_name in state_graph.name_to_idx:
+            seeded_state_idx = state_graph.name_to_idx[seeded_name]
+        elif state_graph.idx_symp >= 0:
+            seeded_state_idx = state_graph.idx_symp
+        else:
+            inf_ids = np.where(state_graph.is_infectious)[0]
+            seeded_state_idx = int(inf_ids[0]) if len(inf_ids) > 0 else 1
+
+        if seeding.area_id and seeding.area_id in pop.area_id_to_int:
+            target_aid_int = pop.area_id_to_int[seeding.area_id]
+            eligible = np.where(pop.area_id == target_aid_int)[0]
+        else:
+            eligible = np.arange(pop.n_agents)
+
+        n_seed = min(len(eligible), seeding.initial_cases_per_area)
+        seed_chosen = rng.choice(eligible, size=n_seed, replace=False)
+        states[seed_chosen] = seeded_state_idx
+        dwell_remaining[seed_chosen] = state_graph.sample_state_dwell_time(
+            seeded_state_idx, n_seed, rng
+        )
+
+        seed_mode = getattr(seeding, "seed_infectiousness", "mean")
+        if seed_mode == "mean":
+            individual_k[seed_chosen] = 1.0
+
+        daily_state_counts = np.zeros((horizon, n_states), dtype=np.int32)
+        daily_area_infections = np.zeros((horizon, n_areas), dtype=np.int32)
+        daily_hospital_demand = np.zeros(horizon, dtype=np.int32)
+        daily_icu_demand = np.zeros(horizon, dtype=np.int32)
+        daily_incident_symptomatic = np.zeros(horizon, dtype=np.int32)
+        daily_incident_hospitalized = np.zeros(horizon, dtype=np.int32)
+        daily_incident_icu = np.zeros(horizon, dtype=np.int32)
+        daily_incident_deaths = np.zeros(horizon, dtype=np.int32)
+        total_overflow_deaths = 0
+        event_logs = [f"Day 0: Initialized outbreak simulation (R0: {target_r0:.2f}, Seeds: {n_seed})."]
     else:
-        inf_ids = np.where(state_graph.is_infectious)[0]
-        seeded_state_idx = int(inf_ids[0]) if len(inf_ids) > 0 else 1
+        start_day = checkpoint.day + 1
+        states = np.copy(checkpoint.states)
+        dwell_remaining = np.copy(checkpoint.dwell_remaining)
+        individual_k = np.copy(checkpoint.individual_k)
+        susceptibility_mult = np.copy(checkpoint.susceptibility_mult)
+        severity_odds = np.copy(checkpoint.severity_odds)
+        agent_masking = np.copy(checkpoint.agent_masking)
+        agent_isolating = np.copy(checkpoint.agent_isolating)
+        agent_work_avoid = np.copy(checkpoint.agent_work_avoid)
+        agent_vaccinated = np.copy(checkpoint.agent_vaccinated)
+        pop.compliance = np.copy(checkpoint.pop_compliance)
+        saved_compliance = np.copy(checkpoint.saved_compliance)
+        n_seed = checkpoint.n_seed
+        calib_beta = checkpoint.calib_beta
+        empirical_r0 = checkpoint.empirical_r0
+        target_r0 = checkpoint.target_r0
+        total_overflow_deaths = checkpoint.total_overflow_deaths
+        event_logs = list(checkpoint.event_logs)
+        event_logs.append(f"Day {start_day}: Resumed simulation from Day {checkpoint.day} checkpoint.")
+        rng.bit_generator.state = checkpoint.rng_state
 
-    if seeding.area_id and seeding.area_id in pop.area_id_to_int:
-        target_aid_int = pop.area_id_to_int[seeding.area_id]
-        eligible = np.where(pop.area_id == target_aid_int)[0]
-    else:
-        eligible = np.arange(pop.n_agents)
+        daily_state_counts = np.zeros((horizon, n_states), dtype=np.int32)
+        daily_area_infections = np.zeros((horizon, n_areas), dtype=np.int32)
+        daily_hospital_demand = np.zeros(horizon, dtype=np.int32)
+        daily_icu_demand = np.zeros(horizon, dtype=np.int32)
+        daily_incident_symptomatic = np.zeros(horizon, dtype=np.int32)
+        daily_incident_hospitalized = np.zeros(horizon, dtype=np.int32)
+        daily_incident_icu = np.zeros(horizon, dtype=np.int32)
+        daily_incident_deaths = np.zeros(horizon, dtype=np.int32)
 
-    n_seed = min(len(eligible), seeding.initial_cases_per_area)
-    seed_chosen = rng.choice(eligible, size=n_seed, replace=False)
-    states[seed_chosen] = seeded_state_idx
-    dwell_remaining[seed_chosen] = state_graph.sample_state_dwell_time(
-        seeded_state_idx, n_seed, rng
-    )
-
-    seed_mode = getattr(seeding, "seed_infectiousness", "mean")
-    if seed_mode == "mean":
-        individual_k[seed_chosen] = 1.0
-
-    n_states = state_graph.n_states
-    daily_state_counts = np.zeros((horizon, n_states), dtype=np.int32)
-    daily_area_infections = np.zeros((horizon, n_areas), dtype=np.int32)
-    daily_hospital_demand = np.zeros(horizon, dtype=np.int32)
-    daily_icu_demand = np.zeros(horizon, dtype=np.int32)
-    daily_incident_symptomatic = np.zeros(horizon, dtype=np.int32)
-    daily_incident_hospitalized = np.zeros(horizon, dtype=np.int32)
-    daily_incident_icu = np.zeros(horizon, dtype=np.int32)
-    daily_incident_deaths = np.zeros(horizon, dtype=np.int32)
-
-    total_overflow_deaths = 0
+        prev_len = min(horizon, checkpoint.daily_state_counts.shape[0])
+        daily_state_counts[:prev_len] = checkpoint.daily_state_counts[:prev_len]
+        daily_area_infections[:prev_len] = checkpoint.daily_area_infections[:prev_len]
+        daily_hospital_demand[:prev_len] = checkpoint.daily_hospital_demand[:prev_len]
+        daily_icu_demand[:prev_len] = checkpoint.daily_icu_demand[:prev_len]
+        daily_incident_symptomatic[:prev_len] = checkpoint.daily_incident_symptomatic[:prev_len]
+        daily_incident_hospitalized[:prev_len] = checkpoint.daily_incident_hospitalized[:prev_len]
+        daily_incident_icu[:prev_len] = checkpoint.daily_incident_icu[:prev_len]
+        daily_incident_deaths[:prev_len] = checkpoint.daily_incident_deaths[:prev_len]
+        daily_mean_compliance[:prev_len] = checkpoint.daily_mean_compliance[:prev_len]
+        for t_id, cp_arr in checkpoint.daily_rumor_beliefs.items():
+            if t_id in daily_rumor_beliefs:
+                daily_rumor_beliefs[t_id][:min(horizon, len(cp_arr))] = cp_arr[:min(horizon, len(cp_arr))]
 
     # 8. Day-by-day stepping loop
-    for day in range(horizon):
+    sim_horizon = horizon
+    for day in range(start_day, horizon):
         # A. Resolve active interventions, corrections, and resource additions per area (Spec 4.1 & Phase 16)
         layer_scalings = {
             "home": np.ones(n_areas, dtype=np.float32),
@@ -771,17 +860,90 @@ def run_simulation(
                 'fallbacks': getattr(active_policy, 'fallback_count', 0)
             })
 
+        # Check for pause condition at end of step
+        if pause_at_day is not None and day >= (pause_at_day - 1):
+            is_paused = True
+            sim_horizon = day + 1
+            event_logs.append(f"Day {day}: Simulation paused by user at Day {day}.")
+            checkpoint_obj = SimulationCheckpoint(
+                day=day,
+                states=np.copy(states),
+                dwell_remaining=np.copy(dwell_remaining),
+                individual_k=np.copy(individual_k),
+                susceptibility_mult=np.copy(susceptibility_mult),
+                severity_odds=np.copy(severity_odds),
+                agent_masking=np.copy(agent_masking),
+                agent_isolating=np.copy(agent_isolating),
+                agent_vaccinated=np.copy(agent_vaccinated),
+                agent_work_avoid=np.copy(agent_work_avoid),
+                saved_compliance=np.copy(saved_compliance),
+                pop_compliance=np.copy(pop.compliance),
+                daily_state_counts=np.copy(daily_state_counts[:sim_horizon]),
+                daily_area_infections=np.copy(daily_area_infections[:sim_horizon]),
+                daily_hospital_demand=np.copy(daily_hospital_demand[:sim_horizon]),
+                daily_icu_demand=np.copy(daily_icu_demand[:sim_horizon]),
+                daily_incident_symptomatic=np.copy(daily_incident_symptomatic[:sim_horizon]),
+                daily_incident_hospitalized=np.copy(daily_incident_hospitalized[:sim_horizon]),
+                daily_incident_icu=np.copy(daily_incident_icu[:sim_horizon]),
+                daily_incident_deaths=np.copy(daily_incident_deaths[:sim_horizon]),
+                daily_mean_compliance=np.copy(daily_mean_compliance[:sim_horizon]),
+                daily_rumor_beliefs={k: np.copy(v[:sim_horizon]) for k, v in daily_rumor_beliefs.items()},
+                n_seed=n_seed,
+                calib_beta=calib_beta,
+                empirical_r0=empirical_r0,
+                target_r0=target_r0,
+                rng_state=rng.bit_generator.state,
+                total_overflow_deaths=total_overflow_deaths,
+                event_logs=list(event_logs)
+            )
+            break
+
+    if not is_paused:
+        sim_horizon = horizon
+        event_logs.append(f"Day {horizon - 1}: Outbreak simulation completed over {horizon} days.")
+        checkpoint_obj = SimulationCheckpoint(
+            day=horizon - 1,
+            states=np.copy(states),
+            dwell_remaining=np.copy(dwell_remaining),
+            individual_k=np.copy(individual_k),
+            susceptibility_mult=np.copy(susceptibility_mult),
+            severity_odds=np.copy(severity_odds),
+            agent_masking=np.copy(agent_masking),
+            agent_isolating=np.copy(agent_isolating),
+            agent_vaccinated=np.copy(agent_vaccinated),
+            agent_work_avoid=np.copy(agent_work_avoid),
+            saved_compliance=np.copy(saved_compliance),
+            pop_compliance=np.copy(pop.compliance),
+            daily_state_counts=np.copy(daily_state_counts[:sim_horizon]),
+            daily_area_infections=np.copy(daily_area_infections[:sim_horizon]),
+            daily_hospital_demand=np.copy(daily_hospital_demand[:sim_horizon]),
+            daily_icu_demand=np.copy(daily_icu_demand[:sim_horizon]),
+            daily_incident_symptomatic=np.copy(daily_incident_symptomatic[:sim_horizon]),
+            daily_incident_hospitalized=np.copy(daily_incident_hospitalized[:sim_horizon]),
+            daily_incident_icu=np.copy(daily_incident_icu[:sim_horizon]),
+            daily_incident_deaths=np.copy(daily_incident_deaths[:sim_horizon]),
+            daily_mean_compliance=np.copy(daily_mean_compliance[:sim_horizon]),
+            daily_rumor_beliefs={k: np.copy(v[:sim_horizon]) for k, v in daily_rumor_beliefs.items()},
+            n_seed=n_seed,
+            calib_beta=calib_beta,
+            empirical_r0=empirical_r0,
+            target_r0=target_r0,
+            rng_state=rng.bit_generator.state,
+            total_overflow_deaths=total_overflow_deaths,
+            event_logs=list(event_logs)
+        )
+
     # Restore pop baseline compliance to prevent mutative side effects
     pop.compliance = saved_compliance
 
     init_s = pop.n_agents - n_seed
-    final_s = daily_state_counts[-1, state_graph.idx_S]
+    final_s = daily_state_counts[sim_horizon - 1, state_graph.idx_S]
     total_infections = max(0, init_s - final_s) + n_seed
     attack_rate = total_infections / float(pop.n_agents)
 
     total_deaths = 0
     if state_graph.idx_D >= 0:
-        total_deaths = int(daily_state_counts[-1, state_graph.idx_D])
+        total_deaths = int(daily_state_counts[sim_horizon - 1, state_graph.idx_D])
 
     total_overflow_deaths = 0
     if compute_attributable_overflow and not unlimited_resources:
@@ -813,28 +975,32 @@ def run_simulation(
         run_id=f"run_{int(time.time()*1000)}",
         scenario_name=scenario_pack.name,
         disease_name=disease_pack.name,
-        horizon_days=horizon,
+        horizon_days=sim_horizon,
         n_agents=pop.n_agents,
         sampling_ratio=pop.sampling_ratio,
         calibrated_beta=calib_beta,
         target_r0=target_r0,
         empirical_r0=empirical_r0,
-        daily_state_counts=daily_state_counts,
+        daily_state_counts=daily_state_counts[:sim_horizon],
         state_names=state_graph.state_names,
-        daily_area_infections=daily_area_infections,
-        daily_hospital_demand=daily_hospital_demand,
-        daily_icu_demand=daily_icu_demand,
+        daily_area_infections=daily_area_infections[:sim_horizon],
+        daily_hospital_demand=daily_hospital_demand[:sim_horizon],
+        daily_icu_demand=daily_icu_demand[:sim_horizon],
         total_infections=total_infections,
         total_deaths=total_deaths,
         attack_rate=attack_rate,
         overflow_deaths=total_overflow_deaths,
-        daily_mean_compliance=daily_mean_compliance,
-        daily_rumor_beliefs=daily_rumor_beliefs,
-        daily_incident_symptomatic=daily_incident_symptomatic,
-        daily_incident_hospitalized=daily_incident_hospitalized,
-        daily_incident_icu=daily_incident_icu,
-        daily_incident_deaths=daily_incident_deaths,
-        manifest=manifest
+        daily_mean_compliance=daily_mean_compliance[:sim_horizon],
+        daily_rumor_beliefs={k: v[:sim_horizon] for k, v in daily_rumor_beliefs.items()},
+        daily_incident_symptomatic=daily_incident_symptomatic[:sim_horizon],
+        daily_incident_hospitalized=daily_incident_hospitalized[:sim_horizon],
+        daily_incident_icu=daily_incident_icu[:sim_horizon],
+        daily_incident_deaths=daily_incident_deaths[:sim_horizon],
+        manifest=manifest,
+        is_paused=is_paused,
+        current_day=sim_horizon - 1,
+        checkpoint=checkpoint_obj,
+        event_logs=event_logs
     )
 
 

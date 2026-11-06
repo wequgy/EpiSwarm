@@ -58,6 +58,13 @@ def test_assumptions_endpoint():
         assert "status" in a
 
 
+def test_history_endpoints():
+    resp = client.get("/api/history")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert isinstance(data, list)
+
+
 def test_diorama_topology_endpoint():
     resp = client.get("/api/diorama?region_id=example_synthetic")
     assert resp.status_code == 200

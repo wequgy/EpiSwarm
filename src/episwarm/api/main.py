@@ -45,6 +45,7 @@ class SimulationRequest(BaseModel):
     n_replicates: int = Field(default=5, ge=1, le=50, description="Number of stochastic replicates for intervals")
     random_seed: int = Field(default=42, description="Random seed")
     horizon_days: Optional[int] = Field(default=None, description="Optional override for simulation horizon")
+    pause_at_day: Optional[int] = Field(default=None, description="Optional day to pause simulation and return checkpoint")
 
 
 class WhatIfRequest(BaseModel):
@@ -119,6 +120,23 @@ def get_validation_card() -> Dict[str, Any]:
         raise HTTPException(status_code=404, detail="Validation card not found")
     with open(card_path, "r", encoding="utf-8") as f:
         return json.load(f)
+
+
+@app.get("/api/history")
+def list_simulation_history(limit: int = 50) -> List[Dict[str, Any]]:
+    """Return past simulation history records."""
+    from episwarm.analysis.history import SimulationHistoryManager
+    return SimulationHistoryManager().load_history(limit=limit)
+
+
+@app.get("/api/history/{run_id}")
+def get_simulation_run_history(run_id: str) -> Dict[str, Any]:
+    """Return detailed manifest, events, and daily timeline for a specific past run."""
+    from episwarm.analysis.history import SimulationHistoryManager
+    run_record = SimulationHistoryManager().get_run(run_id)
+    if not run_record:
+        raise HTTPException(status_code=404, detail=f"Run '{run_id}' not found in history archive")
+    return run_record
 
 
 @app.get("/api/assumptions")

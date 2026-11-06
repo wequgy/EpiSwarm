@@ -37,6 +37,7 @@ from episwarm.analysis.metrics import evaluate_single_run_objectives
 from episwarm.analysis.calibration import calibrate_to_observed_data
 from episwarm.analysis.marginal_value import compute_marginal_value_curve, rank_areas_by_marginal_benefit
 from episwarm.analysis.resource_whatif import evaluate_resource_whatif_paired
+from episwarm.analysis.history import SimulationHistoryManager
 
 # Page config
 st.set_page_config(
@@ -150,7 +151,8 @@ step = st.sidebar.radio(
         "6. Analysis & Equity",
         "7. Policy Advisor & Optimizer",
         "8. Export Audit Report",
-        "9. City Diorama (Isometric View)"
+        "9. City Diorama (Isometric View)",
+        "10. Simulation History & Archive"
     ]
 )
 
@@ -630,8 +632,54 @@ elif step == "5. Simulation Engine":
 
     st.divider()
 
-    # EXECUTE SIMULATION BUTTON
-    if st.button("🚀 Execute Outbreak Simulation", type="primary"):
+    # EXECUTION CONTROLS & PAUSE/RESUME
+    st.markdown("#### ⏱️ Simulation Stepping & Checkpoints")
+    col_flow1, col_flow2 = st.columns([1.5, 2])
+    with col_flow1:
+        sim_step_mode = st.radio(
+            "Execution Control",
+            ["Continuous (Full Run)", "Pause at Target Day"],
+            index=0,
+            horizontal=True
+        )
+    with col_flow2:
+        if sim_step_mode == "Pause at Target Day":
+            pause_target = st.number_input("Pause at Day", min_value=1, max_value=int(sim_horizon), value=min(15, int(sim_horizon)), step=5)
+        else:
+            pause_target = None
+
+    active_cp = st.session_state.get("active_checkpoint")
+    col_b1, col_b2, col_b3, col_b4 = st.columns([1.5, 1.2, 1.2, 1.0])
+    
+    do_execute = False
+    is_resuming = False
+    
+    if active_cp is None:
+        with col_b1:
+            if st.button("🚀 Execute Outbreak Simulation", type="primary"):
+                do_execute = True
+                is_resuming = False
+    else:
+        with col_b1:
+            if st.button(f"⏯️ Resume from Day {active_cp.day+1}", type="primary"):
+                do_execute = True
+                is_resuming = True
+        with col_b2:
+            if st.button("⏭️ Step +5 Days"):
+                do_execute = True
+                is_resuming = True
+                pause_target = min(int(sim_horizon), active_cp.day + 6)
+        with col_b3:
+            if st.button("⏹️ Finalize Run"):
+                st.session_state.active_checkpoint = None
+                st.rerun()
+        with col_b4:
+            if st.button("🔄 Reset"):
+                st.session_state.active_checkpoint = None
+                st.session_state.sim_results = None
+                st.rerun()
+
+    if do_execute:
         # 0. Resolve stochastic seed
         if sim_randomize_seed:
             active_seed = random.randint(1000, 999999)
@@ -766,6 +814,7 @@ elif step == "5. Simulation Engine":
                     feed_lines.append(c_line)
                 live_feed_box.markdown("\n".join(feed_lines), unsafe_allow_html=True)
 
+        cp_input = st.session_state.get("active_checkpoint") if is_resuming else None
         res = run_simulation(
             pop,
             d_pack,
@@ -773,14 +822,35 @@ elif step == "5. Simulation Engine":
             behavior_pack=b_pack,
             policy=policy_inst,
             behavior_mode=chosen_mode,
-            step_callback=sim_step_cb
+            step_callback=sim_step_cb,
+            checkpoint=cp_input,
+            pause_at_day=pause_target
         )
         total_time = time.time() - t_sim_start
         tot_m = int(total_time // 60)
         tot_s = int(total_time % 60)
-        prog_bar.progress(100, text=f"Simulation successfully completed across {sim_horizon} days in {tot_m}m {tot_s:02d}s!")
         st.session_state.sim_results = res
-        st.success(f"Outbreak simulation completed across {sim_horizon} days for {pop.n_agents:,} synthetic agents in {tot_m}m {tot_s:02d}s!")
+        
+        if res.is_paused:
+            st.session_state.active_checkpoint = res.checkpoint
+            prog_bar.progress(int((res.current_day + 1) / sim_horizon * 100), text=f"Simulation paused at Day {res.current_day} of {sim_horizon}!")
+            st.warning(f"⏸️ Outbreak simulation paused at Day {res.current_day} ({res.total_infections:,} infections so far). You can inspect the current state below or click **Resume** to continue.")
+        else:
+            st.session_state.active_checkpoint = None
+            prog_bar.progress(100, text=f"Simulation successfully completed across {res.horizon_days} days in {tot_m}m {tot_s:02d}s!")
+            st.success(f"Outbreak simulation completed across {res.horizon_days} days for {pop.n_agents:,} synthetic agents in {tot_m}m {tot_s:02d}s!")
+            
+        # Automatically record to persistent history archive
+        hist_mgr = SimulationHistoryManager()
+        hist_mgr.save_run(
+            results=res,
+            region_id=st.session_state.region_dir.name,
+            scenario_name=s_pack.name,
+            disease_name=d_pack.name,
+            behavior_mode=chosen_mode,
+            population_scale=pop.n_agents,
+            interventions=[iv.measure_type for iv in active_interventions]
+        )
 
     # SIMULATION RESULTS DASHBOARD
     if st.session_state.sim_results:
@@ -994,3 +1064,74 @@ elif step == "9. City Diorama (Isometric View)":
         components.html(html_data, height=730, scrolling=False)
     
     st.info("💡 **Diorama Anatomy**: Four-tone technical shading, brass corner mounts, sub-layer contact tracks (household, school, workplace, clinic), live dial gauges with 95% confidence intervals.")
+
+# --- STEP 10: SIMULATION HISTORY & ARCHIVE ---
+elif step == "10. Simulation History & Archive":
+    st.header("Step 10: Simulation History & Detailed Run Archive")
+    st.caption("Inspect, compare, and audit all past simulation trajectories, event logs, and intervention outcomes.")
+    
+    hist_mgr = SimulationHistoryManager()
+    runs = hist_mgr.load_history(limit=100)
+    
+    if not runs:
+        st.info("No recorded simulations found in `logs/simulation_history.jsonl`. Run a simulation in Step 5 to generate history.")
+    else:
+        df_summary = hist_mgr.export_summary_df()
+        
+        c_h1, c_h2, c_h3 = st.columns([2, 1, 1])
+        with c_h1:
+            st.markdown(f"**Total Archived Runs:** `{len(runs)}`")
+        with c_h2:
+            st.download_button(
+                "⬇️ Export History (CSV)",
+                df_summary.to_csv(index=False),
+                file_name="episwarm_simulation_history.csv",
+                mime="text/csv"
+            )
+        with c_h3:
+            if st.button("🗑️ Clear History Log"):
+                hist_mgr.clear_history()
+                st.rerun()
+                
+        st.dataframe(df_summary, width="stretch")
+        
+        st.divider()
+        st.subheader("🔍 Inspect Detailed Run Manifest & Daily Timeline")
+        run_ids = [r["run_id"] for r in runs]
+        selected_run_id = st.selectbox("Select Past Run ID", run_ids, index=0)
+        
+        selected_run = hist_mgr.get_run(selected_run_id)
+        if selected_run:
+            m = selected_run.get("metrics", {})
+            
+            c_m1, c_m2, c_m3, c_m4, c_m5 = st.columns(5)
+            with c_m1:
+                st.metric("Attack Rate", f"{m.get('attack_rate_pct', 0):.1f}%")
+            with c_m2:
+                st.metric("Total Fatalities", f"{m.get('total_deaths', 0):,}")
+            with c_m3:
+                st.metric("Peak Hospital Beds", f"{m.get('peak_hospital_demand', 0):,}")
+            with c_m4:
+                st.metric("Peak ICU Beds", f"{m.get('peak_icu_demand', 0):,}")
+            with c_m5:
+                st.metric("Status", "PAUSED" if selected_run.get("is_paused") else "COMPLETED")
+                
+            tab_daily, tab_events, tab_json = st.tabs(["📈 Daily Trajectory", "📝 Chronological Event Log", "📦 Raw Run JSON"])
+            
+            with tab_daily:
+                daily_df = pd.DataFrame(selected_run.get("daily_timeline", []))
+                if not daily_df.empty:
+                    fig_h = px.line(daily_df, x="day", y=["hospitalized", "icu"], title=f"Healthcare Demand Over Time ({selected_run_id})")
+                    st.plotly_chart(fig_h, width="stretch")
+                    st.dataframe(daily_df, width="stretch")
+                    
+            with tab_events:
+                events = selected_run.get("events_log", [])
+                if events:
+                    for ev in events:
+                        st.markdown(f"- `{ev}`")
+                else:
+                    st.info("No recorded discrete events for this run.")
+                    
+            with tab_json:
+                st.json(selected_run)
