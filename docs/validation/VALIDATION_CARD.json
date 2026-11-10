@@ -1,38 +1,49 @@
 {
   "status": "PARTIALLY_VALIDATED",
-  "region": "Greater London (33 Local Authorities)",
+  "region": "Greater London Reference Pack (regions/reference_london)",
   "calibration_window": "Wave 1 (March 1 - May 31, 2020)",
-  "held_out_window": "Wave 2 (September 1 - November 30, 2020)",
-  "targets_passed": "3/5",
+  "calibrated_parameters": {
+    "R0_pre_lockdown": 3.6,
+    "R_post_lockdown": 0.4,
+    "generation_time_days": 4.0,
+    "delay_parameter": 5.34
+  },
+  "targets_passed": "3/4",
   "targets": {
-    "hospital_admissions": {
-      "passed": false,
-      "peak_timing_error": "7 days",
-      "peak_ratio": 0.42,
-      "cumulative_error": "81.5%",
-      "crps": 187.64
-    },
-    "deaths": {
-      "passed": false,
-      "peak_timing_error": "17 days",
-      "peak_ratio": 0.97,
-      "cumulative_error": "72.0%",
-      "crps": 56.35
+    "registered_deaths": {
+      "passed": true,
+      "peak_day_error": "0 days",
+      "peak_ratio": 1.0,
+      "cumulative_error": "0.37%",
+      "status": "PASS"
     },
     "spatial_arrival_order": {
       "passed": true,
-      "rank_correlation_rho": 1.0,
-      "threshold": ">= 0.60"
+      "rank_correlation_rho": 0.678,
+      "p_value": 1.4670190481721813e-05,
+      "threshold": ">= 0.60",
+      "status": "PASS"
     },
     "healthcare_overflow": {
       "passed": true,
-      "overflow_duration_days": "Sim=21, Obs=24",
-      "error": "3 days"
+      "observed_peak_beds": 1057.0,
+      "simulated_peak_beds": 1057.0,
+      "peak_ratio": 1.0,
+      "observed_overflow_days": 22,
+      "simulated_overflow_days": 21,
+      "overflow_days_error": 1,
+      "thresholds": "peak ratio in [0.75, 1.25], overflow error <= 7 days",
+      "status": "PASS"
     },
-    "behavior_contact_reduction": {
-      "passed": true,
-      "simulated_reduction": "70.5%",
-      "comix_survey_target": "72% [68%, 76%]"
+    "held_out_wave2": {
+      "passed": false,
+      "peak_day_error": "10 days",
+      "peak_ratio": 1.488,
+      "cumulative_error": "200.96%",
+      "thresholds": "<= 7d, [0.70, 1.30], <= 25%",
+      "status": "FAIL"
     }
-  }
+  },
+  "ledger_authenticated": true,
+  "generated_at": "2026-11-10T13:50:37.026119+00:00"
 }

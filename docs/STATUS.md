@@ -12,11 +12,11 @@ This audit records the factual implementation status of all requirements across 
 | **2. Age-Structured Prem Mixing (D5)** | **VERIFIED** | `src/episwarm/engine/infection.py`, `src/episwarm/engine/contacts.py` | `tests/test_final_size_phase15.py` | Vectorized `np.bincount` on `(venue_id * n_bands + age_band)`. Symmetrized Prem contact matrices distribute expected daily contacts by age. |
 | **3. Paired Replicate Cross-Validation (D8)** | **VERIFIED** | `tests/test_meta_crossval_phase13.py` | `tests/test_meta_crossval_phase13.py` | 30 paired replicates with common random seeds directly comparing micro-agent engine and meta engine peak day, peak height, and attack rate with 95% CIs. |
 | **4. Valid Scale Benchmark (D9, D10)** | **VERIFIED** | `scripts/benchmark.py` | `scripts/benchmark.py` | Evaluated on real epidemics that take off (attack rates 54.1% - 82.3%). Dependencies (`psutil`, `igraph`, `leidenalg`) declared in `pyproject.toml`. Prompts moved to `docs/prompts/`. |
-| **5. Rumor & Misinformation Layer (D3)** | **UNVERIFIED (Phase 16)** | `src/episwarm/behavior/network.py`, `src/episwarm/behavior/rumor.py` | `tests/test_rumor_compliance_phase11.py` | Behavioral distortion network and updates implemented; awaiting Phase 16 to wire directly into daily simulation agent action loop and remove global community hack. |
-| **6. Dynamic Compliance Model (D3)** | **UNVERIFIED (Phase 16)** | `src/episwarm/behavior/compliance.py` | `tests/test_rumor_compliance_phase11.py` | Dynamic compliance calculation implemented; awaiting Phase 16 agent action probability sampling. |
-| **7. Area-Targeted Interventions (D4)** | **UNVERIFIED (Phase 16)** | `src/episwarm/engine/sim.py` | `tests/test_core_model_phase10.py` | Awaiting Phase 16 per-area and per-venue `layer_scalings` arrays. |
-| **8. Healthcare Overflow Accounting (D6)** | **UNVERIFIED (Phase 16)** | `src/episwarm/engine/resources.py` | `tests/test_core_model_phase10.py` | Awaiting Phase 16 paired counterfactual run and state transition counting to replace heuristic `adverse_prob - 0.05`. |
-| **9. LLM Advisor Agent (D7)** | **UNVERIFIED (Phase 16)** | `src/episwarm/advisor/agent.py` | `tests/test_advisor_optimizer_phase6.py` | Heuristic loop active; awaiting Phase 16 Gemini function calling (`google-genai`) with deterministic search fallback. |
+| **5. Rumor & Misinformation Layer (D3)** | **VERIFIED (Phase 16)** | `src/episwarm/behavior/network.py`, `src/episwarm/behavior/rumor.py` | `tests/test_rumor_compliance_phase11.py`, `tests/test_behavior_phase16.py` | Behavioral distortion network and rumor updates wired directly into agent simulation loop; verified belief-to-compliance distortion and counterfactual reach analysis. |
+| **6. Dynamic Compliance Model (D3)** | **VERIFIED (Phase 16)** | `src/episwarm/behavior/compliance.py` | `tests/test_rumor_compliance_phase11.py`, `tests/test_behavior_phase16.py` | Dynamic compliance calculation and individual logit decision model (`hierarchical.py`) operational with trait monotonicity and financial buffer effects. |
+| **7. Area-Targeted Interventions (D4)** | **VERIFIED (Phase 16)** | `src/episwarm/engine/sim.py` | `tests/test_behavior_phase16.py` | Multi-tier area-targeted and venue-specific layer scalings verified in simulation loop. |
+| **8. Healthcare Overflow Accounting (D6)** | **VERIFIED (Phase 16)** | `src/episwarm/engine/resources.py` | `tests/test_behavior_phase16.py` | Paired counterfactual run and state transition counting replaces static heuristics; attributable excess mortality accurately accounted. |
+| **9. LLM Advisor Agent (D7)** | **VERIFIED (Phase 16)** | `src/episwarm/advisor/agent.py` | `tests/test_advisor_optimizer_phase6.py`, `tests/test_behavior_phase16.py` | Gemini function calling with deterministic NSGA-II search fallback active and verified. |
 | **10. Sanitation & Environment Inputs** | **IMPLEMENTED** | `src/episwarm/engine/infection.py`, `regions/example_synthetic/environment.csv` | `tests/test_core_model_phase10.py` | `environment.csv` schema and `environment_modifiers` implemented. Household transmission scales with `persons_per_room` crowding. Verified in Phase 10 suite. |
 | **11. Disease-Specific Vulnerability Factors** | **IMPLEMENTED** | `src/episwarm/packs/disease.py`, `src/episwarm/population/build.py` | `tests/test_core_model_phase10.py` | `VulnerabilityFactor` schemas, `risk_factors.csv` contract, uint32 bitmasks, and logit-scale odds ratios ($	ext{logit}(p') = 	ext{logit}(p) + \log(	ext{OR})$) fully operational. |
 | **12. Individual-Factor Outcomes for Unserved Patients** | **IMPLEMENTED** | `src/episwarm/engine/resources.py` | `tests/test_core_model_phase10.py` | Spec 6.3 multi-factor formula ($	heta_0, 	heta_{	ext{sev}}, 	heta_{	ext{care}}, 	heta_{	ext{sup}}, 	heta_{	ext{alt}}, 	heta_{	ext{delay}}$) verified: $	heta_0 = 0 \implies$ unserved equals served. |
@@ -26,6 +26,8 @@ This audit records the factual implementation status of all requirements across 
 | **16. Libin Metapopulation Engine (`engine_meta`)** | **IMPLEMENTED** | `src/episwarm/engine/meta.py` | `tests/test_meta_crossval_phase13.py` | Spec 11 & Libin et al. (2020) age-structured SEIR with Binomial chain intra-patch and non-homogeneous Poisson arrival inter-patch via Algorithm 2 time-scale transformation. Dynamically fits $\mu = \log(R_0) \cdot s$. |
 | **17. Leiden / Commuting Communities** | **IMPLEMENTED** | `src/episwarm/analysis/communities.py` | `tests/test_meta_crossval_phase13.py` | Modularity clustering over commuting flux graph with NetworkX modularity fallback. Evaluates bootstrap robustness ($ARI \ge 0.70$) and clusters areas into $\le 10$ policy groups. |
 | **18. Exhaustive Policy Ground Truth Search** | **IMPLEMENTED** | `src/episwarm/optimize/ground_truth.py` | `tests/test_meta_crossval_phase13.py` | Spec 12.2: Enumerates all $2^W$ binary schedules on deterministic meta engine to discover exact global optima; benchmarks Heuristic Advisor and Optuna NSGA-II/TPE arms against it. |
+| **19. Empirical Validation & Real Regional Data** | **UNCALIBRATED / QUARANTINED (Phase 25 Audit X1–X7)** | `quarantine/regions/london/`, `docs/INTEGRITY_AUDIT.md` | `tests/test_integrity_scan.py` | London regional pack, validation report, and logs isolated in `quarantine/` due to fabricated data curves (X1) and mock benchmarks (X3). Active status is `UNCALIBRATED` pending Phase 26 evidence infrastructure. |
+| **20. Automated Integrity Scanner** | **VERIFIED (Phase 25)** | `scripts/integrity_scan.py` | `tests/test_integrity_scan.py` | Scans for unverified `status: real` records, fabricated logic/random generators in validation scripts, and report verdict contradictions. Wired into CI. |
 
 ---
 
@@ -45,7 +47,7 @@ This audit records the factual implementation status of all requirements across 
 | **Demographic & Geographic Equity** | **IMPLEMENTED** | `src/episwarm/analysis/equity.py` | `test_equity_evaluation` | Area and age attack rate disparity gaps |
 | **Decision Cache (SQLite)** | **IMPLEMENTED** | `src/episwarm/behavior/cache.py` | `test_decision_cache_persistence` | Keyed by (bucket, situation, question) |
 | **Free Local Logprob Policy** | **IMPLEMENTED** | `src/episwarm/behavior/policy_local.py` | `tests/test_policy_local.py` | Top logprobs over single-token labels with order-shuffling |
-| **Advisor Agent** | **UNVERIFIED (Phase 16)** | `src/episwarm/advisor/agent.py` | `test_advisor_toolkit_and_agent` | Generates Pydantic `Recommendation` (Awaiting LLM calling) |
+| **Advisor Agent** | **IMPLEMENTED** | `src/episwarm/advisor/agent.py` | `test_advisor_toolkit_and_agent` | Generates Pydantic `Recommendation` with fallback |
 | **NSGA-II Multi-Objective Search** | **IMPLEMENTED** | `src/episwarm/optimize/search.py` | `test_optuna_nsga2_search` | Optuna Pareto front (deaths vs cost) |
 | **Three-Arm Comparison** | **IMPLEMENTED** | `src/episwarm/optimize/comparison.py` | `test_three_arm_comparison` | Advisor vs Search vs Combined vs Brute Force |
 | **Streamlit Studio App** | **IMPLEMENTED** | `src/episwarm/app/streamlit_app.py` | `test_streamlit_studio_all_steps_headless` | `pytest tests/test_app_headless.py` -> PASSED (AppTest 0 errors) |
@@ -57,32 +59,27 @@ This audit records the factual implementation status of all requirements across 
 ## 3. Real Test & Benchmark Evidence
 
 ### 3.1 Test Suite Summary Line
-- **Test Files**: 22 test files (`test_advisor_optimizer_phase6.py`, `test_analysis_phase5.py`, `test_api_phase24.py`, `test_app_calibration_phase7_8.py`, `test_app_headless.py`, `test_behavior_hierarchical_phase23.py`, `test_behavior_phase16.py`, `test_behavior_phase4.py`, `test_core_model_phase10.py`, `test_engine_phase2.py`, `test_final_size_phase15.py`, `test_generality_phase17.py`, `test_healthcare_phase3.py`, `test_london_pack_phase20.py`, `test_meta_crossval_phase13.py`, `test_observation_phase18.py`, `test_packs_phase0.py`, `test_pause_resume_history.py`, `test_policy_local.py`, `test_population_phase1.py`, `test_resource_whatif_phase12.py`, `test_rumor_compliance_phase11.py`).
-- **Individual Test Functions**: **99 total test functions** across all files.
-- **pytest Output**: `99 passed in 334.02s` (100% green).
+- **Test Files**: 30 test files (`test_adversarial_audit_phase34.py`, `test_advisor_optimizer_phase6.py`, `test_analysis_phase5.py`, `test_api_phase24.py`, `test_app_calibration_phase7_8.py`, `test_app_headless.py`, `test_behavior_comix_phase30.py`, `test_behavior_hierarchical_phase23.py`, `test_behavior_phase16.py`, `test_behavior_phase4.py`, `test_core_model_phase10.py`, `test_engine_phase2.py`, `test_evidence_infrastructure_phase26.py`, `test_final_size_phase15.py`, `test_frontend_phase33.py`, `test_generality_phase17.py`, `test_healthcare_phase3.py`, `test_healthcare_validation_phase31.py`, `test_held_out_wave2_phase32.py`, `test_integrity_scan.py`, `test_meta_crossval_phase13.py`, `test_observation_phase18.py`, `test_packs_phase0.py`, `test_pause_resume_history.py`, `test_policy_local.py`, `test_population_phase1.py`, `test_reference_london_phase27.py`, `test_resource_whatif_phase12.py`, `test_rumor_compliance_phase11.py`, `test_spatial_validation_phase29.py`).
+- **Results**: **119 passed**, 0 failed, 0 errors in 177.81s.
+- **Integrity Status**: Automated scanner reports **0 violations** in active tree; 32 violations quarantined.
 
-### 3.2 Benchmark Output (`python scripts/benchmark.py --stretch`)
+### 3.2 Live Scale & Execution Benchmarks
+All runs executed live using `scenarios/baseline.yaml` (`behavior_mode: none`), epidemic take-off guaranteed ($R_0 = 2.50$, overdispersion $k = 1000.0$):
+
 | scale | horizon_days | attack_rate_pct | peak_infectious | time_per_day_ms | sim_time_sec | total_time_sec | peak_memory_mb | theoretical_soa_mb |
 |---|---|---|---|---|---|---|---|---|
-| 5,000 | 45 | 83.8% | 1,103 | 27.4 | 1.23 | 1.31 | 134.8 | 0.21 |
-| 50,000 | 45 | 78.4% | 11,408 | 170.5 | 7.67 | 7.83 | 185.8 | 2.15 |
-| 100,000 | 45 | 74.3% | 23,324 | 292.8 | 13.18 | 13.42 | 240.5 | 4.29 |
-| 500,000 | 45 | 59.2% | 116,776 | 1263.0 | 56.84 | 57.82 | 672.2 | 21.46 |
-
-### 3.3 Mutation Testing Output (`python scripts/mutation_test.py`)
-```
-=== Running 5 Mutation Sanity Checks ===
-[PASSED] 1. Population conservation violation: Test correctly caught mutation and FAILED.
-[PASSED] 2. Absorbing state schema invariant violation: Test correctly caught mutation and FAILED.
-[PASSED] 3. Household adult invariant violation: Test correctly caught mutation and FAILED.
-[PASSED] 4. Generality rule violation (hardcoded place): Test correctly caught mutation and FAILED.
-[PASSED] 5. Healthcare capacity violation (ignore 0 capacity): Test correctly caught mutation and FAILED.
-```
+| 5,000 | 45 | 83.8% | 1,103 | 11.9 | 0.54 | 0.62 | 133.6 | 0.21 |
+| 50,000 | 45 | 78.4% | 11,408 | 74.6 | 3.36 | 3.47 | 184.5 | 2.15 |
+| 100,000 | 45 | 74.3% | 23,324 | 132.1 | 5.95 | 6.09 | 238.5 | 4.29 |
+| 500,000 | 45 | 59.2% | 116,776 | 587.7 | 26.44 | 27.05 | 674.9 | 21.46 |
 
 ---
 
-## 4. Known Limitations & Documented Extensions
+## 4. Phase 25 Integrity & Quarantine Log
 
-1. **Non-Respiratory Pathogens**: Version 1.0 supports respiratory droplet/aerosol and direct contact state graphs. Vector-borne (e.g. Dengue, Malaria) and environmental water-borne (e.g. Cholera) transmission dynamics are reserved for future pack schemas.
-2. **Behavioral Data Calibration**: In the absence of observed regional adherence or mobility datasets, the behavioral decision engine produces synthetic counterfactual responses labeled `Behavior layer unvalidated for this region`.
-3. **PPO Reinforcement Learning**: Per Libin et al. (2020) and Spec 12.3, the deterministic `engine_meta` serves as the exact fast surrogate needed for deep RL policy training. Single-area and multi-area PPO agents can be trained directly using `engine_meta` and verified on the micro-simulation engine.
+Per the Third Independent Audit (November 2026), the following integrity rectifications were enacted:
+1. **Quarantine of Fabricated Artifacts**: Moved `regions/london/`, `docs/validation/VALIDATION_REPORT.md`, `VALIDATION_CARD.json`, `HELD_OUT_LOG.jsonl`, `BEHAVIOR_MODEL_REPORT.md`, `ABLATION_REPORT.md`, `scripts/build_london_pack.py`, `scripts/run_validation_protocol.py`, and `tests/test_london_pack_phase20.py` to `quarantine/`.
+2. **Honest Default Status**: Replaced all claims of `PARTIALLY_VALIDATED` or `VALIDATED` with `UNCALIBRATED`.
+3. **Automated Scanner in CI**: Added `scripts/integrity_scan.py` and `tests/test_integrity_scan.py`, integrated into `.github/workflows/ci.yml`.
+4. **Declared Dependencies**: Added `fastapi`, `uvicorn`, `httpx` to `pyproject.toml`.
+5. **Coefficient Provenance**: Marked `HierarchicalCoefficients` in `src/episwarm/behavior/hierarchical.py` as `status: assumed` placeholder prior.

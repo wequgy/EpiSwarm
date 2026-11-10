@@ -1,0 +1,17 @@
+layer,age_band_i,age_band_j,contacts_per_day,source,status
+all,0-4,0-4,0.301,"LSHTM CoMix Contact Survey Period 1 (https://zenodo.org/api/records/4677018/files/contact_matrices_9_periods.csv/content, SHA-256: 217e03a3ec0460b5)",real
+all,0-4,18-64,0.602,"LSHTM CoMix Contact Survey Period 1 (https://zenodo.org/api/records/4677018/files/contact_matrices_9_periods.csv/content, SHA-256: 217e03a3ec0460b5)",real
+all,0-4,5-17,0.191,"LSHTM CoMix Contact Survey Period 1 (https://zenodo.org/api/records/4677018/files/contact_matrices_9_periods.csv/content, SHA-256: 217e03a3ec0460b5)",real
+all,0-4,65+,0.082,"LSHTM CoMix Contact Survey Period 1 (https://zenodo.org/api/records/4677018/files/contact_matrices_9_periods.csv/content, SHA-256: 217e03a3ec0460b5)",real
+all,18-64,0-4,0.256,"LSHTM CoMix Contact Survey Period 1 (https://zenodo.org/api/records/4677018/files/contact_matrices_9_periods.csv/content, SHA-256: 217e03a3ec0460b5)",real
+all,18-64,18-64,0.382,"LSHTM CoMix Contact Survey Period 1 (https://zenodo.org/api/records/4677018/files/contact_matrices_9_periods.csv/content, SHA-256: 217e03a3ec0460b5)",real
+all,18-64,5-17,0.273,"LSHTM CoMix Contact Survey Period 1 (https://zenodo.org/api/records/4677018/files/contact_matrices_9_periods.csv/content, SHA-256: 217e03a3ec0460b5)",real
+all,18-64,65+,0.186,"LSHTM CoMix Contact Survey Period 1 (https://zenodo.org/api/records/4677018/files/contact_matrices_9_periods.csv/content, SHA-256: 217e03a3ec0460b5)",real
+all,5-17,0-4,0.14,"LSHTM CoMix Contact Survey Period 1 (https://zenodo.org/api/records/4677018/files/contact_matrices_9_periods.csv/content, SHA-256: 217e03a3ec0460b5)",real
+all,5-17,18-64,0.484,"LSHTM CoMix Contact Survey Period 1 (https://zenodo.org/api/records/4677018/files/contact_matrices_9_periods.csv/content, SHA-256: 217e03a3ec0460b5)",real
+all,5-17,5-17,0.318,"LSHTM CoMix Contact Survey Period 1 (https://zenodo.org/api/records/4677018/files/contact_matrices_9_periods.csv/content, SHA-256: 217e03a3ec0460b5)",real
+all,5-17,65+,0.052,"LSHTM CoMix Contact Survey Period 1 (https://zenodo.org/api/records/4677018/files/contact_matrices_9_periods.csv/content, SHA-256: 217e03a3ec0460b5)",real
+all,65+,0-4,0.035,"LSHTM CoMix Contact Survey Period 1 (https://zenodo.org/api/records/4677018/files/contact_matrices_9_periods.csv/content, SHA-256: 217e03a3ec0460b5)",real
+all,65+,18-64,0.173,"LSHTM CoMix Contact Survey Period 1 (https://zenodo.org/api/records/4677018/files/contact_matrices_9_periods.csv/content, SHA-256: 217e03a3ec0460b5)",real
+all,65+,5-17,0.029,"LSHTM CoMix Contact Survey Period 1 (https://zenodo.org/api/records/4677018/files/contact_matrices_9_periods.csv/content, SHA-256: 217e03a3ec0460b5)",real
+all,65+,65+,0.738,"LSHTM CoMix Contact Survey Period 1 (https://zenodo.org/api/records/4677018/files/contact_matrices_9_periods.csv/content, SHA-256: 217e03a3ec0460b5)",real

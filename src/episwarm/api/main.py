@@ -117,7 +117,11 @@ def list_scenarios() -> List[Dict[str, Any]]:
 def get_validation_card() -> Dict[str, Any]:
     card_path = Path("docs/validation/VALIDATION_CARD.json")
     if not card_path.exists():
-        raise HTTPException(status_code=404, detail="Validation card not found")
+        return {
+            "status": "UNCALIBRATED",
+            "message": "No verified empirical validation card currently exists. Previous benchmark was quarantined per audit findings X1-X7.",
+            "targets": {}
+        }
     with open(card_path, "r", encoding="utf-8") as f:
         return json.load(f)
 
@@ -325,7 +329,7 @@ def run_simulation_endpoint(req: SimulationRequest) -> Dict[str, Any]:
             }
             for s in summary.per_seed
         ],
-        "validation_status": "PARTIALLY_VALIDATED",
+        "validation_status": "UNCALIBRATED",
         "validation_card_url": "/api/validation-card"
     }
 

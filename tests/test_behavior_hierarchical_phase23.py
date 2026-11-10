@@ -102,7 +102,7 @@ def test_prompt_shuffle_invariance():
 
 def test_simulation_with_hierarchical_behavior(test_pop, test_disease, test_scenario):
     """End-to-end simulation runs seamlessly with individual hierarchical decisions."""
-    contacts_df = pd.read_csv("regions/london/contacts.csv")
+    contacts_df = pd.read_csv("regions/metro_dense/contacts.csv")
     test_scenario.horizon_days = 14
     
     res = run_simulation(

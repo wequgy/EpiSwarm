@@ -1,0 +1,6 @@
+date_start,date_end,measure,stringency,area_id,source,status
+2020-03-23,2020-12-31,school_closure,1.0,ALL,OxCGRT Subnational Policy Dataset (SHA-256: d242cf3b2332bf02),real
+2020-03-16,2020-12-31,workplace_reduction,0.33,ALL,OxCGRT Subnational Policy Dataset (SHA-256: d242cf3b2332bf02),real
+2020-03-23,2020-06-15,movement_curfew,0.67,ALL,OxCGRT Subnational Policy Dataset (SHA-256: d242cf3b2332bf02),real
+2020-06-30,2020-08-01,movement_curfew,0.33,ALL,OxCGRT Subnational Policy Dataset (SHA-256: d242cf3b2332bf02),real
+2020-10-12,2020-12-31,movement_curfew,0.33,ALL,OxCGRT Subnational Policy Dataset (SHA-256: d242cf3b2332bf02),real

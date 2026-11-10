@@ -36,6 +36,10 @@ jobs:
       run: |
         mypy --ignore-missing-imports --no-strict-optional src/episwarm/packs/
 
+    - name: Run Integrity Scan (Rule 1 & Audit Compliance)
+      run: |
+        python scripts/integrity_scan.py
+
     - name: Run pytest
       run: |
         pytest -v

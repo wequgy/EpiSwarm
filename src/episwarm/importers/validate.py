@@ -71,7 +71,7 @@ def validate_region_pack(region_dir: Path) -> ValidationReport:
     if areas_path.exists():
         try:
             df_areas = pd.read_csv(areas_path)
-            report.file_statuses["areas.csv"] = _extract_status(df_areas)
+            report.file_statuses["areas.csv"] = _extract_status(df_areas, areas_path, report)
             _validate_headers("areas.csv", df_areas, report)
 
             if "population" in df_areas.columns:
@@ -95,7 +95,7 @@ def validate_region_pack(region_dir: Path) -> ValidationReport:
     if age_path.exists():
         try:
             df_age = pd.read_csv(age_path)
-            report.file_statuses["age_structure.csv"] = _extract_status(df_age)
+            report.file_statuses["age_structure.csv"] = _extract_status(df_age, age_path, report)
             _validate_headers("age_structure.csv", df_age, report)
 
             if "share" in df_age.columns:
@@ -121,7 +121,7 @@ def validate_region_pack(region_dir: Path) -> ValidationReport:
     if commute_path.exists():
         try:
             df_commute = pd.read_csv(commute_path)
-            report.file_statuses["commute_od.csv"] = _extract_status(df_commute)
+            report.file_statuses["commute_od.csv"] = _extract_status(df_commute, commute_path, report)
             _validate_headers("commute_od.csv", df_commute, report)
 
             if known_area_ids:
@@ -152,7 +152,7 @@ def validate_region_pack(region_dir: Path) -> ValidationReport:
         if fpath.exists():
             try:
                 df = pd.read_csv(fpath)
-                report.file_statuses[fname] = _extract_status(df)
+                report.file_statuses[fname] = _extract_status(df, fpath, report)
                 _validate_headers(fname, df, report)
             except Exception as e:
                 report.errors.append(ValidationIssue(fname, None, f"Error parsing {fname}: {e}"))
@@ -174,12 +174,32 @@ def _validate_headers(filename: str, df: pd.DataFrame, report: ValidationReport)
         ))
 
 
-def _extract_status(df: pd.DataFrame) -> str:
+def _extract_status(
+    df: pd.DataFrame,
+    fpath: Optional[Path] = None,
+    report: Optional[ValidationReport] = None
+) -> str:
+    status_str = "UNKNOWN"
     if "status" in df.columns:
         statuses = df["status"].dropna().unique().tolist()
         if len(statuses) == 1:
-            return str(statuses[0]).upper()
+            status_str = str(statuses[0]).upper()
         elif len(statuses) > 1:
-            return "MIXED"
-    return "UNKNOWN"
+            status_str = "MIXED"
+
+    # Evidence Gate Enforcement (Phase 26): Any 'REAL' data must be authenticated by the Evidence Ledger
+    if "REAL" in status_str and fpath is not None:
+        try:
+            from episwarm.evidence.gate import verify_real_dataset
+            verify_real_dataset(fpath)
+        except Exception as e:
+            if report is not None:
+                report.errors.append(ValidationIssue(
+                    fpath.name, "status",
+                    f"Evidence Gate Error: {e}"
+                ))
+                report.is_valid = False
+            return "UNVERIFIED_REAL_REJECTED"
+
+    return status_str
 

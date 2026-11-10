@@ -98,7 +98,11 @@ if card_path.exists():
         v_card = json.load(f)
 
 with col_b1:
-    st.success(f"🏷️ VALIDATION: **{v_card.get('status', 'PARTIALLY_VALIDATED')}**")
+    v_status = v_card.get('status', 'UNCALIBRATED')
+    if v_status == 'VALIDATED':
+        st.success(f"🏷️ VALIDATION: **{v_status}**")
+    else:
+        st.warning(f"🏷️ VALIDATION: **{v_status}**")
 with col_b2:
     st.info(f"ℹ️ REGION: `{st.session_state.region_dir.name}`")
 with col_b3:
@@ -172,6 +176,38 @@ if step == "1. Region & Population":
                 with open(yaml_path, "r", encoding="utf-8") as f:
                     meta = yaml.safe_load(f)
                 st.json(meta)
+
+            # Check provenance against Cryptographic Evidence Ledger (Phase 33)
+            from episwarm.evidence.ledger import EvidenceLedger
+            ledger = EvidenceLedger()
+            pack_files = list(st.session_state.region_dir.glob("*.csv"))
+            ledger_records = []
+            for pf in pack_files:
+                rec = ledger.verify_file(pf)
+                if rec:
+                    ledger_records.append({
+                        "File": pf.name,
+                        "Status": "[OK] REAL (Verified)",
+                        "SHA-256": rec.sha256[:16] + "...",
+                        "Source URL": rec.url,
+                        "Retrieved At": rec.retrieved_at,
+                        "License": rec.license
+                    })
+                else:
+                    ledger_records.append({
+                        "File": pf.name,
+                        "Status": "SYNTHETIC",
+                        "SHA-256": "Unregistered / Synthetic",
+                        "Source URL": "Local Pack Generator",
+                        "Retrieved At": "N/A",
+                        "License": "N/A"
+                    })
+            if any("REAL" in r["Status"] for r in ledger_records):
+                st.success("Verified Empirical Pack (REAL) - Authenticated by Evidence Ledger.")
+            else:
+                st.info("Synthetic Demonstration Pack (SYNTHETIC) - Generated for simulation modeling.")
+            with st.expander("View Cryptographic Evidence Ledger Audit for this Pack", expanded=False):
+                st.dataframe(pd.DataFrame(ledger_records), width="stretch")
 
     with tab_l0:
         st.subheader("Synthesize Region from High-Level (L0) Indicators")
@@ -588,7 +624,7 @@ elif step == "5. Simulation Engine":
         sim_policy_backend = st.selectbox(
             "Behavior Policy Engine",
             ["None (Unmitigated Baseline)", "Deterministic Rules (RulePolicy - Fast)", "Local LLM (Ollama)", "Google Gemini LLM"],
-            index=0 if s_raw.get('behavior_mode', 'none') == 'none' else (1 if s_raw.get('behavior_mode', 'none') == 'rule' else 2)
+            index=0 if s_raw.get('behavior_mode', 'none') == 'none' else (1 if s_raw.get('behavior_mode', 'none') == 'rule' else 0)
         )
 
         selected_ollama_model = "qwen3:4b"

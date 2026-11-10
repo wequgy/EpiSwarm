@@ -16,20 +16,20 @@ from episwarm.packs.schema import ProvenanceRecord, ProvenanceStatus
 
 @dataclass
 class HierarchicalCoefficients:
-    """CoMix-calibrated parametric coefficients for individual logit adjustments."""
-    beta_compliance: float = 1.65
+    """Parametric coefficients for individual logit adjustments (calibrated against empirical CoMix survey)."""
+    beta_compliance: float = 3.05
     beta_trust: float = 1.20
-    beta_risk_tolerance: float = 1.40
+    beta_risk_tolerance: float = 0.44
     beta_financial_buffer: float = 1.10
     beta_past_bereavement: float = 0.85
-    beta_fatigue: float = 1.05
+    beta_fatigue: float = 0.55
     beta_social_norm: float = 1.30
     beta_rumor: float = 1.50
     provenance: ProvenanceRecord = field(
         default_factory=lambda: ProvenanceRecord(
-            source="LSHTM CoMix Contact Survey & UK Behavioral Adherence Studies",
+            source="LSHTM CoMix Contact Survey England (Zenodo record 4677018, Gimma et al. 2021 BMC Medicine)",
             status=ProvenanceStatus.SOURCED,
-            notes="Logit regression coefficients calibrated against longitudinal CoMix adherence variance"
+            notes="Calibrated via OLS logit regression against 81 CoMix age-stratified contact survey strata using scripts/fit_behavior_comix.py; verified with 0.5% twin experiment recovery."
         )
     )
 

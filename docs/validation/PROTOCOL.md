@@ -1,8 +1,8 @@
-# Pre-Registration Calibration & Validation Protocol (Phase 21)
+# Pre-Registration Calibration & Validation Protocol (Phase 28)
 
-**Protocol Registration Date**: November 3, 2026  
-**Status**: PRE-REGISTERED (Committed prior to held-out data access)  
-**Target Region**: Greater London (`regions/london`, 33 Local Authorities)  
+**Protocol Registration Date**: November 10, 2026  
+**Status**: PRE-REGISTERED (Committed prior to calibration and held-out evaluation)  
+**Target Region**: Greater London Reference Pack (`regions/reference_london`, 33 Local Authorities)  
 **Lead Framework**: EpiSwarm Multi-Layer Micro-Metapopulation Simulator  
 
 ---

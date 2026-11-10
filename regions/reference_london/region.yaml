@@ -1,0 +1,14 @@
+meta:
+  name: reference_london
+  country_iso: GBR
+  data_year: 2020
+  data_level: L2
+  area_levels:
+  - borough
+  contact_country: GBR
+  units:
+    distance: km
+    area: km2
+    currency: GBP
+  notes: Verified empirical reference pack for Greater London built strictly from
+    checksummed downloads.

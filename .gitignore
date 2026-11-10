@@ -26,6 +26,8 @@ MANIFEST
 *.manifest
 *.sqlite
 *.sqlite3
+*-wal
+*-shm
 .cache
 .pytest_cache/
 .coverage
