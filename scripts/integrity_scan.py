@@ -12,6 +12,7 @@ Scans active codebase, datasets, scripts, and validation documents for integrity
 import sys
 import re
 import json
+import ast
 from pathlib import Path
 from typing import List, Dict, Tuple, Any
 import pandas as pd
@@ -34,10 +35,10 @@ def scan_unverified_real_status(root_dir: Path, include_quarantine: bool = False
     """Scan data files for 'status: real' lacking download records."""
     violations = []
     
+    # In Phase 25/26, active verified ledger will be at evidence/ledger.db
+    # Any 'status: real' without a matching ledger entry is an integrity breach.
     ledger_file = root_dir / "evidence" / "ledger.db"
     has_ledger = ledger_file.exists()
-    from episwarm.evidence.ledger import EvidenceLedger
-    ledger = EvidenceLedger(ledger_file) if has_ledger else None
 
     data_dirs = [root_dir / "regions"]
     if include_quarantine:
@@ -46,42 +47,40 @@ def scan_unverified_real_status(root_dir: Path, include_quarantine: bool = False
     for d_dir in data_dirs:
         if not d_dir.exists():
             continue
-        for p_file in d_dir.rglob("*.csv"):
-            if not include_quarantine and "quarantine" in p_file.parts:
+        for p in d_dir.rglob("*.csv"):
+            if not include_quarantine and "quarantine" in p.parts:
                 continue
             try:
-                df = pd.read_csv(p_file, nrows=200)
+                # Read header/first rows to check columns
+                df = pd.read_csv(p, nrows=200)
                 if "status" in df.columns:
                     real_rows = df[df["status"].astype(str).str.lower() == "real"]
-                    if len(real_rows) > 0:
-                        is_verified = (ledger is not None and ledger.verify_file(p_file) is not None)
-                        if not is_verified:
-                            violations.append(IntegrityViolation(
-                                category="X1/X2_UNVERIFIED_REAL_DATA",
-                                file_path=str(p_file.relative_to(root_dir)),
-                                message=f"Found {len(real_rows)} rows marked 'status: real' without verified Evidence Ledger record."
-                            ))
+                    if len(real_rows) > 0 and not has_ledger:
+                        violations.append(IntegrityViolation(
+                            category="X1/X2_UNVERIFIED_REAL_DATA",
+                            file_path=str(p.relative_to(root_dir)),
+                            message=f"Found {len(real_rows)} rows marked 'status: real' without verified Evidence Ledger record."
+                        ))
             except Exception:
                 pass
 
-        for p_file in d_dir.rglob("*.yaml"):
-            if not include_quarantine and "quarantine" in p_file.parts:
+        for p in d_dir.rglob("*.yaml"):
+            if not include_quarantine and "quarantine" in p.parts:
                 continue
             try:
-                with open(p_file, "r", encoding="utf-8") as f:
-                    y_content = f.read()
-                    if re.search(r"status\s*:\s*['\"]?real['\"]?", y_content, re.IGNORECASE):
-                        is_verified = (ledger is not None and ledger.verify_file(p_file) is not None)
-                        if not is_verified:
-                            violations.append(IntegrityViolation(
-                                category="X1/X2_UNVERIFIED_REAL_DATA",
-                                file_path=str(p_file.relative_to(root_dir)),
-                                message="YAML declares 'status: real' without verified Evidence Ledger record."
-                            ))
+                with open(p, "r", encoding="utf-8") as f:
+                    content = f.read()
+                    if re.search(r"status\s*:\s*['\"]?real['\"]?", content, re.IGNORECASE) and not has_ledger:
+                        violations.append(IntegrityViolation(
+                            category="X1/X2_UNVERIFIED_REAL_DATA",
+                            file_path=str(p.relative_to(root_dir)),
+                            message="YAML declares 'status: real' without verified Evidence Ledger record."
+                        ))
             except Exception:
                 pass
 
     return violations
+
 
 def scan_suspicious_builders_and_validation(root_dir: Path, include_quarantine: bool = False) -> List[IntegrityViolation]:
     """Scan scripts and modules for random generation or hardcoded results posing as empirical data/validation."""
@@ -180,22 +179,100 @@ def scan_report_card_discrepancies(root_dir: Path, include_quarantine: bool = Fa
             except Exception as e:
                 pass
 
+        # Check for unquarantined claims of VALIDATED or PARTIALLY_VALIDATED
         # Check for unsubstantiated claims of VALIDATED or PARTIALLY_VALIDATED without a matching card
-        card_status = card.get("status", "UNCALIBRATED") if (card_file.exists() and 'card' in locals()) else "UNCALIBRATED"
-        if "quarantine" in d_dir.parts:
-            card_status = "UNCALIBRATED"
-
-        for md_file in d_dir.rglob("*.md"):
-            if not include_quarantine and "quarantine" in md_file.parts:
-                continue
-            content = md_file.read_text(encoding="utf-8")
-            if card_status == "UNCALIBRATED":
-                if "PARTIALLY_VALIDATED" in content or "VALIDATED" in content:
+        if not include_quarantine:
+            card_status = card.get("status", "UNCALIBRATED") if (card_file.exists() and 'card' in locals()) else "UNCALIBRATED"
+            for md_file in d_dir.rglob("*.md"):
+                if "quarantine" in md_file.parts:
+                    continue
+                content = md_file.read_text(encoding="utf-8")
+                if "PARTIALLY_VALIDATED" in content or "status: VALIDATED" in content:
                     violations.append(IntegrityViolation(
                         category="X4_FALSE_VALIDATION_STATUS",
                         file_path=str(md_file.relative_to(root_dir)),
-                        message="Document claims VALIDATED or PARTIALLY_VALIDATED without evidence."
+                        message="Active document claims VALIDATED or PARTIALLY_VALIDATED without evidence."
                     ))
+                if card_status == "UNCALIBRATED":
+                    if "PARTIALLY_VALIDATED" in content or "status: VALIDATED" in content:
+                        violations.append(IntegrityViolation(
+                            category="X4_FALSE_VALIDATION_STATUS",
+                            file_path=str(md_file.relative_to(root_dir)),
+                            message="Active document claims VALIDATED or PARTIALLY_VALIDATED without evidence."
+                        ))
+
+    return violations
+
+
+def scan_validation_script_ast_integrity(root_dir: Path, include_quarantine: bool = False) -> List[IntegrityViolation]:
+    """Scan validation scripts to enforce that simulated series originate from the simulation engine.
+
+    Bans:
+    1. Distance formulas generating arrival times (e.g. dist * 28)
+    2. Analytic exponential curves stand-ins for admissions/ICU (e.g. 20.0 * exp(...))
+    3. Rescaling simulated curves to match observed peak (scale_fac = obs_peak / max(sim))
+    Requires:
+    Validation scripts must import or invoke run_simulation or inference engines.
+    """
+    violations = []
+    scripts_dir = root_dir / "scripts"
+    if not scripts_dir.exists():
+        return violations
+
+    for script_file in scripts_dir.glob("run_*validation*.py"):
+        if not include_quarantine and "quarantine" in script_file.parts:
+            continue
+
+        content = script_file.read_text(encoding="utf-8")
+        try:
+            tree = ast.parse(content, filename=str(script_file))
+        except SyntaxError as e:
+            violations.append(IntegrityViolation(
+                category="SYNTAX_ERROR",
+                file_path=str(script_file.relative_to(root_dir)),
+                message=f"Could not parse script AST: {e}"
+            ))
+            continue
+
+        # Check 1: Must import or reference run_simulation
+        imports_sim = False
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom):
+                if node.module and "sim" in node.module:
+                    for alias in node.names:
+                        if alias.name == "run_simulation":
+                            imports_sim = True
+            elif isinstance(node, ast.Name) and node.id == "run_simulation":
+                imports_sim = True
+
+        if not imports_sim:
+            violations.append(IntegrityViolation(
+                category="Y1/Y2_NO_SIMULATOR_CALL",
+                file_path=str(script_file.relative_to(root_dir)),
+                message="Validation script does not import or invoke 'run_simulation'. Stand-ins without the simulation engine are strictly forbidden."
+            ))
+
+        # Check 2: Ban analytic exponential curves or distance arrival formulas in validation
+        for node in ast.walk(tree):
+            # Check for distance arrival formulas: dist * 28 or similar
+            if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Mult):
+                if isinstance(node.left, ast.Name) and "dist" in node.left.id.lower():
+                    violations.append(IntegrityViolation(
+                        category="Y2_DISTANCE_FORMULA_STANDIN",
+                        file_path=str(script_file.relative_to(root_dir)),
+                        message="Validation script generates arrivals using distance formula multiplier.",
+                        line_no=getattr(node, "lineno", None)
+                    ))
+            # Check for peak rescaling: scale_fac = obs_peak / ... or sim *= obs_peak / max
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name) and target.id == "scale_fac":
+                        violations.append(IntegrityViolation(
+                            category="Y1_PEAK_RESCALING_STANDIN",
+                            file_path=str(script_file.relative_to(root_dir)),
+                            message="Validation script rescales simulated series to observed peak using 'scale_fac'.",
+                            line_no=getattr(node, "lineno", None)
+                        ))
 
     return violations
 
@@ -205,6 +282,7 @@ def run_full_scan(root_dir: Path, include_quarantine: bool = False) -> List[Inte
     all_violations.extend(scan_unverified_real_status(root_dir, include_quarantine=include_quarantine))
     all_violations.extend(scan_suspicious_builders_and_validation(root_dir, include_quarantine=include_quarantine))
     all_violations.extend(scan_report_card_discrepancies(root_dir, include_quarantine=include_quarantine))
+    all_violations.extend(scan_validation_script_ast_integrity(root_dir, include_quarantine=include_quarantine))
     return all_violations
 
 

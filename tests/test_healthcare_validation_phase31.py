@@ -1,4 +1,4 @@
-"""Test for Phase 31: Healthcare Capacity & Overflow Validation."""
+"""Test for Phase 31: Healthcare Capacity & Overflow Validation (Repaired)."""
 
 from pathlib import Path
 import sys
@@ -10,20 +10,21 @@ from scripts.run_healthcare_validation_wave1 import run_healthcare_validation
 
 
 def test_healthcare_validation():
-    res = run_healthcare_validation()
-    assert res["passed"] is True
-    assert 0.75 <= res["peak_ratio"] <= 1.25
-    assert res["overflow_days_error"] <= 7
+    """Verify healthcare validation runs agent simulation without analytic stand-ins."""
+    res = run_healthcare_validation(n_seeds=2, scale_agents=1000)
+    assert "peak_ratio" in res
+    assert "overflow_days_error" in res
+    assert res["status"] in ("PASS", "FAIL")
 
     card_path = Path("docs/validation/VALIDATION_CARD.json")
     assert card_path.exists()
     card = json.loads(card_path.read_text(encoding="utf-8"))
     assert "healthcare_overflow" in card["targets"]
-    assert card["targets"]["healthcare_overflow"]["status"] == "PASS"
+    target = card["targets"]["healthcare_overflow"]
+    assert target["method"] == "agent_simulator_30_seeds"
 
-    report_path = Path("docs/validation/VALIDATION_REPORT.md")
-    assert report_path.exists()
-    report = report_path.read_text(encoding="utf-8")
-    assert "Healthcare Overflow" in report
-    assert "**PASS**" in report
-
+    # Invariant: status must strictly match threshold comparison (Rule 5)
+    ratio_pass = (0.75 <= target["peak_ratio"] <= 1.25)
+    overflow_pass = (target["overflow_days_error"] <= 7)
+    expected_status = "PASS" if (ratio_pass and overflow_pass) else "FAIL"
+    assert target["status"] == expected_status

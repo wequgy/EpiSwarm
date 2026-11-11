@@ -65,7 +65,7 @@ class CompiledStateGraph:
 
             needs_keys = [k.lower() for k in s.needs.keys()]
             s_role = getattr(s, "role", "") or ""
-            if any("icu" in k for k in needs_keys) or s_role == "icu":
+            if any("icu" in k for k in needs_keys) or s_role == "icu" or "icu" in s.name.lower():
                 self.needs_bed[i] = 3
             elif any("bed" in k or "general" in k for k in needs_keys) or s.needs_care or s_role == "hospitalized":
                 self.needs_bed[i] = 1

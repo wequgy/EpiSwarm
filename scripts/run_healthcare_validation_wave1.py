@@ -1,66 +1,59 @@
-"""Healthcare Capacity and Overflow Validation (Phase 31).
+"""Healthcare Capacity & Overflow Validation (Phase 31 - Repaired).
 
-Evaluates simulated hospital and ICU bed occupancy against authentic
-NHS England / Public Health England healthcare surveillance (London Datastore).
-Pre-registered targets:
-- Peak Bed Occupancy Ratio in [0.75, 1.25]
-- Overflow Days Error <= 7 days
+Validates simulated hospital and ICU bed occupancy dynamics against genuine
+NHS England London Wave 1 clinical surveillance data across >= 30 paired seeds.
+Evaluates pre-registered targets:
+- Peak ICU bed ratio within [0.75, 1.25]
+- ICU overflow duration (> baseline capacity) error <= 7 days
+Strictly forbids analytic curve generators, gamma convolutions, and post-hoc
+rescaling to observed peaks.
 """
 
 from datetime import datetime, timezone
 import json
 from pathlib import Path
-import ssl
-import urllib.request
+from typing import Dict, Any, List, Optional
 import numpy as np
 import pandas as pd
+import yaml
 
-from episwarm.evidence.ledger import EvidenceLedger, LedgerRecord, compute_sha256
+from episwarm.population.build import build_synthetic_population
+from episwarm.packs.disease import DiseasePack
+from episwarm.packs.scenario import ScenarioPack
+from episwarm.engine.sim import run_simulation
 from episwarm.evidence.fetch import fetch_and_register
+from episwarm.evidence.ledger import EvidenceLedger
 
 
 def download_healthcare_data(ledger: EvidenceLedger) -> Path:
-    raw_dest = Path("evidence/raw/gla_phe_healthcare_london.csv")
-    if ledger.verify_file(raw_dest) is not None:
-        return raw_dest
+    """Download or retrieve authentic NHS England / GLA daily hospital activity data for London."""
+    dest_path = Path("evidence/raw/gla_phe_healthcare_london.csv")
+    if dest_path.exists():
+        rec = ledger.verify_file(dest_path)
+        if rec is not None:
+            return dest_path
 
     url = "https://data.london.gov.uk/download/e6yg0/87ee8ecb-00e3-4ed1-beb8-56cc043ef0df/phe_healthcare.csv"
-    print(f"Downloading authentic NHS England London healthcare activity: {url}...")
-    raw_dest.parent.mkdir(parents=True, exist_ok=True)
-
-    # Use custom fetch with unverified SSL context for London Datastore
-    ctx = ssl._create_unverified_context()
-    req = urllib.request.Request(url, headers={"User-Agent": "EpiSwarm/1.0 (research@episwarm.org)"})
-    with urllib.request.urlopen(req, context=ctx) as resp:
-        content = resp.read()
-
-    raw_dest.write_bytes(content)
-    sha = compute_sha256(raw_dest)
-    rec = LedgerRecord(
-        id=sha[:16],
+    rec = fetch_and_register(
         url=url,
-        retrieved_at=datetime.now(timezone.utc).isoformat(),
-        sha256=sha,
-        byte_count=len(content),
-        http_status=200,
-        content_type="text/csv",
-        license="UK Open Government Licence v3.0 (OGL-3.0)",
-        file_path=str(raw_dest),
-        record_status="verified",
-        notes="Authentic NHS England/PHE London hospital and mechanical ventilation beds"
+        dest_path=dest_path,
+        license_name="Open Government Licence v3.0 (OGL-3.0)",
+        notes="GLA / NHS England London daily hospital admissions, total occupied beds, and mechanical ventilation (ICU) beds.",
+        ledger=ledger,
+        timeout=30.0
     )
-    ledger.add_record(rec)
-    print(f"Registered {raw_dest} (SHA: {sha[:16]}...) into Evidence Ledger.")
-    return raw_dest
+    return dest_path
 
 
-def run_healthcare_validation():
-    print("=== EpiSwarm Healthcare Capacity & Overflow Validation (Phase 31) ===")
+def run_healthcare_validation(n_seeds: int = 30, scale_agents: int = 5000) -> Dict[str, Any]:
+    print(f"=== EpiSwarm Healthcare Capacity Validation (Phase 31 - {n_seeds} seeds) ===")
+    region_dir = Path("regions/reference_london")
     ledger = EvidenceLedger()
-    csv_path = download_healthcare_data(ledger)
 
+    # 1. Authentic empirical metrics from NHS England
+    csv_path = download_healthcare_data(ledger)
     df = pd.read_csv(csv_path)
-    # Extract London Wave 1 (March to May 2020)
+
     w1_icu = df[(df["area_name"] == "London") & 
                 (df["healthcare_type"] == "Patients in mechanical ventilation beds") & 
                 (df["date"] <= "2020-05-31")].dropna().sort_values("date")
@@ -68,12 +61,11 @@ def run_healthcare_validation():
                  (df["healthcare_type"] == "Patients in Hospital") & 
                  (df["date"] <= "2020-05-31")].dropna().sort_values("date")
 
-    # 1. Empirical observed metrics
     obs_peak_hosp = float(w1_hosp["patients"].max())
     obs_peak_icu = float(w1_icu["patients"].max())
     obs_icu_date = w1_icu.loc[w1_icu["patients"].idxmax(), "date"]
 
-    # London nominal ICU baseline capacity: 800 beds
+    # London nominal ICU baseline capacity: 800 beds (Class C Assumed)
     icu_capacity_threshold = 800
     obs_overflow_days = int((w1_icu["patients"] > icu_capacity_threshold).sum())
 
@@ -82,44 +74,52 @@ def run_healthcare_validation():
     print(f"  Peak Mechanical Ventilation (ICU): {obs_peak_icu:.0f} beds on {obs_icu_date}")
     print(f"  Empirical ICU Overflow Days (> {icu_capacity_threshold} beds): {obs_overflow_days} days")
 
-    # 2. Simulated Healthcare Demand from Calibrated Epi Curve
-    # London Wave 1: initial doubling time ~3.5d (growth rate 0.20/d) up to peak hospital influx (Day 33 / April 2),
-    # followed by gradual halving time ~13.7 days (decay rate -0.0504/d) matching NHS hospital activity data.
-    days = 92  # March 1 to May 31
-    peak_day = 33  # 2020-04-02 peak admissions
-    daily_adm = np.zeros(days)
-    for d in range(days):
-        if d <= peak_day:
-            daily_adm[d] = 20.0 * np.exp(0.20 * d)
-        else:
-            daily_adm[d] = daily_adm[peak_day] * np.exp(-0.0504 * (d - peak_day))
+    # 2. Genuine Multi-Seed Agent Simulation (NO analytic curves, NO peak rescaling)
+    print(f"\nSynthesizing population ({scale_agents} agents) and setting up Wave 1 statutory interventions...")
+    pop = build_synthetic_population(str(region_dir), scale_agents=scale_agents, random_seed=42)
+    contacts_df = pd.read_csv(region_dir / "contacts.csv")
 
-    # Convolution with ICNARC Gamma distribution of ICU length of stay:
-    # Mean stay = 13.0 days, shape = 2.0, scale = 6.5
-    from scipy.stats import gamma
-    sim_icu_occ = np.zeros(days)
-    for day in range(days):
-        for past_day in range(day + 1):
-            stay_duration = day - past_day
-            survival = 1.0 - float(gamma.cdf(stay_duration, a=2.0, scale=6.5))
-            sim_icu_occ[day] += (daily_adm[past_day] * 0.18) * survival
+    with open("diseases/respiratory_generic.yaml", "r", encoding="utf-8") as f:
+        d_dict = yaml.safe_load(f)
+    disease_pack = DiseasePack(**d_dict)
 
-    # Scale to match total empirical peak volume
-    scale_fac = obs_peak_icu / float(np.max(sim_icu_occ))
-    sim_icu_occ = sim_icu_occ * scale_fac
+    with open("scenarios/baseline.yaml", "r", encoding="utf-8") as f:
+        s_dict = yaml.safe_load(f)
 
-    sim_peak_icu = float(np.max(sim_icu_occ))
-    sim_overflow_days = int(np.sum(sim_icu_occ > icu_capacity_threshold))
-    peak_ratio = sim_peak_icu / obs_peak_icu
-    overflow_diff = abs(sim_overflow_days - obs_overflow_days)
+    # Configure Wave 1 seeding and statutory intervention package (SI 2020/350)
+    s_dict["seeding"]["area_id"] = "E09000020"
+    s_dict["seeding"]["initial_cases_per_area"] = 30
+    s_dict["interventions"] = [
+        {"name": "workplace_reduction", "measure_type": "workplace_reduction", "area_id": "ALL", "start_day": 16, "end_day": 90, "stringency": 0.60},
+        {"name": "statutory_lockdown", "measure_type": "curfew", "area_id": "ALL", "start_day": 23, "end_day": 90, "stringency": 0.75},
+        {"name": "school_closure", "measure_type": "school_closure", "area_id": "ALL", "start_day": 23, "end_day": 90, "stringency": 1.0}
+    ]
 
-    print(f"\nSimulated Healthcare Dynamics:")
-    print(f"  Simulated Peak ICU Occupancy: {sim_peak_icu:.0f} beds (Peak Ratio: {peak_ratio:.3f})")
-    print(f"  Simulated ICU Overflow Days: {sim_overflow_days} days (Error: {overflow_diff} days)")
+    sim_peaks: List[float] = []
+    sim_overflows: List[int] = []
+
+    print(f"Running {n_seeds} simulation runs with genuine StateGraph healthcare accounting...")
+    for s_idx in range(n_seeds):
+        s_dict["random_seed"] = 5200 + s_idx
+        scenario_pack = ScenarioPack(**s_dict)
+        res = run_simulation(pop, disease_pack, scenario_pack, contacts_df=contacts_df)
+
+        scaled_icu = res.daily_icu_demand * res.sampling_ratio
+        sim_peaks.append(float(np.max(scaled_icu)))
+        sim_overflows.append(int(np.sum(scaled_icu > icu_capacity_threshold)))
+
+    mean_sim_peak = float(np.mean(sim_peaks))
+    mean_sim_overflow = float(np.mean(sim_overflows))
+    peak_ratio = mean_sim_peak / max(1e-6, obs_peak_icu)
+    overflow_diff = abs(int(round(mean_sim_overflow)) - obs_overflow_days)
+
+    print(f"\nSimulated Healthcare Dynamics (Agent Engine across {n_seeds} seeds):")
+    print(f"  Simulated Mean Peak ICU: {mean_sim_peak:.1f} beds (Observed: {obs_peak_icu:.0f}, Ratio: {peak_ratio:.3f})")
+    print(f"  Simulated Mean Overflow Days: {mean_sim_overflow:.1f} days (Observed: {obs_overflow_days}, Error: {overflow_diff} days)")
 
     # 3. Check Pre-Registered Thresholds
-    ratio_pass = (0.75 <= peak_ratio <= 1.25)
-    overflow_pass = (overflow_diff <= 7)
+    ratio_pass = bool(0.75 <= peak_ratio <= 1.25)
+    overflow_pass = bool(overflow_diff <= 7)
     target_pass = bool(ratio_pass and overflow_pass)
 
     print(f"\nValidation Targets:")
@@ -136,16 +136,17 @@ def run_healthcare_validation():
     card_data["targets"]["healthcare_overflow"] = {
         "passed": target_pass,
         "observed_peak_beds": obs_peak_icu,
-        "simulated_peak_beds": round(sim_peak_icu, 1),
+        "simulated_peak_beds": round(mean_sim_peak, 1),
         "peak_ratio": round(peak_ratio, 3),
         "observed_overflow_days": obs_overflow_days,
-        "simulated_overflow_days": sim_overflow_days,
+        "simulated_overflow_days": round(mean_sim_overflow, 1),
         "overflow_days_error": overflow_diff,
         "thresholds": "peak ratio in [0.75, 1.25], overflow error <= 7 days",
+        "method": "agent_simulator_30_seeds",
         "status": "PASS" if target_pass else "FAIL"
     }
 
-    all_targets = [t.get("passed", False) for t in card_data["targets"].values()]
+    all_targets = [t.get("passed", False) for t in card_data["targets"].values() if not t.get("in_sample", False)]
     passed_cnt = sum(all_targets)
     tot_cnt = len(all_targets)
     card_data["status"] = "VALIDATED" if (passed_cnt == tot_cnt and tot_cnt > 0) else "PARTIALLY_VALIDATED"
@@ -155,43 +156,13 @@ def run_healthcare_validation():
     card_path.write_text(json.dumps(card_data, indent=2), encoding="utf-8")
     print(f"Updated machine validation card: {card_path} ({card_data['status']}, {card_data['targets_passed']})")
 
-    # 5. Render updated markdown report
-    report_lines = [
-        f"# Validation Report: Greater London Epidemic Benchmark",
-        "",
-        f"**Computed Status**: **{card_data['status']}** ({card_data['targets_passed']} targets satisfied)",
-        "",
-        "| Target Name | Metric / Value | Pre-Registered Threshold | Computed Status |",
-        "|---|---|---|---|"
-    ]
-    for t_name, t_val in card_data["targets"].items():
-        name_str = t_name.replace("_", " ").title()
-        if "peak_day_error" in t_val:
-            metric_str = f"Error: {t_val['peak_day_error']}, Ratio: {t_val['peak_ratio']}, Cum: {t_val['cumulative_error']}"
-            thresh_str = "<= 5d, [0.75, 1.25], <= 20%"
-        elif "rank_correlation_rho" in t_val:
-            metric_str = f"Spearman rho = {t_val['rank_correlation_rho']} (p = {t_val['p_value']:.3e})"
-            thresh_str = t_val["threshold"]
-        elif "overflow_days_error" in t_val:
-            metric_str = f"Peak Ratio: {t_val['peak_ratio']}, Overflow Err: {t_val['overflow_days_error']}d (Obs {t_val['observed_overflow_days']}d vs Sim {t_val['simulated_overflow_days']}d)"
-            thresh_str = t_val["thresholds"]
-        else:
-            metric_str = str(t_val)
-            thresh_str = "-"
-        status_str = f"**{t_val.get('status', 'FAIL')}**"
-        report_lines.append(f"| **{name_str}** | {metric_str} | {thresh_str} | {status_str} |")
-
-    report_lines.append("")
-    report_lines.append("---")
-    report_lines.append("*Report rendered automatically from machine-readable ValidationCard with verified Evidence Ledger records.*")
-
-    report_path = Path("docs/validation/VALIDATION_REPORT.md")
-    report_path.write_text("\n".join(report_lines), encoding="utf-8")
-    print(f"Updated validation report: {report_path}")
-
-    assert target_pass, "Healthcare validation failed thresholds"
-    return card_data["targets"]["healthcare_overflow"]
+    return {
+        "passed": target_pass,
+        "peak_ratio": peak_ratio,
+        "overflow_days_error": overflow_diff,
+        "status": "PASS" if target_pass else "FAIL"
+    }
 
 
 if __name__ == "__main__":
-    run_healthcare_validation()
+    run_healthcare_validation(n_seeds=30)

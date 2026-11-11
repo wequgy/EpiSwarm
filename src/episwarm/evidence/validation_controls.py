@@ -130,10 +130,28 @@ def render_markdown_report_from_card(card: ValidationCard) -> str:
 
     for t_id, data in card.targets.items():
         name_str = t_id.replace("_", " ").title()
-        status_str = "**PASS**" if data["passed"] else "**FAIL**"
+        if data.get("in_sample") or data.get("status") == "IN-SAMPLE":
+            status_str = "**IN-SAMPLE (Calibration Fit)**"
+        elif data.get("passed", False):
+            status_str = "**PASS**"
+        else:
+            status_str = "**FAIL**"
+        peak_err = data.get("peak_day_error", "-")
+        peak_ratio = data.get("peak_ratio", "-")
+        cum_err = data.get("cumulative_error", "-")
         lines.append(
-            f"| **{name_str}** | {data['peak_day_error']} | {data['peak_ratio']} | {data['cumulative_error']} | {status_str} |"
+            f"| **{name_str}** | {peak_err} | {peak_ratio} | {cum_err} | {status_str} |"
         )
+
+    assumptions = getattr(card, "assumptions", None)
+    if assumptions:
+        lines.append("")
+        lines.append("## Assumptions Register (Evidence Class C)")
+        lines.append("")
+        lines.append("| Parameter | Nominal Value | Evidence Class | Uncertainty Bound / Notes |")
+        lines.append("|---|---|---|---|")
+        for a_name, a_info in assumptions.items():
+            lines.append(f"| **{a_name}** | {a_info.get('value', '-')} | {a_info.get('class', 'Class C')} | {a_info.get('bounds', '-')} |")
 
     lines.append("")
     lines.append("---")

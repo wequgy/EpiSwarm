@@ -8,42 +8,71 @@
     "generation_time_days": 4.0,
     "delay_parameter": 5.34
   },
-  "targets_passed": "3/4",
+  "targets_passed": "0/3",
   "targets": {
     "registered_deaths": {
       "passed": true,
       "peak_day_error": "0 days",
       "peak_ratio": 1.0,
       "cumulative_error": "0.37%",
-      "status": "PASS"
+      "status": "IN-SAMPLE",
+      "in_sample": true
     },
     "spatial_arrival_order": {
-      "passed": true,
-      "rank_correlation_rho": 0.678,
-      "p_value": 1.4670190481721813e-05,
+      "passed": false,
+      "rank_correlation_rho": -0.009,
+      "p_value": 0.9584830722826886,
       "threshold": ">= 0.60",
-      "status": "PASS"
+      "method": "agent_simulator_30_seeds",
+      "status": "FAIL"
     },
     "healthcare_overflow": {
-      "passed": true,
+      "passed": false,
       "observed_peak_beds": 1057.0,
-      "simulated_peak_beds": 1057.0,
-      "peak_ratio": 1.0,
+      "simulated_peak_beds": 9002.5,
+      "peak_ratio": 8.517,
       "observed_overflow_days": 22,
-      "simulated_overflow_days": 21,
-      "overflow_days_error": 1,
+      "simulated_overflow_days": 6.5,
+      "overflow_days_error": 16,
       "thresholds": "peak ratio in [0.75, 1.25], overflow error <= 7 days",
-      "status": "PASS"
+      "method": "agent_simulator_30_seeds",
+      "status": "FAIL"
     },
     "held_out_wave2": {
       "passed": false,
-      "peak_day_error": "10 days",
-      "peak_ratio": 1.488,
-      "cumulative_error": "200.96%",
-      "thresholds": "<= 7d, [0.70, 1.30], <= 25%",
-      "status": "FAIL"
+      "status": "COMPROMISED",
+      "reason": "Auditor finding Y4: Prior evaluations accessed local held-out dataset without hash chaining or counter increments; dataset compromised for v3.0.0.",
+      "held_out_window": "London_Wave2_2020-09-01_to_2020-11-30",
+      "external_dataset_required": true
     }
   },
   "ledger_authenticated": true,
-  "generated_at": "2026-11-10T13:50:37.026119+00:00"
+  "generated_at": "2026-11-11T16:51:59.103681+00:00",
+  "assumptions": {
+    "London Baseline ICU Capacity": {
+      "value": "800 beds",
+      "class": "Class C (Assumed)",
+      "bounds": "[700, 950] beds; nominal pre-surge baseline without Nightingale capacity"
+    },
+    "ICU Admission Fraction": {
+      "value": "0.18",
+      "class": "Class C (Assumed)",
+      "bounds": "[0.12, 0.22] of acute respiratory hospital admissions"
+    },
+    "ICU Length of Stay": {
+      "value": "Gamma(mean=13.0d, shape=2.0, scale=6.5)",
+      "class": "Class C (Assumed)",
+      "bounds": "[10.0, 16.0] days duration parameterization"
+    },
+    "Borough Centroid Coordinates": {
+      "value": "OpenStreetMap Nominatim place coordinates",
+      "class": "Class C (Assumed)",
+      "bounds": "ODbL place-name geocoder proxy for administrative polygon centroids"
+    },
+    "Hierarchical Behavior Compliance": {
+      "value": "beta_compliance = 1.65, beta_fatigue = 0.45",
+      "class": "Class C (Assumed)",
+      "bounds": "Assumed baseline archetype coefficients for social distancing adherence"
+    }
+  }
 }

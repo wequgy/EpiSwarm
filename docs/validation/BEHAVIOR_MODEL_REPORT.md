@@ -4,7 +4,7 @@
 - **Empirical Dataset**: LSHTM CoMix Contact Survey for England (Zenodo record 4677018, Gimma et al. 2021).
 - **Audit SHA-256**: `217e03a3ec0460b54e793910c2c31ff7bf461ee60ec4f58c7e97426aa0f24255`
 - **License**: Creative Commons Attribution 4.0 International (CC-BY-4.0)
-- **Calibrated At**: 2026-11-10T13:48:20.408203+00:00
+- **Calibrated At**: 2026-11-11T16:46:20.988316+00:00
 
 ## 2. Parameter Estimates & Standard Errors
 Model specification on logit scale:

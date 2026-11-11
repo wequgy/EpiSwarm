@@ -344,25 +344,51 @@ def build_region_yaml():
 
 
 def register_clean_pack_in_ledger():
-    """Register all generated clean pack files in the Evidence Ledger."""
-    now_str = datetime.now(timezone.utc).isoformat()
-    for csv_file in OUTPUT_DIR.glob("*.csv"):
-        file_hash = compute_sha256(csv_file)
-        rec = LedgerRecord(
-            id=f"rec_clean_{csv_file.stem}_{file_hash[:12]}",
-            url=f"pack://reference_london/{csv_file.name}",
-            retrieved_at=now_str,
-            sha256=file_hash,
-            byte_count=csv_file.stat().st_size,
-            http_status=200,
-            content_type="text/csv",
-            license="Open Government Licence v3.0 / CC-BY-4.0",
-            file_path=str(csv_file),
-            record_status="verified",
-            notes=f"Derived clean reference table transformed from raw ledger downloads"
+    """Register all generated clean pack files in the Evidence Ledger as verified derived tables."""
+    build_script = Path(__file__).resolve()
+    derived_mappings = {
+        "areas.csv": {
+            "parents": [RAW_DIR / "ukpopestimatesmid2020.xls", RAW_DIR / "london_borough_centroids.json"],
+            "license": "Open Government Licence v3.0 & ODbL",
+            "notes": "Derived area metadata (ONS mid-2020 populations + Nominatim geocoded place coordinates marked assumed)"
+        },
+        "age_structure.csv": {
+            "parents": [RAW_DIR / "ukpopestimatesmid2020.xls"],
+            "license": "Open Government Licence v3.0",
+            "notes": "Derived borough-level age distributions from ONS mid-2020 single-year population estimates"
+        },
+        "commute_od.csv": {
+            "parents": [RAW_DIR / "nomis_wu03uk_london_commuting.csv"],
+            "license": "Open Government Licence v3.0",
+            "notes": "Derived directed commuting origin-destination flux matrix from NOMIS Census 2011 Table WU03UK"
+        },
+        "contacts.csv": {
+            "parents": [RAW_DIR / "comix_contact_matrices_england.csv"],
+            "license": "Creative Commons Attribution 4.0 International (CC-BY-4.0)",
+            "notes": "Derived baseline age-structured contact matrix from LSHTM CoMix England survey (Zenodo 4677018)"
+        },
+        "observed_cases.csv": {
+            "parents": [RAW_DIR / "ukhsa_london_deaths_2020.json"],
+            "license": "Open Government Licence v3.0",
+            "notes": "Derived daily registered deaths and hospitalizations time series from UKHSA Data Dashboard API"
+        },
+        "policy_timeline.csv": {
+            "parents": [RAW_DIR / "oxcgrt_compact_subnational_v1.csv"],
+            "license": "Creative Commons Attribution 4.0 International (CC-BY-4.0)",
+            "notes": "Derived statutory policy intervention timeline from Oxford Blavatnik OxCGRT subnational tracker"
+        }
+    }
+
+    for filename, meta in derived_mappings.items():
+        csv_file = OUTPUT_DIR / filename
+        rec = ledger.add_derived_record(
+            file_path=csv_file,
+            parent_paths=meta["parents"],
+            transform_script=build_script,
+            license_name=meta["license"],
+            notes=meta["notes"]
         )
-        ledger.add_record(rec)
-        print(f"Registered in ledger: {csv_file.name} (SHA-256: {file_hash[:16]}...)")
+        print(f"Registered derived table in ledger: {filename} (SHA-256: {rec.sha256[:16]}..., parents: {len(meta['parents'])})")
 
 
 def main():
