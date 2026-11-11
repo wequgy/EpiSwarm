@@ -39,6 +39,8 @@ def scan_unverified_real_status(root_dir: Path, include_quarantine: bool = False
     # Any 'status: real' without a matching ledger entry is an integrity breach.
     ledger_file = root_dir / "evidence" / "ledger.db"
     has_ledger = ledger_file.exists()
+    from episwarm.evidence.ledger import EvidenceLedger
+    ledger = EvidenceLedger(ledger_file) if has_ledger else None
 
     data_dirs = [root_dir / "regions"]
     if include_quarantine:
@@ -55,12 +57,14 @@ def scan_unverified_real_status(root_dir: Path, include_quarantine: bool = False
                 df = pd.read_csv(p, nrows=200)
                 if "status" in df.columns:
                     real_rows = df[df["status"].astype(str).str.lower() == "real"]
-                    if len(real_rows) > 0 and not has_ledger:
-                        violations.append(IntegrityViolation(
-                            category="X1/X2_UNVERIFIED_REAL_DATA",
-                            file_path=str(p.relative_to(root_dir)),
-                            message=f"Found {len(real_rows)} rows marked 'status: real' without verified Evidence Ledger record."
-                        ))
+                    if len(real_rows) > 0:
+                        is_verified = (ledger is not None and ledger.verify_file(p) is not None)
+                        if not is_verified:
+                            violations.append(IntegrityViolation(
+                                category="X1/X2_UNVERIFIED_REAL_DATA",
+                                file_path=str(p.relative_to(root_dir)),
+                                message=f"Found {len(real_rows)} rows marked 'status: real' without verified Evidence Ledger record."
+                            ))
             except Exception:
                 pass
 
@@ -70,12 +74,14 @@ def scan_unverified_real_status(root_dir: Path, include_quarantine: bool = False
             try:
                 with open(p, "r", encoding="utf-8") as f:
                     content = f.read()
-                    if re.search(r"status\s*:\s*['\"]?real['\"]?", content, re.IGNORECASE) and not has_ledger:
-                        violations.append(IntegrityViolation(
-                            category="X1/X2_UNVERIFIED_REAL_DATA",
-                            file_path=str(p.relative_to(root_dir)),
-                            message="YAML declares 'status: real' without verified Evidence Ledger record."
-                        ))
+                    if re.search(r"status\s*:\s*['\"]?real['\"]?", content, re.IGNORECASE):
+                        is_verified = (ledger is not None and ledger.verify_file(p) is not None)
+                        if not is_verified:
+                            violations.append(IntegrityViolation(
+                                category="X1/X2_UNVERIFIED_REAL_DATA",
+                                file_path=str(p.relative_to(root_dir)),
+                                message="YAML declares 'status: real' without verified Evidence Ledger record."
+                            ))
             except Exception:
                 pass
 

@@ -236,7 +236,28 @@ class EvidenceLedger:
         if not file_path.exists() or not file_path.is_file():
             return None
         file_sha256 = compute_sha256(file_path)
-        return self.get_by_sha256(file_sha256)
+        rec = self.get_by_sha256(file_sha256)
+        if rec is not None:
+            return rec
+
+        # Support cross-platform line ending normalization (CRLF vs LF) on text files
+        if file_path.suffix.lower() in [".csv", ".json", ".yaml", ".yml", ".tsv", ".txt", ".md"]:
+            try:
+                with open(file_path, "rb") as f:
+                    raw_bytes = f.read()
+                lf_bytes = raw_bytes.replace(b"\r\n", b"\n")
+                lf_sha = hashlib.sha256(lf_bytes).hexdigest()
+                rec = self.get_by_sha256(lf_sha)
+                if rec is not None:
+                    return rec
+                crlf_bytes = lf_bytes.replace(b"\n", b"\r\n")
+                crlf_sha = hashlib.sha256(crlf_bytes).hexdigest()
+                rec = self.get_by_sha256(crlf_sha)
+                if rec is not None:
+                    return rec
+            except Exception:
+                pass
+        return None
 
     def verify_derived_file(self, file_path: Path) -> Tuple[bool, Optional[str]]:
         """Verify that a derived table has a verified record and all its parents trace to verified records."""
