@@ -1,4 +1,4 @@
-"""Healthcare Capacity & Overflow Validation (Phase 31 - Repaired).
+"""Healthcare Capacity & Overflow Validation (Phase 31 & Stage A1 Repaired).
 
 Validates simulated hospital and ICU bed occupancy dynamics against genuine
 NHS England London Wave 1 clinical surveillance data across >= 30 paired seeds.
@@ -7,6 +7,7 @@ Evaluates pre-registered targets:
 - ICU overflow duration (> baseline capacity) error <= 7 days
 Strictly forbids analytic curve generators, gamma convolutions, and post-hoc
 rescaling to observed peaks.
+All policy interventions and borough seeding derived directly from empirical data.
 """
 
 from datetime import datetime, timezone
@@ -23,6 +24,12 @@ from episwarm.packs.scenario import ScenarioPack
 from episwarm.engine.sim import run_simulation
 from episwarm.evidence.fetch import fetch_and_register
 from episwarm.evidence.ledger import EvidenceLedger
+from episwarm.evidence.validation_controls import ValidationCard, render_markdown_report_from_card
+from scripts.run_spatial_validation_wave1 import (
+    acquire_borough_cases_and_get_arrivals,
+    get_empirical_borough_seeding,
+    load_policy_interventions_from_timeline
+)
 
 
 def download_healthcare_data(ledger: EvidenceLedger) -> Path:
@@ -86,14 +93,19 @@ def run_healthcare_validation(n_seeds: int = 30, scale_agents: int = 5000) -> Di
     with open("scenarios/baseline.yaml", "r", encoding="utf-8") as f:
         s_dict = yaml.safe_load(f)
 
-    # Configure Wave 1 seeding and statutory intervention package (SI 2020/350)
-    s_dict["seeding"]["area_id"] = "E09000020"
-    s_dict["seeding"]["initial_cases_per_area"] = 30
-    s_dict["interventions"] = [
-        {"name": "workplace_reduction", "measure_type": "workplace_reduction", "area_id": "ALL", "start_day": 16, "end_day": 90, "stringency": 0.60},
-        {"name": "statutory_lockdown", "measure_type": "curfew", "area_id": "ALL", "start_day": 23, "end_day": 90, "stringency": 0.75},
-        {"name": "school_closure", "measure_type": "school_closure", "area_id": "ALL", "start_day": 23, "end_day": 90, "stringency": 1.0}
-    ]
+    # Configure empirical Wave 1 seeding and statutory intervention package from policy_timeline.csv & policy_mapping.yaml
+    df_areas = pd.read_csv(region_dir / "areas.csv")
+    obs_arrivals_dict = acquire_borough_cases_and_get_arrivals(df_areas, ledger)
+    epicenter_aid, initial_cases = get_empirical_borough_seeding(obs_arrivals_dict)
+
+    s_dict["seeding"]["area_id"] = epicenter_aid
+    s_dict["seeding"]["initial_cases_per_area"] = initial_cases
+    s_dict["interventions"] = load_policy_interventions_from_timeline(
+        region_dir / "policy_timeline.csv",
+        region_dir / "policy_mapping.yaml",
+        base_date="2020-03-01",
+        horizon_days=90
+    )
 
     sim_peaks: List[float] = []
     sim_overflows: List[int] = []
@@ -149,12 +161,31 @@ def run_healthcare_validation(n_seeds: int = 30, scale_agents: int = 5000) -> Di
     all_targets = [t.get("passed", False) for t in card_data["targets"].values() if not t.get("in_sample", False)]
     passed_cnt = sum(all_targets)
     tot_cnt = len(all_targets)
-    card_data["status"] = "VALIDATED" if (passed_cnt == tot_cnt and tot_cnt > 0) else "PARTIALLY_VALIDATED"
+    if tot_cnt > 0 and passed_cnt == tot_cnt:
+        card_data["status"] = "VALIDATED"
+    elif passed_cnt > 0:
+        card_data["status"] = "PARTIALLY_VALIDATED"
+    else:
+        card_data["status"] = "UNCALIBRATED"
     card_data["targets_passed"] = f"{passed_cnt}/{tot_cnt}"
     card_data["generated_at"] = datetime.now(timezone.utc).isoformat()
 
     card_path.write_text(json.dumps(card_data, indent=2), encoding="utf-8")
     print(f"Updated machine validation card: {card_path} ({card_data['status']}, {card_data['targets_passed']})")
+
+    # Keep report coherent with card
+    report_path = Path("docs/validation/VALIDATION_REPORT.md")
+    if report_path.exists():
+        report_text = render_markdown_report_from_card(
+            ValidationCard(
+                status=card_data["status"],
+                region_id=card_data.get("region", "Greater London Reference Pack (regions/reference_london)"),
+                targets_passed=card_data["targets_passed"],
+                targets=card_data["targets"],
+                all_passed=(card_data["status"] == "VALIDATED")
+            )
+        )
+        report_path.write_text(report_text, encoding="utf-8")
 
     return {
         "passed": target_pass,

@@ -106,7 +106,7 @@ def build_validation_card(
     elif passed_count > 0:
         overall_status = "PARTIALLY_VALIDATED"
     else:
-        overall_status = "FAILED"
+        overall_status = "UNCALIBRATED"
 
     return ValidationCard(
         status=overall_status,

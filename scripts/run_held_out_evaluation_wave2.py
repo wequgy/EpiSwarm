@@ -52,7 +52,7 @@ def run_held_out_evaluation() -> Dict[str, Any]:
         passed_cnt = sum(1 for k in val_targets if card_data["targets"][k].get("passed", False))
         tot_cnt = len(val_targets)
         card_data["targets_passed"] = f"{passed_cnt}/{tot_cnt}"
-        card_data["status"] = "UNVALIDATED" if passed_cnt == 0 else ("VALIDATED" if passed_cnt == tot_cnt else "PARTIALLY_VALIDATED")
+        card_data["status"] = "UNCALIBRATED" if passed_cnt == 0 else ("VALIDATED" if passed_cnt == tot_cnt else "PARTIALLY_VALIDATED")
         card_data["generated_at"] = datetime.now(timezone.utc).isoformat()
 
         card_path.write_text(json.dumps(card_data, indent=2), encoding="utf-8")

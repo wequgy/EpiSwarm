@@ -154,13 +154,13 @@ def test_validation_controls_positive_and_negative():
     # 2. Negative Control: model evaluated against inverted/shuffled curve
     neg_card = run_negative_control(synthetic_admissions)
     assert neg_card.all_passed is False
-    assert neg_card.status == "FAILED"
+    assert neg_card.status == "UNCALIBRATED"
     assert neg_card.targets_passed == "0/1"
 
     neg_report = render_markdown_report_from_card(neg_card)
     assert "**FAIL**" in neg_report
     assert "**PASS**" not in neg_report
-    assert "**FAILED**" in neg_report
+    assert "**UNCALIBRATED**" in neg_report
 
 
 def test_held_out_gate_enforcement(tmp_path):

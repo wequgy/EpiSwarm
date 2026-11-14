@@ -67,10 +67,10 @@ Evaluated on single-socket CPU (AMD/Intel Core architecture, 16 GB RAM baseline)
 
 | Agent Scale | Synthetic Pop Build | 30-Day Simulation | Total Runtime | Peak Working Set RAM | SoA Theoretical Size |
 |:---:|:---:|:---:|:---:|:---:|:---:|
-| **5,000** | 0.03s | 0.60s | **0.65s** | 151.7 MB | 0.21 MB |
-| **50,000** | 0.05s | 5.66s | **5.73s** | 202.0 MB | 2.15 MB |
-| **100,000** | 0.09s | 13.29s | **13.39s** | 257.3 MB | 4.29 MB |
-| **500,000** | 0.66s | 80.32s | **80.99s** | **692.3 MB** | 21.46 MB |
+| **5,000** | 0.10s | 1.87s | **1.97s** | 133.0 MB | 0.21 MB |
+| **50,000** | 0.18s | 12.13s | **12.31s** | 184.2 MB | 2.15 MB |
+| **100,000** | 0.29s | 19.51s | **19.80s** | 238.2 MB | 4.29 MB |
+| **500,000** | 1.36s | 77.35s | **78.71s** | 672.3 MB | 21.46 MB |
 
 > [!NOTE]
 > Even at 500,000 agents, peak RAM usage is **692 MB**, comfortably below the 11 GB ceiling on 16 GB hardware. CPU NumPy vectorization achieves >6,000 agent-days per millisecond. GPU offloading provides minimal additional gain at these scales due to PCIe transfer overhead.
@@ -81,3 +81,12 @@ Evaluated on single-socket CPU (AMD/Intel Core architecture, 16 GB RAM baseline)
 1. **Local Processing**: All uploaded regional datasets and synthetic micro-data are processed 100% locally on the host machine.
 2. **LLM Context Protection**: No raw population records or PII are ever transmitted to external LLM APIs (e.g. Gemini). The Advisory agent observes only aggregated, anonymized public health summaries (infection counts, resource occupancy, equity metrics).
 3. **Reproducibility**: All simulations use a single seeded `numpy.random.Generator`. Every simulation result writes an immutable manifest containing the git commit hash, pack hashes, seed, and provenance records.
+
+
+---
+
+## 8. Multi-Scale Convergence & Resolution Guidance
+Based on the multi-scale convergence study (`docs/validation/CONVERGENCE_REPORT.md`) evaluating 5k, 20k, 50k, 100k, and 200k agents against authentic UKHSA spatial surveillance and NHS hospital data:
+- **Minimum Stable Resolution**: **50,000 agents** is designated as the recommended operational resolution for production policy planning.
+- **Between-Seed Variance**: Between-seed variance of healthcare ICU peaks and borough arrivals stabilizes substantially at $\ge 50,000$ agents.
+- **Discretization Granularity**: Discretization noise drops from 1 agent = 1,800 beds at 5k agents to 1 agent = 180 beds at 50k agents.

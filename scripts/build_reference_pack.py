@@ -376,6 +376,11 @@ def register_clean_pack_in_ledger():
             "parents": [RAW_DIR / "oxcgrt_compact_subnational_v1.csv"],
             "license": "Creative Commons Attribution 4.0 International (CC-BY-4.0)",
             "notes": "Derived statutory policy intervention timeline from Oxford Blavatnik OxCGRT subnational tracker"
+        },
+        "policy_mapping.yaml": {
+            "parents": [RAW_DIR / "oxcgrt_compact_subnational_v1.csv", RAW_DIR / "comix_contact_matrices_england.csv"],
+            "license": "Creative Commons Attribution 4.0 International (CC-BY-4.0)",
+            "notes": "Empirical mapping of statutory policy measures and Oxford Stringency Index to contact multipliers with prior ranges"
         }
     }
 

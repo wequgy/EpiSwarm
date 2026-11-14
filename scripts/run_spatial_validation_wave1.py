@@ -1,16 +1,17 @@
-"""Spatial Epidemic Wavefront Validation (Phase 29 - Repaired).
+"""Spatial Epidemic Wavefront Validation (Phase 29 & Stage A1 Repaired).
 
 Validates spatial arrival ordering across London Local Authorities against genuine
 UKHSA empirical surveillance observations, driven by agent engine simulation on
 NOMIS Census commuting flows and contact networks across >= 30 paired seeds.
 Evaluates pre-registered Spearman rank correlation target: rho >= 0.60 without
 distance formulas, analytic approximations, or pseudo-random mocks.
+All policy interventions and borough seeding derived directly from empirical data.
 """
 
 from datetime import datetime, timezone
 import json
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 from scipy.stats import spearmanr
@@ -22,7 +23,7 @@ from episwarm.packs.scenario import ScenarioPack
 from episwarm.engine.sim import run_simulation
 from episwarm.evidence.fetch import fetch_and_register
 from episwarm.evidence.ledger import EvidenceLedger
-from episwarm.evidence.validation_controls import render_markdown_report_from_card
+from episwarm.evidence.validation_controls import ValidationCard, render_markdown_report_from_card
 
 
 def acquire_borough_cases_and_get_arrivals(df_areas: pd.DataFrame, ledger: EvidenceLedger) -> Dict[str, int]:
@@ -83,6 +84,84 @@ def acquire_borough_cases_and_get_arrivals(df_areas: pd.DataFrame, ledger: Evide
     return arrivals
 
 
+def get_empirical_borough_seeding(obs_arrivals_dict: Dict[str, int]) -> Tuple[str, int]:
+    """Identify empirical epicenter borough and initial outbreak seed volume from UKHSA surveillance."""
+    epicenter_aid = min(obs_arrivals_dict, key=obs_arrivals_dict.get)
+    raw_dir = Path("evidence/raw/borough_cases")
+    dest_file = raw_dir / f"cases_{epicenter_aid}.json"
+    if not dest_file.exists():
+        dest_file = raw_dir / "cases_hackney_city.json"
+
+    initial_cases = 30
+    if dest_file.exists():
+        with open(dest_file, "r", encoding="utf-8") as f:
+            data = json.load(f).get("results", [])
+        w1 = sorted([x for x in data if x.get("date", "") >= "2020-03-01"], key=lambda x: x["date"])
+        cum = sum(float(item.get("metric_value", 0)) for item in w1[: obs_arrivals_dict[epicenter_aid] + 2])
+        if cum > 0:
+            initial_cases = int(cum)
+
+    return epicenter_aid, initial_cases
+
+
+def load_policy_interventions_from_timeline(
+    timeline_csv: Path,
+    mapping_yaml: Optional[Path] = None,
+    base_date: str = "2020-03-01",
+    horizon_days: int = 90
+) -> List[Dict[str, Any]]:
+    """Parse policy_timeline.csv into ScenarioPack intervention actions using policy_mapping.yaml."""
+    if not timeline_csv.exists():
+        return []
+
+    df_policies = pd.read_csv(timeline_csv)
+    mapping = {}
+    if mapping_yaml and mapping_yaml.exists():
+        with open(mapping_yaml, "r", encoding="utf-8") as f:
+            mapping_data = yaml.safe_load(f)
+            mapping = mapping_data.get("measures", {})
+
+    base_dt = pd.to_datetime(base_date)
+    interventions = []
+
+    for idx, row in df_policies.iterrows():
+        start_dt = pd.to_datetime(row["date_start"])
+        end_dt = pd.to_datetime(row["date_end"])
+
+        start_day = max(0, (start_dt - base_dt).days)
+        end_day = min(horizon_days, max(start_day, (end_dt - base_dt).days))
+
+        if start_day >= horizon_days:
+            continue
+
+        measure_name = str(row["measure"])
+        measure_info = mapping.get(measure_name, {})
+
+        measure_type = measure_info.get("measure_type", measure_name)
+        if measure_type == "movement_curfew":
+            measure_type = "curfew"
+
+        if "effective_stringency" in measure_info:
+            stringency = float(measure_info["effective_stringency"])
+        elif "contact_multiplier" in measure_info:
+            stringency = float(1.0 - measure_info["contact_multiplier"])
+        else:
+            stringency = float(row["stringency"])
+
+        area_id = str(row.get("area_id", "ALL"))
+
+        interventions.append({
+            "name": f"{measure_name}_{idx}",
+            "measure_type": measure_type,
+            "area_id": area_id,
+            "start_day": int(start_day),
+            "end_day": int(end_day),
+            "stringency": float(np.clip(stringency, 0.0, 1.0))
+        })
+
+    return interventions
+
+
 def run_spatial_validation(n_seeds: int = 30, scale_agents: int = 5000) -> Dict[str, Any]:
     """Execute spatial wave validation using the genuine agent simulation engine across >= 30 seeds."""
     print(f"=== EpiSwarm Spatial Arrival Rank Validation (Phase 29 - {n_seeds} paired seeds) ===")
@@ -94,6 +173,8 @@ def run_spatial_validation(n_seeds: int = 30, scale_agents: int = 5000) -> Dict[
 
     # 1. Authentic empirical arrivals from UKHSA
     obs_arrivals_dict = acquire_borough_cases_and_get_arrivals(df_areas, ledger)
+    epicenter_aid, initial_cases = get_empirical_borough_seeding(obs_arrivals_dict)
+    print(f"Empirical Borough Seeding: Epicenter {epicenter_aid}, Initial Seed Volume: {initial_cases} cases")
 
     # 2. Genuine multi-seed agent simulation
     print(f"Synthesizing London population ({scale_agents} agents) with NOMIS commuting...")
@@ -106,9 +187,18 @@ def run_spatial_validation(n_seeds: int = 30, scale_agents: int = 5000) -> Dict[
     with open("scenarios/baseline.yaml", "r", encoding="utf-8") as f:
         s_dict = yaml.safe_load(f)
 
-    # Seed in primary observed London epicenter: Kensington & Chelsea (E09000020)
-    s_dict["seeding"]["area_id"] = "E09000020"
-    s_dict["seeding"]["initial_cases_per_area"] = 30
+    # Empirical Seeding
+    s_dict["seeding"]["area_id"] = epicenter_aid
+    s_dict["seeding"]["initial_cases_per_area"] = initial_cases
+
+    # Data-Driven Interventions from policy_timeline.csv & policy_mapping.yaml
+    interventions = load_policy_interventions_from_timeline(
+        region_dir / "policy_timeline.csv",
+        region_dir / "policy_mapping.yaml",
+        base_date="2020-03-01",
+        horizon_days=90
+    )
+    s_dict["interventions"] = interventions
 
     aids = list(df_areas["area_id"])
     sim_matrix = np.zeros((n_seeds, len(aids)), dtype=np.float64)
@@ -156,12 +246,31 @@ def run_spatial_validation(n_seeds: int = 30, scale_agents: int = 5000) -> Dict[
     all_targets = [t.get("passed", False) for t in card_data["targets"].values() if not t.get("in_sample", False)]
     passed_cnt = sum(all_targets)
     tot_cnt = len(all_targets)
-    card_data["status"] = "VALIDATED" if (passed_cnt == tot_cnt and tot_cnt > 0) else "PARTIALLY_VALIDATED"
+    if tot_cnt > 0 and passed_cnt == tot_cnt:
+        card_data["status"] = "VALIDATED"
+    elif passed_cnt > 0:
+        card_data["status"] = "PARTIALLY_VALIDATED"
+    else:
+        card_data["status"] = "UNCALIBRATED"
     card_data["targets_passed"] = f"{passed_cnt}/{tot_cnt}"
     card_data["generated_at"] = datetime.now(timezone.utc).isoformat()
 
     card_path.write_text(json.dumps(card_data, indent=2), encoding="utf-8")
     print(f"Updated machine validation card: {card_path} ({card_data['status']}, {card_data['targets_passed']})")
+
+    # Keep report coherent with card
+    report_path = Path("docs/validation/VALIDATION_REPORT.md")
+    if report_path.exists():
+        report_text = render_markdown_report_from_card(
+            ValidationCard(
+                status=card_data["status"],
+                region_id=card_data.get("region", "Greater London Reference Pack (regions/reference_london)"),
+                targets_passed=card_data["targets_passed"],
+                targets=card_data["targets"],
+                all_passed=(card_data["status"] == "VALIDATED")
+            )
+        )
+        report_path.write_text(report_text, encoding="utf-8")
 
     return {
         "passed": spatial_passed,

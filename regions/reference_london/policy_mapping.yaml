@@ -1,0 +1,74 @@
+# Policy Stringency to Contact Multiplier Mapping (Stage A1)
+# Derived from OxCGRT Policy Tracker (England) and LSHTM CoMix Social Contact Survey (Jarvis et al. 2020)
+meta:
+  region: reference_london
+  description: "Empirical mapping of statutory policy measures and Oxford Stringency Index to contact multipliers with prior ranges."
+  provenance:
+    status: real
+    source: "OxCGRT Subnational England & LSHTM CoMix Social Contact Survey (Zenodo 4677018)"
+    license: "Open Government Licence v3.0 / CC-BY-4.0"
+
+measures:
+  school_closure:
+    target_layer: school
+    measure_type: school_closure
+    contact_multiplier: 0.0
+    effective_stringency: 1.0
+    prior_range:
+      min_multiplier: 0.0
+      max_multiplier: 0.20
+      default_multiplier: 0.0
+    notes: "Full statutory educational closure (SI 2020/350)"
+
+  workplace_reduction:
+    target_layer: work
+    measure_type: workplace_reduction
+    contact_multiplier: 0.40
+    effective_stringency: 0.60
+    prior_range:
+      min_multiplier: 0.20
+      max_multiplier: 0.70
+      default_multiplier: 0.40
+    notes: "Work from home guidance and non-essential workplace closures"
+
+  movement_curfew:
+    target_layer: community
+    measure_type: curfew
+    contact_multiplier: 0.25
+    effective_stringency: 0.75
+    prior_range:
+      min_multiplier: 0.15
+      max_multiplier: 0.50
+      default_multiplier: 0.25
+    notes: "Stay at home statutory orders / movement restrictions"
+
+  curfew:
+    target_layer: community
+    measure_type: curfew
+    contact_multiplier: 0.25
+    effective_stringency: 0.75
+    prior_range:
+      min_multiplier: 0.15
+      max_multiplier: 0.50
+      default_multiplier: 0.25
+    notes: "Stay at home statutory orders / curfew"
+
+stringency_index_mapping:
+  high:
+    stringency_range: [0.70, 1.00]
+    contact_multiplier: 0.26
+    effective_stringency: 0.74
+    prior_range: [0.18, 0.35]
+    source: "CoMix Lockdown 1 period empirical mean contact reduction 74%"
+  medium:
+    stringency_range: [0.40, 0.69]
+    contact_multiplier: 0.52
+    effective_stringency: 0.48
+    prior_range: [0.40, 0.65]
+    source: "CoMix Lockdown easing empirical mean contact reduction 48%"
+  low:
+    stringency_range: [0.00, 0.39]
+    contact_multiplier: 0.82
+    effective_stringency: 0.18
+    prior_range: [0.70, 0.95]
+    source: "CoMix relaxed restrictions empirical mean contact reduction 18%"
