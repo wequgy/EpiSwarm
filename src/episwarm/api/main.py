@@ -19,6 +19,8 @@ from episwarm.packs.disease import DiseasePack
 from episwarm.packs.scenario import ScenarioPack
 from episwarm.engine.sim import run_simulation
 from episwarm.analysis.replicates import run_replicates, ReplicateSummary
+from episwarm.api.v1 import api_v1_router
+from episwarm.api.v1.errors import register_problem_handlers
 
 
 app = FastAPI(
@@ -34,6 +36,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Register RFC 7807 problem+json error handlers and mount API v1 router
+register_problem_handlers(app)
+app.include_router(api_v1_router)
 
 
 class SimulationRequest(BaseModel):
@@ -382,3 +388,27 @@ def compare_scenarios_endpoint(req: WhatIfRequest) -> Dict[str, Any]:
             "delta_peak_hospital": summary.delta_means.get("peak_hospital_demand", 0.0) if summary.delta_means else 0.0
         }
     }
+
+
+# ------------------------------------------------------------------------------
+# SPA Static File Serving (Stage B4)
+# ------------------------------------------------------------------------------
+web_dist = Path("web/dist")
+if web_dist.exists():
+    from fastapi.staticfiles import StaticFiles
+    from fastapi.responses import FileResponse
+
+    assets_dir = web_dist / "assets"
+    if assets_dir.exists():
+        app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="spa_assets")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def serve_spa(full_path: str):
+        # Never intercept API routes
+        if full_path.startswith("api/") or full_path == "api":
+            raise HTTPException(status_code=404, detail=f"API endpoint '/{full_path}' not found.")
+        candidate = web_dist / full_path
+        if candidate.is_file():
+            return FileResponse(candidate)
+        return FileResponse(web_dist / "index.html")
+

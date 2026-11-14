@@ -37,9 +37,11 @@
    - Optuna NSGA-II multi-objective optimization exploring Pareto frontiers (deaths vs. economic cost proxy).
    - Three-arm comparison harness: Advisor Alone vs. Search Alone vs. Combined.
 
-6. **Interactive Studio App (Streamlit + Plotly)**:
-   - Complete 8-step guided workflow: Region, Disease, Healthcare, Scenario, Run, Analysis/Equity, Advisor/Optimizer, and Audit Export.
-   - Column mapper wizard for uploading external CSV/Excel data.
+6. **Decoupled Modern Web Studio & API v1**:
+   - Modern React 18 + TypeScript + Vite + Tailwind CSS + ECharts frontend.
+   - Interactive 3D Isometric City Diorama with spatial wavefront scrubbing and borough block extrusion.
+   - FastAPI headless service facade with RFC 7807 problem details error handling.
+   - Persistent SQLite job queue with Server-Sent Events (SSE) streaming real-time simulation progress.
 
 ---
 
@@ -53,22 +55,35 @@ cd EpiSwarm
 pip install -e .
 ```
 
+To build the web frontend:
+```bash
+cd web
+npm install
+npm run build
+cd ..
+```
+
 ### 2. Run Diagnostics & Unit Tests
-Run the API health check (never prints keys) and full unit test suite:
+Run the API test suite:
 ```bash
-python scripts/check_apis.py
-pytest -v
+pytest tests/test_api_v1_contract.py tests/test_api_phase24.py -v
 ```
 
-### 3. Run Benchmark
-Measure runtime and peak memory scaling across 5k, 50k, and 100k agents:
-```bash
-python scripts/benchmark.py
+### 3. Launch EpiSwarm Studio Web Platform
+Run full-stack development mode:
+```powershell
+.\scripts\dev.ps1
 ```
 
-### 4. Launch EpiSwarm Studio Web App
+Or run the production server (FastAPI directly serving the modern Vite build):
 ```bash
-streamlit run src/episwarm/app/streamlit_app.py
+uvicorn episwarm.api.main:app --host 0.0.0.0 --port 8000
+```
+Open [http://localhost:8000](http://localhost:8000) in your browser.
+
+Or with Docker Compose:
+```bash
+docker compose up --build
 ```
 
 ---
@@ -100,8 +115,10 @@ episwarm/
     advisor/     tools.py agent.py schemas.py memory.py
     optimize/    search.py comparison.py
     analysis/    metrics.py equity.py calibration.py sensitivity.py spread_matrix.py variance_check.py
-    app/         streamlit_app.py
-  scripts/       benchmark.py validate_region.py make_synthetic_region.py check_apis.py
-  tests/         test_packs_phase0.py test_population_phase1.py test_engine_phase2.py test_healthcare_phase3.py test_behavior_phase4.py test_analysis_phase5.py test_advisor_optimizer_phase6.py test_app_calibration_phase7_8.py
+    service/     models.py packs.py simulation.py jobs.py trust.py system.py
+    api/         main.py v1/
+  web/           src/ dist/ package.json vite.config.ts openapi.json
+  scripts/       export_openapi.py dev.ps1 benchmark.py check_apis.py
+  tests/         test_api_v1_contract.py test_api_phase24.py
 ```
 

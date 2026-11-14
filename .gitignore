@@ -7,6 +7,9 @@ __pycache__/
 build/
 develop-eggs/
 dist/
+node_modules/
+web/node_modules/
+web/dist/
 downloads/
 eggs/
 .eggs/
@@ -26,6 +29,8 @@ MANIFEST
 *.manifest
 *.sqlite
 *.sqlite3
+*.db
+logs/
 *-wal
 *-shm
 .cache
