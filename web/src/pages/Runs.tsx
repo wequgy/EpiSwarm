@@ -12,6 +12,9 @@ export const Runs: React.FC = () => {
   const { data: regions } = useQuery({ queryKey: ['regions'], queryFn: api.getRegions });
   const { data: diseases } = useQuery({ queryKey: ['diseases'], queryFn: api.getDiseases });
   const { data: scenarios } = useQuery({ queryKey: ['scenarios'], queryFn: api.getScenarios });
+  const { data: backends } = useQuery({ queryKey: ['backends'], queryFn: api.getBackends });
+
+  const localBackend = backends?.backends?.find((b) => b.name === 'local_llm');
 
   const { data: jobsList, refetch: refetchJobs } = useQuery({
     queryKey: ['runsList'],
@@ -206,12 +209,25 @@ export const Runs: React.FC = () => {
               <select
                 value={behaviorMode}
                 onChange={(e) => setBehaviorMode(e.target.value as any)}
-                className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
               >
                 <option value="none">none (Unmitigated Baseline)</option>
                 <option value="rule">rule (Psychographic Rules)</option>
-                <option value="llm">llm (AI Decision Agent)</option>
+                <option value="llm">
+                  llm ({localBackend?.status === 'available' ? `Local Model: ${localBackend.active_model || 'Ollama'}` : 'Local LLM / AI Decision Agent'})
+                </option>
               </select>
+              {localBackend?.status === 'available' ? (
+                <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-emerald-600 font-medium">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  <span>Local Model Detected: <strong>{localBackend.active_model}</strong> (localhost:11434)</span>
+                </div>
+              ) : (
+                <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-slate-400">
+                  <span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
+                  <span>Local LLM: not detected on localhost:11434</span>
+                </div>
+              )}
             </div>
           </div>
 

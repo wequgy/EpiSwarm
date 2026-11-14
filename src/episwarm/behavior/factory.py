@@ -34,8 +34,8 @@ def create_decision_policy(cache: Optional[DecisionCache] = None) -> Tuple[Decis
         logger.info("Instantiating JevPolicy as primary backend.")
         return JevPolicy(api_key=jev_key, cache=cache), "jev"
 
-    # 2. Local LLM Check (only if LOCAL_LLM_BASE_URL is explicitly configured)
-    local_url = os.getenv("LOCAL_LLM_BASE_URL", "").strip().rstrip("/")
+    # 2. Local LLM Check (auto-detects local Ollama/OpenAI at http://localhost:11434 by default)
+    local_url = (os.getenv("LOCAL_LLM_BASE_URL", "").strip() or "http://localhost:11434").rstrip("/")
     local_reachable = False
     if local_url:
         try:

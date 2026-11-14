@@ -81,12 +81,17 @@ class SystemService:
         )
 
         # 4. Local Logprob / Ollama LLM Backend
-        local_url = os.getenv("LOCAL_LLM_BASE_URL", "").strip().rstrip("/")
+        local_url = (os.getenv("LOCAL_LLM_BASE_URL", "").strip() or "http://localhost:11434").rstrip("/")
         local_reachable = False
+        detected_model = None
         if local_url:
             try:
                 resp = requests.get(f"{local_url}/api/tags", timeout=0.5)
-                local_reachable = (resp.status_code == 200)
+                if resp.status_code == 200:
+                    local_reachable = True
+                    models_list = resp.json().get("models", [])
+                    if models_list:
+                        detected_model = models_list[0].get("name")
             except Exception:
                 try:
                     resp = requests.get(f"{local_url}/v1/models", timeout=0.5)
@@ -97,13 +102,14 @@ class SystemService:
         backends.append(
             BackendItem(
                 name="local_llm",
-                status="available" if local_reachable else ("configured" if local_url else "unavailable"),
-                configured=bool(local_url),
-                active_model=os.getenv("LOCAL_LLM_MODEL", "llama3:latest") if local_url else None,
+                status="available" if local_reachable else "unavailable",
+                configured=local_reachable or bool(os.getenv("LOCAL_LLM_BASE_URL")),
+                active_model=os.getenv("LOCAL_LLM_MODEL") or detected_model or "llama3:latest",
                 details={
                     "provider": "Ollama / Local OpenAI Compat",
-                    "base_url": local_url or "not configured",
+                    "base_url": local_url,
                     "reachable": local_reachable,
+                    "active_model": detected_model or os.getenv("LOCAL_LLM_MODEL", "auto"),
                 },
             )
         )
