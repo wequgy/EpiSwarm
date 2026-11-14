@@ -1,0 +1,3204 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "EpiSwarm Studio API",
+    "description": "Agent-based epidemic simulation, policy optimization, and validation platform",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/v1/health": {
+      "get": {
+        "tags": [
+          "System & Health"
+        ],
+        "summary": "Get V1 Health",
+        "description": "Return operational service health and timestamp.",
+        "operationId": "get_v1_health_api_v1_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/backends": {
+      "get": {
+        "tags": [
+          "System & Health"
+        ],
+        "summary": "Get V1 Backends",
+        "description": "List operational AI and simulation backends without exposing confidential keys.",
+        "operationId": "get_v1_backends_api_v1_backends_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackendsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/validation/card": {
+      "get": {
+        "tags": [
+          "Trust & Validation"
+        ],
+        "summary": "Get Validation Card",
+        "description": "Retrieve verified empirical benchmark validation card.",
+        "operationId": "get_validation_card_api_v1_validation_card_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Validation Card Api V1 Validation Card Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/validation/report": {
+      "get": {
+        "tags": [
+          "Trust & Validation"
+        ],
+        "summary": "Get Validation Report",
+        "description": "Retrieve human-readable validation report markdown and status.",
+        "operationId": "get_validation_report_api_v1_validation_report_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationReportResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/validation/assumptions": {
+      "get": {
+        "tags": [
+          "Trust & Validation"
+        ],
+        "summary": "Get Assumptions",
+        "description": "Retrieve active assumptions provenance register (Evidence Class C).",
+        "operationId": "get_assumptions_api_v1_validation_assumptions_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AssumptionItem"
+                  },
+                  "type": "array",
+                  "title": "Response Get Assumptions Api V1 Validation Assumptions Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/validation/evidence": {
+      "get": {
+        "tags": [
+          "Trust & Validation"
+        ],
+        "summary": "Get Evidence",
+        "description": "Query cryptographic evidence ledger for checksummed downloads and derived tables.",
+        "operationId": "get_evidence_api_v1_validation_evidence_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/EvidenceItem"
+                  },
+                  "type": "array",
+                  "title": "Response Get Evidence Api V1 Validation Evidence Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/packs/regions": {
+      "get": {
+        "tags": [
+          "Domain Packs"
+        ],
+        "summary": "List Regions",
+        "description": "List all installed geographic regions with readiness tiers.",
+        "operationId": "list_regions_api_v1_packs_regions_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RegionSummary"
+                  },
+                  "type": "array",
+                  "title": "Response List Regions Api V1 Packs Regions Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/packs/regions/{region_id}": {
+      "get": {
+        "tags": [
+          "Domain Packs"
+        ],
+        "summary": "Get Region",
+        "description": "Retrieve raw manifest and table inventory for a specific region.",
+        "operationId": "get_region_api_v1_packs_regions__region_id__get",
+        "parameters": [
+          {
+            "name": "region_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Region Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Region Api V1 Packs Regions  Region Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/packs/regions/{region_id}/validate": {
+      "post": {
+        "tags": [
+          "Domain Packs"
+        ],
+        "summary": "Validate Region",
+        "description": "Validate all tables and metadata within a region pack directory.",
+        "operationId": "validate_region_api_v1_packs_regions__region_id__validate_post",
+        "parameters": [
+          {
+            "name": "region_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Region Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PackValidationResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Domain Packs"
+        ],
+        "summary": "Validate Region",
+        "description": "Validate all tables and metadata within a region pack directory.",
+        "operationId": "validate_region_api_v1_packs_regions__region_id__validate_get",
+        "parameters": [
+          {
+            "name": "region_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Region Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PackValidationResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/packs/diseases": {
+      "get": {
+        "tags": [
+          "Domain Packs"
+        ],
+        "summary": "List Diseases",
+        "description": "List all installed pathogen packs.",
+        "operationId": "list_diseases_api_v1_packs_diseases_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DiseaseSummary"
+                  },
+                  "type": "array",
+                  "title": "Response List Diseases Api V1 Packs Diseases Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/packs/diseases/{disease_id}": {
+      "get": {
+        "tags": [
+          "Domain Packs"
+        ],
+        "summary": "Get Disease",
+        "description": "Retrieve full disease pack specification and state transitions.",
+        "operationId": "get_disease_api_v1_packs_diseases__disease_id__get",
+        "parameters": [
+          {
+            "name": "disease_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Disease Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Disease Api V1 Packs Diseases  Disease Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/packs/diseases/{disease_id}/validate": {
+      "post": {
+        "tags": [
+          "Domain Packs"
+        ],
+        "summary": "Validate Disease",
+        "description": "Validate pathogen state graph, reachability, and probability constraints.",
+        "operationId": "validate_disease_api_v1_packs_diseases__disease_id__validate_post",
+        "parameters": [
+          {
+            "name": "disease_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Disease Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PackValidationResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Domain Packs"
+        ],
+        "summary": "Validate Disease",
+        "description": "Validate pathogen state graph, reachability, and probability constraints.",
+        "operationId": "validate_disease_api_v1_packs_diseases__disease_id__validate_get",
+        "parameters": [
+          {
+            "name": "disease_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Disease Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PackValidationResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/packs/scenarios": {
+      "get": {
+        "tags": [
+          "Domain Packs"
+        ],
+        "summary": "List Scenarios",
+        "description": "List all installed intervention scenario packs.",
+        "operationId": "list_scenarios_api_v1_packs_scenarios_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ScenarioSummary"
+                  },
+                  "type": "array",
+                  "title": "Response List Scenarios Api V1 Packs Scenarios Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/packs/scenarios/{scenario_id}": {
+      "get": {
+        "tags": [
+          "Domain Packs"
+        ],
+        "summary": "Get Scenario",
+        "description": "Retrieve full scenario pack policy parameters and intervention timeline.",
+        "operationId": "get_scenario_api_v1_packs_scenarios__scenario_id__get",
+        "parameters": [
+          {
+            "name": "scenario_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Scenario Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Scenario Api V1 Packs Scenarios  Scenario Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/packs/scenarios/{scenario_id}/validate": {
+      "post": {
+        "tags": [
+          "Domain Packs"
+        ],
+        "summary": "Validate Scenario",
+        "description": "Validate scenario action dates, stringency bounds, and parameters.",
+        "operationId": "validate_scenario_api_v1_packs_scenarios__scenario_id__validate_post",
+        "parameters": [
+          {
+            "name": "scenario_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Scenario Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PackValidationResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Domain Packs"
+        ],
+        "summary": "Validate Scenario",
+        "description": "Validate scenario action dates, stringency bounds, and parameters.",
+        "operationId": "validate_scenario_api_v1_packs_scenarios__scenario_id__validate_get",
+        "parameters": [
+          {
+            "name": "scenario_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Scenario Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PackValidationResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/packs/behaviors": {
+      "get": {
+        "tags": [
+          "Domain Packs"
+        ],
+        "summary": "List Behaviors",
+        "description": "List all agent compliance and rumor behavior packs.",
+        "operationId": "list_behaviors_api_v1_packs_behaviors_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BehaviorSummary"
+                  },
+                  "type": "array",
+                  "title": "Response List Behaviors Api V1 Packs Behaviors Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/packs/behaviors/{behavior_id}": {
+      "get": {
+        "tags": [
+          "Domain Packs"
+        ],
+        "summary": "Get Behavior",
+        "description": "Retrieve behavior questions, rumor topics, and compliance weights.",
+        "operationId": "get_behavior_api_v1_packs_behaviors__behavior_id__get",
+        "parameters": [
+          {
+            "name": "behavior_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Behavior Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Behavior Api V1 Packs Behaviors  Behavior Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/packs/behaviors/{behavior_id}/validate": {
+      "post": {
+        "tags": [
+          "Domain Packs"
+        ],
+        "summary": "Validate Behavior",
+        "description": "Validate psychographic trait distributions and decision schemas.",
+        "operationId": "validate_behavior_api_v1_packs_behaviors__behavior_id__validate_post",
+        "parameters": [
+          {
+            "name": "behavior_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Behavior Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PackValidationResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Domain Packs"
+        ],
+        "summary": "Validate Behavior",
+        "description": "Validate psychographic trait distributions and decision schemas.",
+        "operationId": "validate_behavior_api_v1_packs_behaviors__behavior_id__validate_get",
+        "parameters": [
+          {
+            "name": "behavior_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Behavior Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PackValidationResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/runs": {
+      "post": {
+        "tags": [
+          "Simulation Runs & Jobs"
+        ],
+        "summary": "Launch Run",
+        "description": "Launch an asynchronous simulation job or synchronous mock execution.",
+        "operationId": "launch_run_api_v1_runs_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobRecord"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Simulation Runs & Jobs"
+        ],
+        "summary": "List Runs",
+        "description": "List historical simulation runs in descending order of creation.",
+        "operationId": "list_runs_api_v1_runs_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/runs/{run_id}": {
+      "get": {
+        "tags": [
+          "Simulation Runs & Jobs"
+        ],
+        "summary": "Get Run",
+        "description": "Get metadata, execution status, and progress for a specific simulation job.",
+        "operationId": "get_run_api_v1_runs__run_id__get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobRecord"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/runs/{run_id}/cancel": {
+      "post": {
+        "tags": [
+          "Simulation Runs & Jobs"
+        ],
+        "summary": "Cancel Run",
+        "description": "Request immediate cancellation of a running or queued simulation.",
+        "operationId": "cancel_run_api_v1_runs__run_id__cancel_post",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobCancelResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/runs/{run_id}/events": {
+      "get": {
+        "tags": [
+          "Simulation Runs & Jobs"
+        ],
+        "summary": "Stream Run Events",
+        "description": "Server-Sent Events (SSE) streaming real-time simulation progress and telemetry.",
+        "operationId": "stream_run_events_api_v1_runs__run_id__events_get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/runs/{run_id}/summary": {
+      "get": {
+        "tags": [
+          "Simulation Runs & Jobs"
+        ],
+        "summary": "Get Run Summary",
+        "description": "Retrieve epidemiological outcome summary and metrics with confidence bounds.",
+        "operationId": "get_run_summary_api_v1_runs__run_id__summary_get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/runs/{run_id}/timeseries": {
+      "get": {
+        "tags": [
+          "Simulation Runs & Jobs"
+        ],
+        "summary": "Get Run Timeseries",
+        "description": "Retrieve daily compartmental states, demand, and compliance trajectory curves.",
+        "operationId": "get_run_timeseries_api_v1_runs__run_id__timeseries_get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimeSeriesData"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/runs/{run_id}/spatial": {
+      "get": {
+        "tags": [
+          "Simulation Runs & Jobs"
+        ],
+        "summary": "Get Run Spatial",
+        "description": "Retrieve spatial borough attack rates and multi-layer isometric diorama coordinates.",
+        "operationId": "get_run_spatial_api_v1_runs__run_id__spatial_get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpatialOutput"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/runs/{run_id}/capacity": {
+      "get": {
+        "tags": [
+          "Simulation Runs & Jobs"
+        ],
+        "summary": "Get Run Capacity",
+        "description": "Retrieve healthcare bed thresholds, overflow durations, and unmet demand.",
+        "operationId": "get_run_capacity_api_v1_runs__run_id__capacity_get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapacityOutput"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/compare": {
+      "post": {
+        "tags": [
+          "Scenario Comparison & What-If"
+        ],
+        "summary": "Compare Scenarios",
+        "description": "Run paired stochastic counterfactual evaluation between two intervention scenarios.",
+        "operationId": "compare_scenarios_api_v1_compare_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompareRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompareResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/what-if": {
+      "post": {
+        "tags": [
+          "Scenario Comparison & What-If"
+        ],
+        "summary": "What If Analysis",
+        "description": "Alias for /compare supporting what-if policy queries under identical random seeds.",
+        "operationId": "what_if_analysis_api_v1_what_if_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompareRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompareResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Get Health",
+        "operationId": "get_health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Get Health Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/regions": {
+      "get": {
+        "summary": "List Regions",
+        "operationId": "list_regions_api_regions_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response List Regions Api Regions Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/scenarios": {
+      "get": {
+        "summary": "List Scenarios",
+        "operationId": "list_scenarios_api_scenarios_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response List Scenarios Api Scenarios Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/validation-card": {
+      "get": {
+        "summary": "Get Validation Card",
+        "operationId": "get_validation_card_api_validation_card_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Validation Card Api Validation Card Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/history": {
+      "get": {
+        "summary": "List Simulation History",
+        "description": "Return past simulation history records.",
+        "operationId": "list_simulation_history_api_history_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response List Simulation History Api History Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/history/{run_id}": {
+      "get": {
+        "summary": "Get Simulation Run History",
+        "description": "Return detailed manifest, events, and daily timeline for a specific past run.",
+        "operationId": "get_simulation_run_history_api_history__run_id__get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Simulation Run History Api History  Run Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/assumptions": {
+      "get": {
+        "summary": "Get Assumptions",
+        "description": "Return live list of all execution parameters, thresholds, and their provenance records.",
+        "operationId": "get_assumptions_api_assumptions_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response Get Assumptions Api Assumptions Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/diorama": {
+      "get": {
+        "summary": "Get Diorama Topology",
+        "description": "Provide isometric coordinates, areas, and multi-layer layout for city diorama visualization.",
+        "operationId": "get_diorama_topology_api_diorama_get",
+        "parameters": [
+          {
+            "name": "region_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "example_synthetic",
+              "title": "Region Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Diorama Topology Api Diorama Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/simulate": {
+      "post": {
+        "summary": "Run Simulation Endpoint",
+        "description": "Execute replicate simulation with confidence intervals and full assumptions.",
+        "operationId": "run_simulation_endpoint_api_simulate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SimulationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Run Simulation Endpoint Api Simulate Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/what-if": {
+      "post": {
+        "summary": "Compare Scenarios Endpoint",
+        "description": "Compare two scenarios under paired replicate random seeds.",
+        "operationId": "compare_scenarios_endpoint_api_what_if_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WhatIfRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Compare Scenarios Endpoint Api What If Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AreaSpatialPoint": {
+        "properties": {
+          "area_id": {
+            "type": "string",
+            "title": "Area Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "population": {
+            "type": "integer",
+            "title": "Population"
+          },
+          "density": {
+            "type": "number",
+            "title": "Density"
+          },
+          "iso_x": {
+            "type": "number",
+            "title": "Iso X"
+          },
+          "iso_y": {
+            "type": "number",
+            "title": "Iso Y"
+          },
+          "total_infections": {
+            "type": "integer",
+            "title": "Total Infections"
+          },
+          "attack_rate": {
+            "type": "number",
+            "title": "Attack Rate"
+          },
+          "daily_incident_infections": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Daily Incident Infections"
+          },
+          "peak_day": {
+            "type": "integer",
+            "title": "Peak Day"
+          }
+        },
+        "type": "object",
+        "required": [
+          "area_id",
+          "name",
+          "population",
+          "density",
+          "iso_x",
+          "iso_y",
+          "total_infections",
+          "attack_rate",
+          "daily_incident_infections",
+          "peak_day"
+        ],
+        "title": "AreaSpatialPoint",
+        "description": "Spatial borough / area epidemic telemetry and isometric coordinates."
+      },
+      "AssumptionItem": {
+        "properties": {
+          "parameter": {
+            "type": "string",
+            "title": "Parameter"
+          },
+          "value": {
+            "title": "Value"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "parameter",
+          "value",
+          "source",
+          "status"
+        ],
+        "title": "AssumptionItem",
+        "description": "Provenance entry in assumptions register."
+      },
+      "BackendItem": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Backend identifier (e.g. gemini, jev, local_llm, sqlite)"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "'available' | 'unavailable' | 'configured'"
+          },
+          "configured": {
+            "type": "boolean",
+            "title": "Configured",
+            "description": "Whether required credentials or endpoints are provided"
+          },
+          "active_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Model",
+            "description": "Active model name if applicable"
+          },
+          "details": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Details",
+            "description": "Non-sensitive backend configuration status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "status",
+          "configured"
+        ],
+        "title": "BackendItem",
+        "description": "Status information for an external or optional AI/database backend."
+      },
+      "BackendsResponse": {
+        "properties": {
+          "backends": {
+            "items": {
+              "$ref": "#/components/schemas/BackendItem"
+            },
+            "type": "array",
+            "title": "Backends"
+          }
+        },
+        "type": "object",
+        "required": [
+          "backends"
+        ],
+        "title": "BackendsResponse",
+        "description": "Inventory of available simulation and reasoning backends."
+      },
+      "BehaviorSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Behavior pack identifier"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Behavior configuration name"
+          },
+          "context": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context",
+            "description": "Narrative context prompt"
+          },
+          "rumor_spread_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rumor Spread Rate",
+            "description": "Misinformation transmission rate"
+          },
+          "n_rumor_topics": {
+            "type": "integer",
+            "title": "N Rumor Topics",
+            "description": "Number of rumor topics configured",
+            "default": 0
+          },
+          "n_questions": {
+            "type": "integer",
+            "title": "N Questions",
+            "description": "Number of decision questions configured",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "BehaviorSummary",
+        "description": "Summary metadata of an agent behavior and compliance pack."
+      },
+      "CapacityOutput": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "title": "Job Id"
+          },
+          "hospital_capacity_beds": {
+            "type": "number",
+            "title": "Hospital Capacity Beds"
+          },
+          "icu_capacity_beds": {
+            "type": "number",
+            "title": "Icu Capacity Beds"
+          },
+          "daily_hospital_demand": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Daily Hospital Demand"
+          },
+          "daily_icu_demand": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Daily Icu Demand"
+          },
+          "overflow_days_hospital": {
+            "type": "integer",
+            "title": "Overflow Days Hospital"
+          },
+          "overflow_days_icu": {
+            "type": "integer",
+            "title": "Overflow Days Icu"
+          },
+          "overflow_deaths": {
+            "type": "integer",
+            "title": "Overflow Deaths"
+          },
+          "daily_unmet_demand": {
+            "additionalProperties": {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Daily Unmet Demand"
+          },
+          "is_mock": {
+            "type": "boolean",
+            "title": "Is Mock",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_id",
+          "hospital_capacity_beds",
+          "icu_capacity_beds",
+          "daily_hospital_demand",
+          "daily_icu_demand",
+          "overflow_days_hospital",
+          "overflow_days_icu",
+          "overflow_deaths"
+        ],
+        "title": "CapacityOutput",
+        "description": "Hospital and ICU resource strain, capacity thresholds, and unmet demand."
+      },
+      "CompareRequest": {
+        "properties": {
+          "region_id": {
+            "type": "string",
+            "title": "Region Id",
+            "description": "Region identifier",
+            "default": "example_synthetic"
+          },
+          "disease_id": {
+            "type": "string",
+            "title": "Disease Id",
+            "description": "Pathogen identifier",
+            "default": "respiratory_generic"
+          },
+          "scenario_a": {
+            "type": "string",
+            "title": "Scenario A",
+            "description": "Reference scenario identifier",
+            "default": "baseline"
+          },
+          "scenario_b": {
+            "type": "string",
+            "title": "Scenario B",
+            "description": "Counterfactual scenario identifier",
+            "default": "targeted_containment"
+          },
+          "scale_agents": {
+            "type": "integer",
+            "maximum": 50000.0,
+            "minimum": 100.0,
+            "title": "Scale Agents",
+            "default": 3000
+          },
+          "n_replicates": {
+            "type": "integer",
+            "maximum": 50.0,
+            "minimum": 1.0,
+            "title": "N Replicates",
+            "default": 5
+          },
+          "random_seed": {
+            "type": "integer",
+            "title": "Random Seed",
+            "default": 42
+          },
+          "behavior_mode": {
+            "type": "string",
+            "title": "Behavior Mode",
+            "default": "rule"
+          }
+        },
+        "type": "object",
+        "title": "CompareRequest",
+        "description": "Request for running or retrieving a paired counterfactual comparison."
+      },
+      "CompareResponse": {
+        "properties": {
+          "scenario_a": {
+            "type": "string",
+            "title": "Scenario A"
+          },
+          "scenario_b": {
+            "type": "string",
+            "title": "Scenario B"
+          },
+          "n_replicates": {
+            "type": "integer",
+            "title": "N Replicates"
+          },
+          "means_a": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Means A"
+          },
+          "delta_means": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Delta Means"
+          },
+          "delta_ci_95_lower": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Delta Ci 95 Lower"
+          },
+          "delta_ci_95_upper": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Delta Ci 95 Upper"
+          },
+          "comparison": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Comparison"
+          },
+          "validation_status": {
+            "type": "string",
+            "title": "Validation Status",
+            "default": "UNCALIBRATED"
+          }
+        },
+        "type": "object",
+        "required": [
+          "scenario_a",
+          "scenario_b",
+          "n_replicates",
+          "means_a",
+          "delta_means",
+          "delta_ci_95_lower",
+          "delta_ci_95_upper",
+          "comparison"
+        ],
+        "title": "CompareResponse",
+        "description": "Statistical counterfactual comparison between two policy scenarios."
+      },
+      "DiseaseSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Disease identifier"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Clinical or common pathogen name"
+          },
+          "r0": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "R0",
+            "description": "Target reproductive number R0"
+          },
+          "incubation_days": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Incubation Days",
+            "description": "Mean incubation duration in days"
+          },
+          "infectious_days": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Infectious Days",
+            "description": "Mean infectious period in days"
+          },
+          "case_fatality_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Case Fatality Ratio",
+            "description": "Estimated CFR"
+          },
+          "states_count": {
+            "type": "integer",
+            "title": "States Count",
+            "description": "Total number of discrete compartments in state graph",
+            "default": 0
+          },
+          "has_vulnerability_factors": {
+            "type": "boolean",
+            "title": "Has Vulnerability Factors",
+            "description": "Whether comorbidity factors are defined",
+            "default": false
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Pathogen description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "DiseaseSummary",
+        "description": "Summary metadata of an installed pathogen configuration pack."
+      },
+      "EvidenceItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "retrieved_at": {
+            "type": "string",
+            "title": "Retrieved At"
+          },
+          "sha256": {
+            "type": "string",
+            "title": "Sha256"
+          },
+          "byte_count": {
+            "type": "integer",
+            "title": "Byte Count"
+          },
+          "http_status": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Http Status"
+          },
+          "content_type": {
+            "type": "string",
+            "title": "Content Type"
+          },
+          "license": {
+            "type": "string",
+            "title": "License"
+          },
+          "file_path": {
+            "type": "string",
+            "title": "File Path"
+          },
+          "record_status": {
+            "type": "string",
+            "title": "Record Status",
+            "default": "verified"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "record_type": {
+            "type": "string",
+            "title": "Record Type",
+            "default": "download"
+          },
+          "parent_ids": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Ids"
+          },
+          "transform_script": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transform Script"
+          },
+          "transform_script_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transform Script Sha256"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "url",
+          "retrieved_at",
+          "sha256",
+          "byte_count",
+          "content_type",
+          "license",
+          "file_path"
+        ],
+        "title": "EvidenceItem",
+        "description": "Immutable ledger record for an empirical data download or derived asset."
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": "ok"
+          },
+          "service": {
+            "type": "string",
+            "title": "Service",
+            "default": "episwarm-api"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version",
+            "default": "1.0.0"
+          },
+          "timestamp": {
+            "type": "string",
+            "title": "Timestamp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "timestamp"
+        ],
+        "title": "HealthResponse",
+        "description": "System health and version check response."
+      },
+      "JobCancelResponse": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "title": "Job Id",
+            "description": "Job identifier"
+          },
+          "status": {
+            "$ref": "#/components/schemas/JobStatus",
+            "description": "Resulting status after cancellation request"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Human-readable cancellation status message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_id",
+          "status",
+          "message"
+        ],
+        "title": "JobCancelResponse",
+        "description": "Response returned upon cancelling an active simulation job."
+      },
+      "JobListResponse": {
+        "properties": {
+          "jobs": {
+            "items": {
+              "$ref": "#/components/schemas/JobRecord"
+            },
+            "type": "array",
+            "title": "Jobs"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Total number of jobs in database"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total"
+        ],
+        "title": "JobListResponse",
+        "description": "Paginated list of historical simulation jobs."
+      },
+      "JobRecord": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "title": "Job Id",
+            "description": "Unique job identifier"
+          },
+          "status": {
+            "$ref": "#/components/schemas/JobStatus",
+            "description": "Current lifecycle status",
+            "default": "QUEUED"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At",
+            "description": "ISO 8601 UTC timestamp of creation"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At",
+            "description": "ISO 8601 UTC timestamp of execution start"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At",
+            "description": "ISO 8601 UTC timestamp of completion/failure"
+          },
+          "progress": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Progress",
+            "description": "Execution progress ratio [0.0, 1.0]",
+            "default": 0.0
+          },
+          "current_day": {
+            "type": "integer",
+            "title": "Current Day",
+            "description": "Last simulated day completed",
+            "default": 0
+          },
+          "total_days": {
+            "type": "integer",
+            "title": "Total Days",
+            "description": "Total days targeted in simulation horizon",
+            "default": 0
+          },
+          "request": {
+            "$ref": "#/components/schemas/RunCreateRequest",
+            "description": "Original launch configuration"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error",
+            "description": "Error message if status is FAILED"
+          },
+          "results_summary": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Results Summary",
+            "description": "High-level metrics summary"
+          },
+          "is_mock": {
+            "type": "boolean",
+            "title": "Is Mock",
+            "description": "Whether generated via mock test fixture",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_id",
+          "created_at",
+          "request"
+        ],
+        "title": "JobRecord",
+        "description": "Persistent execution job status and progress descriptor."
+      },
+      "JobStatus": {
+        "type": "string",
+        "enum": [
+          "QUEUED",
+          "RUNNING",
+          "COMPLETED",
+          "FAILED",
+          "CANCELLED"
+        ],
+        "title": "JobStatus",
+        "description": "Execution state machine for asynchronous simulation runs."
+      },
+      "MetricBounds": {
+        "properties": {
+          "mean": {
+            "type": "number",
+            "title": "Mean"
+          },
+          "ci_lower": {
+            "type": "number",
+            "title": "Ci Lower"
+          },
+          "ci_upper": {
+            "type": "number",
+            "title": "Ci Upper"
+          },
+          "std": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Std"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mean",
+          "ci_lower",
+          "ci_upper"
+        ],
+        "title": "MetricBounds",
+        "description": "Mean and 95% confidence intervals for a scalar summary outcome."
+      },
+      "MetricsSummary": {
+        "properties": {
+          "attack_rate": {
+            "$ref": "#/components/schemas/MetricBounds"
+          },
+          "peak_day": {
+            "$ref": "#/components/schemas/MetricBounds"
+          },
+          "total_deaths": {
+            "$ref": "#/components/schemas/MetricBounds"
+          },
+          "peak_hospital_demand": {
+            "$ref": "#/components/schemas/MetricBounds"
+          },
+          "peak_icu_demand": {
+            "$ref": "#/components/schemas/MetricBounds"
+          },
+          "overflow_deaths": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetricBounds"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "attack_rate",
+          "peak_day",
+          "total_deaths",
+          "peak_hospital_demand",
+          "peak_icu_demand"
+        ],
+        "title": "MetricsSummary",
+        "description": "Comprehensive epidemic impact metrics across stochastic replicates."
+      },
+      "PackValidationResult": {
+        "properties": {
+          "pack_type": {
+            "type": "string",
+            "title": "Pack Type",
+            "description": "Type of pack: region | disease | scenario | behavior"
+          },
+          "pack_id": {
+            "type": "string",
+            "title": "Pack Id",
+            "description": "Identifier of verified pack"
+          },
+          "is_valid": {
+            "type": "boolean",
+            "title": "Is Valid",
+            "description": "Whether pack complies with schema specifications"
+          },
+          "errors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Errors",
+            "description": "Validation error messages"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings",
+            "description": "Non-fatal warning notices"
+          },
+          "details": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Details",
+            "description": "Detailed component statuses"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pack_type",
+          "pack_id",
+          "is_valid"
+        ],
+        "title": "PackValidationResult",
+        "description": "Audit verification report for any pack asset."
+      },
+      "RegionSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Region pack identifier"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Display name of the region"
+          },
+          "country_iso": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country Iso",
+            "description": "ISO country code"
+          },
+          "data_year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Year",
+            "description": "Data vintage year"
+          },
+          "data_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Level",
+            "description": "Readiness tier: L0, L1, L2"
+          },
+          "num_areas": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Num Areas",
+            "description": "Number of administrative units"
+          },
+          "total_population": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Population",
+            "description": "Total regional population"
+          },
+          "areas_file_exists": {
+            "type": "boolean",
+            "title": "Areas File Exists",
+            "description": "Whether areas.csv is present",
+            "default": false
+          },
+          "contacts_file_exists": {
+            "type": "boolean",
+            "title": "Contacts File Exists",
+            "description": "Whether contacts.csv is present",
+            "default": false
+          },
+          "commute_file_exists": {
+            "type": "boolean",
+            "title": "Commute File Exists",
+            "description": "Whether commute_od.csv is present",
+            "default": false
+          },
+          "observed_cases_exists": {
+            "type": "boolean",
+            "title": "Observed Cases Exists",
+            "description": "Whether empirical observed_cases.csv is present",
+            "default": false
+          },
+          "provenance_status": {
+            "type": "string",
+            "title": "Provenance Status",
+            "description": "Classification: REAL or SYNTHETIC",
+            "default": "SYNTHETIC"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes",
+            "description": "Descriptive notes or source attribution"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "RegionSummary",
+        "description": "Summary metadata of an installed regional configuration pack."
+      },
+      "RunCreateRequest": {
+        "properties": {
+          "region_id": {
+            "type": "string",
+            "title": "Region Id",
+            "description": "Region identifier",
+            "default": "example_synthetic"
+          },
+          "disease_id": {
+            "type": "string",
+            "title": "Disease Id",
+            "description": "Pathogen pack identifier",
+            "default": "respiratory_generic"
+          },
+          "scenario_id": {
+            "type": "string",
+            "title": "Scenario Id",
+            "description": "Scenario pack identifier",
+            "default": "targeted_containment"
+          },
+          "scale_agents": {
+            "type": "integer",
+            "maximum": 50000.0,
+            "minimum": 100.0,
+            "title": "Scale Agents",
+            "description": "Synthetic agent population size",
+            "default": 3000
+          },
+          "behavior_mode": {
+            "type": "string",
+            "title": "Behavior Mode",
+            "description": "Behavior policy mode: none | rule | llm",
+            "default": "rule"
+          },
+          "n_replicates": {
+            "type": "integer",
+            "maximum": 50.0,
+            "minimum": 1.0,
+            "title": "N Replicates",
+            "description": "Number of stochastic replicates",
+            "default": 5
+          },
+          "random_seed": {
+            "type": "integer",
+            "title": "Random Seed",
+            "description": "Base pseudorandom generator seed",
+            "default": 42
+          },
+          "horizon_days": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 365.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Horizon Days",
+            "description": "Override simulation horizon"
+          },
+          "pause_at_day": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pause At Day",
+            "description": "Day to pause and snapshot state"
+          },
+          "use_mock": {
+            "type": "boolean",
+            "title": "Use Mock",
+            "description": "Execute fast synthetic mock run for offline UI testing",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "RunCreateRequest",
+        "description": "Specification for launching a new simulation run job."
+      },
+      "RunSummary": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "title": "Job Id"
+          },
+          "region_id": {
+            "type": "string",
+            "title": "Region Id"
+          },
+          "disease_id": {
+            "type": "string",
+            "title": "Disease Id"
+          },
+          "scenario_id": {
+            "type": "string",
+            "title": "Scenario Id"
+          },
+          "behavior_mode": {
+            "type": "string",
+            "title": "Behavior Mode"
+          },
+          "scale_agents": {
+            "type": "integer",
+            "title": "Scale Agents"
+          },
+          "n_replicates": {
+            "type": "integer",
+            "title": "N Replicates"
+          },
+          "metrics": {
+            "$ref": "#/components/schemas/MetricsSummary"
+          },
+          "validation_status": {
+            "type": "string",
+            "title": "Validation Status",
+            "description": "Empirical validation classification",
+            "default": "UNCALIBRATED"
+          },
+          "validation_card_url": {
+            "type": "string",
+            "title": "Validation Card Url",
+            "default": "/api/v1/validation/card"
+          },
+          "is_mock": {
+            "type": "boolean",
+            "title": "Is Mock",
+            "description": "Flag indicating mock fixture data",
+            "default": false
+          },
+          "banner": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Banner",
+            "description": "Banner message (e.g. MOCK DATA warning)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_id",
+          "region_id",
+          "disease_id",
+          "scenario_id",
+          "behavior_mode",
+          "scale_agents",
+          "n_replicates",
+          "metrics"
+        ],
+        "title": "RunSummary",
+        "description": "Executive outcome summary for a completed simulation run."
+      },
+      "ScenarioSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Scenario identifier"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Display name of the scenario"
+          },
+          "horizon_days": {
+            "type": "integer",
+            "title": "Horizon Days",
+            "description": "Default simulation duration in days",
+            "default": 90
+          },
+          "behavior_mode": {
+            "type": "string",
+            "title": "Behavior Mode",
+            "description": "Behavior policy mode: none | rule | llm",
+            "default": "rule"
+          },
+          "n_interventions": {
+            "type": "integer",
+            "title": "N Interventions",
+            "description": "Count of declared policy intervention actions",
+            "default": 0
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Scenario description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "ScenarioSummary",
+        "description": "Summary metadata of an intervention scenario pack."
+      },
+      "SimulationRequest": {
+        "properties": {
+          "region_id": {
+            "type": "string",
+            "title": "Region Id",
+            "description": "Region identifier",
+            "default": "example_synthetic"
+          },
+          "disease_id": {
+            "type": "string",
+            "title": "Disease Id",
+            "description": "Pathogen pack identifier",
+            "default": "respiratory_generic"
+          },
+          "scenario_id": {
+            "type": "string",
+            "title": "Scenario Id",
+            "description": "Scenario pack identifier",
+            "default": "targeted_containment"
+          },
+          "scale_agents": {
+            "type": "integer",
+            "maximum": 50000.0,
+            "minimum": 500.0,
+            "title": "Scale Agents",
+            "description": "Synthetic agent population size",
+            "default": 3000
+          },
+          "behavior_mode": {
+            "type": "string",
+            "title": "Behavior Mode",
+            "description": "Behavior policy mode: none | rule | llm",
+            "default": "rule"
+          },
+          "n_replicates": {
+            "type": "integer",
+            "maximum": 50.0,
+            "minimum": 1.0,
+            "title": "N Replicates",
+            "description": "Number of stochastic replicates for intervals",
+            "default": 5
+          },
+          "random_seed": {
+            "type": "integer",
+            "title": "Random Seed",
+            "description": "Random seed",
+            "default": 42
+          },
+          "horizon_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Horizon Days",
+            "description": "Optional override for simulation horizon"
+          },
+          "pause_at_day": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pause At Day",
+            "description": "Optional day to pause simulation and return checkpoint"
+          }
+        },
+        "type": "object",
+        "title": "SimulationRequest"
+      },
+      "SpatialOutput": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "title": "Job Id"
+          },
+          "region_id": {
+            "type": "string",
+            "title": "Region Id"
+          },
+          "n_areas": {
+            "type": "integer",
+            "title": "N Areas"
+          },
+          "areas": {
+            "items": {
+              "$ref": "#/components/schemas/AreaSpatialPoint"
+            },
+            "type": "array",
+            "title": "Areas"
+          },
+          "layers": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Layers"
+          },
+          "is_mock": {
+            "type": "boolean",
+            "title": "Is Mock",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_id",
+          "region_id",
+          "n_areas",
+          "areas",
+          "layers"
+        ],
+        "title": "SpatialOutput",
+        "description": "Geographic distribution of transmission across regional sub-areas."
+      },
+      "TimeSeriesData": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "title": "Job Id"
+          },
+          "horizon_days": {
+            "type": "integer",
+            "title": "Horizon Days"
+          },
+          "days": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Days"
+          },
+          "state_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "State Names"
+          },
+          "daily_states": {
+            "additionalProperties": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Daily States",
+            "description": "Daily population counts keyed by state name (e.g. 'S', 'E', 'I_symp', 'R', 'D')"
+          },
+          "daily_hospital_demand": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Daily Hospital Demand"
+          },
+          "daily_icu_demand": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Daily Icu Demand"
+          },
+          "daily_deaths": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Daily Deaths"
+          },
+          "daily_mean_compliance": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily Mean Compliance"
+          },
+          "daily_rumor_beliefs": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "items": {
+                    "type": "number"
+                  },
+                  "type": "array"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily Rumor Beliefs"
+          },
+          "is_mock": {
+            "type": "boolean",
+            "title": "Is Mock",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_id",
+          "horizon_days",
+          "days",
+          "state_names",
+          "daily_states",
+          "daily_hospital_demand",
+          "daily_icu_demand",
+          "daily_deaths"
+        ],
+        "title": "TimeSeriesData",
+        "description": "Temporal trajectory telemetry for states, demand, and compliance."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "ValidationReportResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "report_markdown": {
+            "type": "string",
+            "title": "Report Markdown"
+          },
+          "assumptions_count": {
+            "type": "integer",
+            "title": "Assumptions Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "report_markdown",
+          "assumptions_count"
+        ],
+        "title": "ValidationReportResponse",
+        "description": "Validation report with markdown body and structured status summary."
+      },
+      "WhatIfRequest": {
+        "properties": {
+          "region_id": {
+            "type": "string",
+            "title": "Region Id",
+            "default": "example_synthetic"
+          },
+          "disease_id": {
+            "type": "string",
+            "title": "Disease Id",
+            "default": "respiratory_generic"
+          },
+          "scenario_a": {
+            "type": "string",
+            "title": "Scenario A",
+            "default": "baseline"
+          },
+          "scenario_b": {
+            "type": "string",
+            "title": "Scenario B",
+            "default": "targeted_containment"
+          },
+          "scale_agents": {
+            "type": "integer",
+            "title": "Scale Agents",
+            "default": 3000
+          },
+          "n_replicates": {
+            "type": "integer",
+            "title": "N Replicates",
+            "default": 5
+          },
+          "random_seed": {
+            "type": "integer",
+            "title": "Random Seed",
+            "default": 42
+          }
+        },
+        "type": "object",
+        "title": "WhatIfRequest"
+      }
+    }
+  }
+}

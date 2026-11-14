@@ -26,6 +26,8 @@ MANIFEST
 *.manifest
 *.sqlite
 *.sqlite3
+*.db
+logs/
 *-wal
 *-shm
 .cache
