@@ -55,7 +55,8 @@ def evaluate_equity(
 
     # 2. By Age Cohort (Dynamic bands per Phase 17 Generality)
     if not age_bands:
-        age_bands = ["0-4", "5-18", "19-64", "65+"]
+        from episwarm.population.age_bands import get_default_age_bands
+        age_bands = getattr(pop, "age_bands", None) or get_default_age_bands()
 
     from episwarm.population.age_bands import assign_age_bands
     band_indices = assign_age_bands(pop.age, age_bands)

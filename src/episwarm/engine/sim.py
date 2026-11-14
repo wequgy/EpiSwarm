@@ -10,6 +10,7 @@ import pandas as pd
 
 from scipy.optimize import root_scalar
 from episwarm.population.build import PopulationSoA
+from episwarm.population.network import ContactNetwork, CalendarSchedule
 from episwarm.packs.disease import DiseasePack
 from episwarm.packs.scenario import ScenarioPack, InterventionAction, ResourceAddAction
 from episwarm.packs.behavior import BehaviorPack, DecisionQuestion, BehaviorExecutionConfig
@@ -147,7 +148,8 @@ def calibrate_beta_expectation(
     and validates via a 2,000 index Monte Carlo trial with common random numbers.
     """
     D = state_graph.mean_infectious_days
-    bands = age_bands or ["0-4", "5-18", "19-64", "65+"]
+    from episwarm.population.age_bands import get_default_age_bands
+    bands = age_bands or getattr(pop, "age_bands", None) or get_default_age_bands()
     n_bands = len(bands)
     agent_age_bands = assign_age_bands(pop.age, bands)
 
@@ -274,7 +276,8 @@ def calibrate_beta_numerical(
     trials: int = 50
 ) -> Tuple[float, float]:
     """Legacy numerical calibration (retained for backward compatibility)."""
-    matrices = {l: np.eye(4) * w * 5.0 for l, w in layer_weights.items()}
+    n_b = len(getattr(pop, "age_bands", [])) or 4
+    matrices = {l: np.eye(n_b, dtype=np.float64) * w * 5.0 for l, w in layer_weights.items()}
     return calibrate_beta_expectation(pop, state_graph, matrices, target_r0, rng)
 
 
@@ -296,7 +299,9 @@ def run_simulation(
     compute_attributable_overflow: bool = False,
     step_callback: Optional[Any] = None,
     checkpoint: Optional[SimulationCheckpoint] = None,
-    pause_at_day: Optional[int] = None
+    pause_at_day: Optional[int] = None,
+    contact_network: Optional[ContactNetwork] = None,
+    calendar_schedule: Optional[CalendarSchedule] = None
 ) -> SimulationResults:
     """Execute complete multi-day epidemic simulation with generic resources, vulnerability factors, and rumor dynamics."""
     rng = np.random.default_rng(scenario_pack.random_seed)
@@ -818,6 +823,7 @@ def run_simulation(
 
         # E. Evaluate new infections (S -> E) with behavior actions
         effective_isolating = agent_isolating.copy()
+        cal_mults = calendar_schedule.get_layer_multipliers(day) if calendar_schedule is not None else None
         newly_infected = evaluate_daily_infections(
             pop, state_graph, states, calib_beta,
             layer_matrices, layer_scalings, individual_k, rng,
@@ -831,7 +837,9 @@ def run_simulation(
             mask_outward_efficacy=disease_pack.transmission.mask_outward_efficacy,
             vaccine_efficacy_acquisition=disease_pack.transmission.vaccine_efficacy_acquisition,
             compliance_acquisition_reduction=exec_cfg.compliance_acquisition_reduction,
-            age_band_labels=age_bands
+            age_band_labels=age_bands,
+            contact_network=contact_network,
+            calendar_multipliers=cal_mults
         )
 
         if np.any(newly_infected):

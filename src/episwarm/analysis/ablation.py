@@ -35,12 +35,13 @@ class SelectiveRulePolicy(RulePolicy):
 def run_ablation_experiment(
     scale_agents: int = 5000,
     n_seeds: int = 25,
-    horizon_days: int = 60
+    horizon_days: int = 60,
+    disease_path: str = "diseases/respiratory_generic.yaml"
 ) -> Dict[str, Any]:
     """Execute paired-seed ablation across 5 behavioral configurations."""
     pop = build_synthetic_population("regions/example_synthetic", scale_agents=scale_agents, random_seed=42)
 
-    with open("diseases/respiratory_generic.yaml", "r", encoding="utf-8") as f:
+    with open(disease_path, "r", encoding="utf-8") as f:
         d_pack = DiseasePack(**yaml.safe_load(f))
     d_pack.transmission.r0 = 2.5
 

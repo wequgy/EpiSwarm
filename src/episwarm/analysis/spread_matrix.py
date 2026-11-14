@@ -42,6 +42,13 @@ def compute_spread_matrix(
     area_names = [pop.int_to_area_id[i] for i in range(n_areas)]
     raw_arrivals = np.full((n_areas, n_areas, n_seeds), np.nan, dtype=np.float32)
 
+    # Identify primary infectious seed state dynamically
+    default_seed_state = "I_symp"
+    for s in disease_pack.states:
+        if s.role in ("symptomatic", "infectious") or s.infectious:
+            default_seed_state = s.name
+            break
+
     for i_origin in range(n_areas):
         origin_id = area_names[i_origin]
 
@@ -52,9 +59,9 @@ def compute_spread_matrix(
             scen.random_seed = base_scenario.random_seed + s_idx * 100 + i_origin
             scen.seeding = SeedingConfig(
                 area_id=origin_id,
-                seed_all_areas=False,
+                all_areas=False,
                 initial_cases_per_area=20,
-                seeded_state="I_symp"
+                seeded_state=default_seed_state
             )
 
             # Run

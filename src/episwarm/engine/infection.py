@@ -6,6 +6,7 @@ import pandas as pd
 
 from episwarm.population.build import PopulationSoA
 from episwarm.engine.state_graph import CompiledStateGraph
+from episwarm.population.network import ContactNetwork, compute_network_edge_lambda
 
 
 def compute_age_structured_layer_lambda(
@@ -141,7 +142,9 @@ def evaluate_daily_infections(
     mask_outward_efficacy: float = 0.50,
     vaccine_efficacy_acquisition: float = 0.80,
     compliance_acquisition_reduction: float = 0.30,
-    age_band_labels: Optional[List[str]] = None
+    age_band_labels: Optional[List[str]] = None,
+    contact_network: Optional[ContactNetwork] = None,
+    calendar_multipliers: Optional[Dict[int, float]] = None
 ) -> np.ndarray:
     """Determine which susceptible agents contract infection on the current simulation day (Spec 4.1, 5.1, 5.2)."""
     susceptible_mask = (current_states == state_graph.idx_S)
@@ -166,8 +169,8 @@ def evaluate_daily_infections(
 
     # 2. Derive agent age bands dynamically if not supplied
     if agent_age_bands is None:
-        from episwarm.population.age_bands import assign_age_bands
-        bands = age_band_labels or ["0-4", "5-18", "19-64", "65+"]
+        from episwarm.population.age_bands import assign_age_bands, get_default_age_bands
+        bands = age_band_labels or getattr(pop, "age_bands", None) or get_default_age_bands()
         agent_age_bands = assign_age_bands(pop.age, bands)
 
     # Resolve per-agent layer scalings from float or per-area arrays
@@ -182,77 +185,91 @@ def evaluate_daily_infections(
         else:
             resolved_scalings[l_key] = float(val)
 
-    # Resolve effective venues with isolation
-    effective_schools = np.copy(pop.school_id)
-    effective_workplaces = np.copy(pop.workplace_id)
-    effective_workplaces[pop.wfh_possible] = -1
-    effective_comm = np.copy(pop.commute_area)
-
-    if agent_isolating is not None:
-        iso_b = agent_isolating.astype(bool)
-        effective_schools[iso_b] = -1
-        effective_workplaces[iso_b] = -1
-        effective_comm[iso_b] = -1
-
-    # Check whether matrices or legacy scalar weights are provided
-    is_matrix_dict = isinstance(next(iter(layer_weights.values())), np.ndarray) and not legacy_uniform_mixing
-
-    if is_matrix_dict:
-        # Age-structured mixing per Spec 4.1
-        M_home = layer_weights.get("home", np.eye(4) * 2.0)
-        M_school = layer_weights.get("school", np.eye(4) * 2.0)
-        M_work = layer_weights.get("work", np.eye(4) * 2.0)
-        M_comm = layer_weights.get("community", layer_weights.get("comm", np.eye(4) * 2.0))
-
-        lambda_home = compute_age_structured_layer_lambda(
-            pop.household_id, agent_loads, agent_age_bands, M_home, beta,
-            resolved_scalings.get("home", 1.0)
+    # If explicit persistent contact network is provided, compute edge transmission
+    if contact_network is not None:
+        total_lambda = compute_network_edge_lambda(
+            contact_network,
+            agent_loads,
+            beta,
+            layer_scalings=resolved_scalings,
+            calendar_multipliers=calendar_multipliers,
+            agent_areas=pop.area_id
         )
-        if area_crowding_multipliers is not None:
-            lambda_home *= area_crowding_multipliers[pop.area_id]
-
-        lambda_school = compute_age_structured_layer_lambda(
-            effective_schools, agent_loads, agent_age_bands, M_school, beta,
-            resolved_scalings.get("school", 1.0)
-        )
-
-        lambda_work = compute_age_structured_layer_lambda(
-            effective_workplaces, agent_loads, agent_age_bands, M_work, beta,
-            resolved_scalings.get("work", 1.0)
-        )
-
-        lambda_comm = compute_age_structured_layer_lambda(
-            effective_comm, agent_loads, agent_age_bands, M_comm, beta,
-            resolved_scalings.get("community", 1.0)
-        )
-
     else:
-        # Legacy uniform mixing mode
-        lw = layer_weights  # type: ignore
-        lambda_home = compute_venue_layer_lambda_legacy(
-            pop.household_id, agent_loads, beta * float(lw.get("home", 0.35)),
-            resolved_scalings.get("home", 1.0) if isinstance(resolved_scalings.get("home", 1.0), float) else 1.0
-        )
-        if area_crowding_multipliers is not None:
-            lambda_home *= area_crowding_multipliers[pop.area_id]
+        # Resolve effective venues with isolation
+        effective_schools = np.copy(pop.school_id)
+        effective_workplaces = np.copy(pop.workplace_id)
+        effective_workplaces[pop.wfh_possible] = -1
+        effective_comm = np.copy(pop.commute_area)
 
-        lambda_school = compute_venue_layer_lambda_legacy(
-            effective_schools, agent_loads, beta * float(lw.get("school", 0.25)),
-            resolved_scalings.get("school", 1.0) if isinstance(resolved_scalings.get("school", 1.0), float) else 1.0
-        )
+        if agent_isolating is not None:
+            iso_b = agent_isolating.astype(bool)
+            effective_schools[iso_b] = -1
+            effective_workplaces[iso_b] = -1
+            effective_comm[iso_b] = -1
 
-        lambda_work = compute_venue_layer_lambda_legacy(
-            effective_workplaces, agent_loads, beta * float(lw.get("work", 0.25)),
-            resolved_scalings.get("work", 1.0) if isinstance(resolved_scalings.get("work", 1.0), float) else 1.0
-        )
+        # Check whether matrices or legacy scalar weights are provided
+        is_matrix_dict = isinstance(next(iter(layer_weights.values())), np.ndarray) and not legacy_uniform_mixing
 
-        lambda_comm = compute_community_layer_lambda_legacy(
-            effective_comm, agent_loads, beta * float(lw.get("community", 0.15)),
-            resolved_scalings.get("community", 1.0) if isinstance(resolved_scalings.get("community", 1.0), float) else 1.0
-        )
+        if is_matrix_dict:
+            # Dynamic dimension based on age bands or matrix shape
+            first_m = next(iter(layer_weights.values()))
+            n_b = first_m.shape[0] if isinstance(first_m, np.ndarray) else (len(np.unique(agent_age_bands)) if agent_age_bands is not None else 4)
+            default_m = np.eye(n_b, dtype=np.float64) * 2.0
 
-    # 3. Total lambda per susceptible agent
-    total_lambda = lambda_home + lambda_school + lambda_work + lambda_comm
+            M_home = layer_weights.get("home", default_m)
+            M_school = layer_weights.get("school", default_m)
+            M_work = layer_weights.get("work", default_m)
+            M_comm = layer_weights.get("community", layer_weights.get("comm", default_m))
+
+            lambda_home = compute_age_structured_layer_lambda(
+                pop.household_id, agent_loads, agent_age_bands, M_home, beta,
+                resolved_scalings.get("home", 1.0)
+            )
+            if area_crowding_multipliers is not None:
+                lambda_home *= area_crowding_multipliers[pop.area_id]
+
+            lambda_school = compute_age_structured_layer_lambda(
+                effective_schools, agent_loads, agent_age_bands, M_school, beta,
+                resolved_scalings.get("school", 1.0)
+            )
+
+            lambda_work = compute_age_structured_layer_lambda(
+                effective_workplaces, agent_loads, agent_age_bands, M_work, beta,
+                resolved_scalings.get("work", 1.0)
+            )
+
+            lambda_comm = compute_age_structured_layer_lambda(
+                effective_comm, agent_loads, agent_age_bands, M_comm, beta,
+                resolved_scalings.get("community", 1.0)
+            )
+
+        else:
+            # Legacy uniform mixing mode
+            lw = layer_weights  # type: ignore
+            lambda_home = compute_venue_layer_lambda_legacy(
+                pop.household_id, agent_loads, beta * float(lw.get("home", 0.35)),
+                resolved_scalings.get("home", 1.0) if isinstance(resolved_scalings.get("home", 1.0), float) else 1.0
+            )
+            if area_crowding_multipliers is not None:
+                lambda_home *= area_crowding_multipliers[pop.area_id]
+
+            lambda_school = compute_venue_layer_lambda_legacy(
+                effective_schools, agent_loads, beta * float(lw.get("school", 0.25)),
+                resolved_scalings.get("school", 1.0) if isinstance(resolved_scalings.get("school", 1.0), float) else 1.0
+            )
+
+            lambda_work = compute_venue_layer_lambda_legacy(
+                effective_workplaces, agent_loads, beta * float(lw.get("work", 0.25)),
+                resolved_scalings.get("work", 1.0) if isinstance(resolved_scalings.get("work", 1.0), float) else 1.0
+            )
+
+            lambda_comm = compute_community_layer_lambda_legacy(
+                effective_comm, agent_loads, beta * float(lw.get("community", 0.15)),
+                resolved_scalings.get("community", 1.0) if isinstance(resolved_scalings.get("community", 1.0), float) else 1.0
+            )
+
+        total_lambda = lambda_home + lambda_school + lambda_work + lambda_comm
 
     # Individual behavioral compliance reduction
     compliance_factor = 1.0 - (compliance_acquisition_reduction * pop.compliance)

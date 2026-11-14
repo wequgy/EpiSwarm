@@ -31,10 +31,15 @@ def parse_age_band_bounds(band: str) -> Tuple[int, int]:
         return 0, 150
 
 
+def get_default_age_bands() -> List[str]:
+    """Default baseline age bands when no empirical contacts or region age structure is provided."""
+    return ["0-4", "5-18", "19-64", "65+"]
+
+
 def resolve_age_bands_from_contacts(contacts_df: Optional[pd.DataFrame], fallback: Optional[List[str]] = None) -> List[str]:
     """Derive sorted age band labels dynamically from contacts dataframe or fallback."""
     if fallback is None:
-        fallback = ["0-4", "5-18", "19-64", "65+"]
+        fallback = get_default_age_bands()
     if contacts_df is None or contacts_df.empty:
         return fallback
 

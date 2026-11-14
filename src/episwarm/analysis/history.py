@@ -42,9 +42,13 @@ class SimulationHistoryManager:
         # Daily trajectory table
         daily_records = []
         n_days = results.horizon_days
-        symp_idx = results.state_names.index("I_symp") if "I_symp" in results.state_names else (
-            results.state_names.index("I") if "I" in results.state_names else -1
-        )
+        symp_idx = -1
+        for idx, sname in enumerate(results.state_names):
+            if sname in ("I_symp", "I", "Clinical_Transmitter", "Infected", "Infectious") or "symp" in sname.lower() or "inf" in sname.lower():
+                symp_idx = idx
+                break
+        if symp_idx == -1 and results.state_names:
+            symp_idx = min(1, len(results.state_names) - 1)
         death_idx = results.state_names.index("D") if "D" in results.state_names else -1
 
         for d in range(n_days):

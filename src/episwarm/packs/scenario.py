@@ -16,7 +16,7 @@ class SeedingConfig(BaseModel):
         description="Flag indicating sequential evaluation across all areas (for spread matrix computation)"
     )
     initial_cases_per_area: int = Field(default=10, gt=0, description="Number of index cases seeded")
-    seeded_state: str = Field(default="I_symp", description="State to place initial index cases in")
+    seeded_state: Optional[str] = Field(default=None, description="State to place initial index cases in (defaults to primary infectious state)")
     seed_infectiousness: Literal["mean", "natural"] = Field(
         default="mean",
         description="Initial infectiousness of seeds: 'mean' (1.0, eliminates chance extinction) or 'natural' (overdispersed)"

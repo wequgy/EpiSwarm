@@ -144,7 +144,8 @@ class MetapopulationEngine:
     ) -> "MetapopulationEngine":
         """Factory method to construct engine directly from RegionPack and DiseasePack."""
         # 1. Age contact matrix
-        c_mat = np.array(disease_pack.contacts.setting_matrices.get("all", np.eye(4) * 5.0), dtype=np.float64)
+        default_bands = len(region_pack.age_distributions[0].bands) if (region_pack and getattr(region_pack, "age_distributions", None)) else 4
+        c_mat = np.array(disease_pack.contacts.setting_matrices.get("all", np.eye(default_bands) * 5.0), dtype=np.float64)
         n_bands = c_mat.shape[0]
 
         # 2. Derive latency and infectious periods by collapsing disease states
