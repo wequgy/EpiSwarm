@@ -1,7 +1,13 @@
 """Export FastAPI application OpenAPI schema to web/openapi.json."""
 
-import json
+import sys
 from pathlib import Path
+
+# Ensure local repository src is prioritized over external editable installs
+REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT / "src"))
+
+import json
 from episwarm.api.main import app
 
 

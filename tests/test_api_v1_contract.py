@@ -384,3 +384,24 @@ def test_v1_rfc7807_pack_not_found():
     data = resp.json()
     assert data["status"] == 404
     assert data["title"] == "Not Found"
+
+
+# ==============================================================================
+# 7. Production SPA Static Serving & Fallback Routing
+# ==============================================================================
+
+def test_v1_spa_serving():
+    """Verify FastAPI root and client-side fallback routes serve Vite SPA."""
+    resp_root = client.get("/")
+    assert resp_root.status_code == 200
+    assert "text/html" in resp_root.headers.get("content-type", "")
+    assert '<div id="root">' in resp_root.text
+
+    resp_client_route = client.get("/runs")
+    assert resp_client_route.status_code == 200
+    assert '<div id="root">' in resp_client_route.text
+
+    resp_api_404 = client.get("/api/v1/nonexistent_subroute")
+    assert resp_api_404.status_code == 404
+    assert resp_api_404.headers["content-type"] == "application/problem+json"
+

@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  episwarm-platform:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: episwarm-studio
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-3.1-flash-lite}
+      - TYPESAFE_API_KEY=${TYPESAFE_API_KEY:-}
+      - LOCAL_LLM_BASE_URL=${LOCAL_LLM_BASE_URL:-}
+    volumes:
+      - ./logs:/app/logs
+      - ./evidence:/app/evidence
+    restart: unless-stopped
