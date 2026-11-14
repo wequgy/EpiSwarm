@@ -246,3 +246,4 @@ async def live_websocket_channel(websocket: WebSocket, job_id: str):
 
     except WebSocketDisconnect:
         pass
+

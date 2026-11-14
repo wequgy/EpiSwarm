@@ -561,3 +561,4 @@ class CaseFileService:
             zf.writestr("checksums.sha256", checksum_text)
 
         return zip_path
+

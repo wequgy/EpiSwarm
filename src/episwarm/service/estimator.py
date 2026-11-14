@@ -61,3 +61,4 @@ class ResourceEstimator:
             stability_status=status,
             within_memory_budget=(mem_gb < 11.0),
         )
+

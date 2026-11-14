@@ -3,24 +3,9 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Layout } from './components/Layout';
 
-import { Home } from './pages/Home';
-import { Runs } from './pages/Runs';
-import { ResultsOverview } from './pages/ResultsOverview';
-import { Regions } from './pages/Regions';
-import { Diseases } from './pages/Diseases';
-import { Scenarios } from './pages/Scenarios';
-import { Behaviors } from './pages/Behaviors';
-import { QuickRegionBuilder } from './pages/QuickRegionBuilder';
-import { Capacity } from './pages/Capacity';
-import { SpatialDiorama } from './pages/SpatialDiorama';
-import { Equity } from './pages/Equity';
-import { BehaviorAnalysis } from './pages/BehaviorAnalysis';
-import { Compare } from './pages/Compare';
-import { Optimization } from './pages/Optimization';
-import { AdvisorChat } from './pages/AdvisorChat';
-import { Validation } from './pages/Validation';
-import { Evidence } from './pages/Evidence';
-import { Settings } from './pages/Settings';
+import { CaseFile } from './pages/CaseFile';
+import { SimulateStage } from './pages/SimulateStage';
+import { Insights } from './pages/Insights';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -37,25 +22,31 @@ export const App: React.FC = () => {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Layout />}>
-            <Route index element={<Home />} />
-            <Route path="runs" element={<Runs />} />
-            <Route path="results/:id" element={<ResultsOverview />} />
-            <Route path="regions" element={<Regions />} />
-            <Route path="diseases" element={<Diseases />} />
-            <Route path="scenarios" element={<Scenarios />} />
-            <Route path="behaviors" element={<Behaviors />} />
-            <Route path="builder" element={<QuickRegionBuilder />} />
-            <Route path="capacity" element={<Capacity />} />
-            <Route path="spatial" element={<SpatialDiorama />} />
-            <Route path="equity" element={<Equity />} />
-            <Route path="behavior-analysis" element={<BehaviorAnalysis />} />
-            <Route path="compare" element={<Compare />} />
-            <Route path="optimization" element={<Optimization />} />
-            <Route path="advisor" element={<AdvisorChat />} />
-            <Route path="validation" element={<Validation />} />
-            <Route path="evidence" element={<Evidence />} />
-            <Route path="settings" element={<Settings />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
+            {/* 3 Core Modes of EpiSwarm Studio v2 */}
+            <Route index element={<Navigate to="/case-file" replace />} />
+            <Route path="case-file" element={<CaseFile />} />
+            <Route path="simulate" element={<SimulateStage />} />
+            <Route path="insights" element={<Insights />} />
+
+            {/* Seamless Legacy Parity Aliases */}
+            <Route path="runs" element={<Navigate to="/simulate" replace />} />
+            <Route path="results/:id" element={<Navigate to="/insights" replace />} />
+            <Route path="capacity" element={<Navigate to="/insights?tab=capacity" replace />} />
+            <Route path="spatial" element={<Navigate to="/insights?tab=spatial" replace />} />
+            <Route path="equity" element={<Navigate to="/insights?tab=equity" replace />} />
+            <Route path="compare" element={<Navigate to="/insights?tab=compare" replace />} />
+            <Route path="optimization" element={<Navigate to="/insights?tab=pareto" replace />} />
+            <Route path="advisor" element={<Navigate to="/insights?tab=advisor" replace />} />
+            <Route path="validation" element={<Navigate to="/insights?tab=calibration" replace />} />
+            <Route path="evidence" element={<Navigate to="/insights?tab=calibration" replace />} />
+            <Route path="regions" element={<Navigate to="/case-file" replace />} />
+            <Route path="diseases" element={<Navigate to="/case-file" replace />} />
+            <Route path="scenarios" element={<Navigate to="/case-file" replace />} />
+            <Route path="behaviors" element={<Navigate to="/case-file" replace />} />
+            <Route path="builder" element={<Navigate to="/case-file" replace />} />
+
+            {/* Default Catch-all */}
+            <Route path="*" element={<Navigate to="/case-file" replace />} />
           </Route>
         </Routes>
       </BrowserRouter>

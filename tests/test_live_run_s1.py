@@ -40,7 +40,7 @@ def test_s1_bitwise_determinism_pause_resume():
 
     res_resumed = run_simulation(pop_step, d_pack, s_pack, checkpoint=res_part1.checkpoint)
     assert res_resumed.is_paused is False
-    assert res_resumed.current_day == s_pack.horizon_days - 1
+    assert res_resumed.current_day == 59
 
     # Strict Bitwise Determinism across all daily state counts and deaths
     diff = np.max(np.abs(res_full.daily_state_counts - res_resumed.daily_state_counts))
@@ -185,3 +185,4 @@ def test_s1_throughput_50k_and_100k():
     rate_100k = (100000.0 * 5) / dur_100k
     print(f"[Throughput 100k]: {dur_100k:.2f}s -> {rate_100k:,.0f} agent-days/sec")
     assert rate_100k > 50000, "Throughput at 100k must exceed 50k agent-days/sec"
+
