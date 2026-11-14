@@ -8,7 +8,7 @@
     "generation_time_days": 4.0,
     "delay_parameter": 5.34
   },
-  "targets_passed": "0/3",
+  "targets_passed": "0/4",
   "targets": {
     "registered_deaths": {
       "passed": true,
@@ -44,10 +44,21 @@
       "reason": "Auditor finding Y4: Prior evaluations accessed local held-out dataset without hash chaining or counter increments; dataset compromised for v3.0.0.",
       "held_out_window": "London_Wave2_2020-09-01_to_2020-11-30",
       "external_dataset_required": true
+    },
+    "held_out_wave3": {
+      "passed": false,
+      "status": "FAIL",
+      "held_out_window": "London_Wave3_2020-12-01_to_2021-02-28",
+      "observed_peak_beds": 1220.0,
+      "simulated_peak_beds": 360.1,
+      "peak_ratio": 0.295,
+      "peak_day_error": "33 days",
+      "cumulative_error": "93.0%",
+      "thresholds": "peak ratio in [0.70, 1.30], timing error <= 10 days"
     }
   },
   "ledger_authenticated": true,
-  "generated_at": "2026-11-14T13:46:42.757356+00:00",
+  "generated_at": "2026-11-14T14:09:52.319620+00:00",
   "assumptions": {
     "London Baseline ICU Capacity": {
       "value": "800 beds",

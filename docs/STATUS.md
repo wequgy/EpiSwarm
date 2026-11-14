@@ -60,8 +60,8 @@ This audit records the factual implementation status of all requirements across 
 ## 3. Real Test & Benchmark Evidence
 
 ### 3.1 Test Suite Summary Line
-- **Test Files**: 30 test files (`test_adversarial_audit_phase34.py`, `test_advisor_optimizer_phase6.py`, `test_analysis_phase5.py`, `test_api_phase24.py`, `test_app_calibration_phase7_8.py`, `test_app_headless.py`, `test_behavior_comix_phase30.py`, `test_behavior_hierarchical_phase23.py`, `test_behavior_phase16.py`, `test_behavior_phase4.py`, `test_core_model_phase10.py`, `test_engine_phase2.py`, `test_evidence_infrastructure_phase26.py`, `test_final_size_phase15.py`, `test_generality_phase17.py`, `test_healthcare_phase3.py`, `test_healthcare_validation_phase31.py`, `test_held_out_wave2_phase32.py`, `test_integrity_scan.py`, `test_meta_crossval_phase13.py`, `test_observation_phase18.py`, `test_packs_phase0.py`, `test_pause_resume_history.py`, `test_policy_local.py`, `test_population_phase1.py`, `test_reference_london_phase27.py`, `test_resource_whatif_phase12.py`, `test_rumor_compliance_phase11.py`, `test_spatial_validation_phase29.py`, `test_validation_coherence.py`).
-- **Results**: **124 passed**, 0 failed, 0 errors in 375.96s.
+- **Test Files**: 35 test files (`test_adversarial_audit_phase34.py`, `test_advisor_optimizer_phase6.py`, `test_advisor_v3.py`, `test_analysis_phase5.py`, `test_api_phase24.py`, `test_app_calibration_phase7_8.py`, `test_app_headless.py`, `test_bayesian_calibration_phase3.py`, `test_behavior_comix_phase30.py`, `test_behavior_hierarchical_phase23.py`, `test_behavior_phase16.py`, `test_behavior_phase4.py`, `test_behavior_v3.py`, `test_core_model_phase10.py`, `test_engine_phase2.py`, `test_evidence_infrastructure_phase26.py`, `test_final_size_phase15.py`, `test_generality_phase17.py`, `test_healthcare_phase3.py`, `test_healthcare_validation_phase31.py`, `test_held_out_wave2_phase32.py`, `test_held_out_wave3_phase6.py`, `test_integrity_scan.py`, `test_meta_crossval_phase13.py`, `test_network_and_generality_phase2.py`, `test_observation_phase18.py`, `test_packs_phase0.py`, `test_pause_resume_history.py`, `test_policy_local.py`, `test_population_phase1.py`, `test_reference_london_phase27.py`, `test_resource_whatif_phase12.py`, `test_rumor_compliance_phase11.py`, `test_spatial_validation_phase29.py`, `test_validation_coherence.py`).
+- **Results**: **143 passed**, 0 failed, 0 errors in 301.08s.
 - **Integrity Status**: Automated scanner reports **0 violations** in active tree; 32 violations quarantined.
 
 ### 3.2 Live Scale & Execution Benchmarks
@@ -69,10 +69,10 @@ All runs executed live using `scenarios/baseline.yaml` (`behavior_mode: none`), 
 
 | scale | horizon_days | attack_rate_pct | peak_infectious | time_per_day_ms | sim_time_sec | total_time_sec | peak_memory_mb | theoretical_soa_mb |
 |---|---|---|---|---|---|---|---|---|
-| 5,000 | 45 | 83.8% | 1,103 | 41.6 | 1.87 | 1.97 | 133.0 | 0.21 |
-| 50,000 | 45 | 78.4% | 11,408 | 269.6 | 12.13 | 12.31 | 184.2 | 2.15 |
-| 100,000 | 45 | 74.3% | 23,324 | 433.6 | 19.51 | 19.8 | 238.2 | 4.29 |
-| 500,000 | 45 | 59.2% | 116,776 | 1718.9 | 77.35 | 78.71 | 672.3 | 21.46 |
+| 5,000 | 45 | 83.8% | 1,103 | 26.4 | 1.19 | 1.39 | 134.6 | 0.21 |
+| 50,000 | 45 | 78.4% | 11,408 | 181.3 | 8.16 | 8.29 | 185.9 | 2.15 |
+| 100,000 | 45 | 74.3% | 23,324 | 334.0 | 15.03 | 15.37 | 239.6 | 4.29 |
+| 500,000 | 45 | 59.2% | 116,776 | 1309.4 | 58.92 | 59.98 | 674.2 | 21.46 |
 
 ---
 

@@ -67,10 +67,10 @@ Evaluated on single-socket CPU (AMD/Intel Core architecture, 16 GB RAM baseline)
 
 | Agent Scale | Synthetic Pop Build | 30-Day Simulation | Total Runtime | Peak Working Set RAM | SoA Theoretical Size |
 |:---:|:---:|:---:|:---:|:---:|:---:|
-| **5,000** | 0.10s | 1.87s | **1.97s** | 133.0 MB | 0.21 MB |
-| **50,000** | 0.18s | 12.13s | **12.31s** | 184.2 MB | 2.15 MB |
-| **100,000** | 0.29s | 19.51s | **19.80s** | 238.2 MB | 4.29 MB |
-| **500,000** | 1.36s | 77.35s | **78.71s** | 672.3 MB | 21.46 MB |
+| **5,000** | 0.20s | 1.19s | **1.39s** | 134.6 MB | 0.21 MB |
+| **50,000** | 0.13s | 8.16s | **8.29s** | 185.9 MB | 2.15 MB |
+| **100,000** | 0.34s | 15.03s | **15.37s** | 239.6 MB | 4.29 MB |
+| **500,000** | 1.06s | 58.92s | **59.98s** | 674.2 MB | 21.46 MB |
 
 > [!NOTE]
 > Even at 500,000 agents, peak RAM usage is **692 MB**, comfortably below the 11 GB ceiling on 16 GB hardware. CPU NumPy vectorization achieves >6,000 agent-days per millisecond. GPU offloading provides minimal additional gain at these scales due to PCIe transfer overhead.

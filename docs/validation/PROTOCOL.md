@@ -27,6 +27,15 @@ To adhere strictly to Rules 4 and 5 (no data leakage and pre-registration):
   1. The held-out window data is strictly forbidden from parameter tuning, model selection, error analysis, or bug hunting.
   2. The held-out window will be evaluated exactly once per model iteration.
   3. Every evaluation timestamp, parameter set, and metrics will be logged in `docs/validation/HELD_OUT_LOG.jsonl`.
+  4. *Audit Status*: Marked COMPROMISED for v3.0.0 due to Finding Y4 (repeated prior evaluation access).
+
+### 1.3 Fresh Pre-Registered Held-Out Validation Window: Wave 3 (Winter Alpha Surge)
+* **Window**: December 1, 2020 to February 28, 2021 (90 days).
+* **Epidemiological Context**: Winter wave featuring Alpha variant sweep (VOC-202012/01), London Tier 3 (Dec 16), Tier 4 (Dec 20), and National Lockdown 3 (Jan 5, 2021). Peak mechanical ventilation ICU bed demand reached 2,516 beds on January 24, 2021 (NHS England / UKHSA).
+* **Quarantine Rules**:
+  1. Strictly uncompromised fresh window; zero prior evaluations.
+  2. Evaluated through `HeldOutGate` with immutable hash-chained audit logging.
+  3. Evaluates peak timing error (within 7 days), peak ICU ratio (within [0.75, 1.25]), and cumulative volume error.
 
 ---
 
