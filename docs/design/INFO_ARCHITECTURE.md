@@ -81,3 +81,4 @@ flowchart TD
 | **Control Dock & HUD** | Simulate | `/runs` form | In-run interactive controls: play, pause, step-1, speed (1x-10x), instant intervention injection, and checkpoint branching. |
 | **Insights Hub** | Insights | `/results`, `/capacity`, `/equity`, `/compare`, `/optimization`, `/advisor` | Unified multi-tabbed analytical suite with ensemble confidence bands, Pareto curves, and spatial rankings. |
 | **Trust & Data Drawer** | Global Drawer | `/validation`, `/evidence`, `/settings` | Global slide-down drawer exposing SHA-256 provenance hashes, validation gates, and backend status without leaving the run. |
+

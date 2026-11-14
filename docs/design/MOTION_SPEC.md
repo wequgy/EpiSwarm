@@ -34,3 +34,4 @@ When `@media (prefers-reduced-motion: reduce)` is enabled:
 2. **Ripples and Pulses Removed**: Expanding infection ripples and pulsing warning halos become solid, high-contrast static alert rings.
 3. **Instant Transitions**: Slide-overs and modals appear immediately (`0ms` duration) without sliding or scaling.
 4. **Ticker Animation Off**: Metric counters snap directly to new numbers without rolling effects.
+

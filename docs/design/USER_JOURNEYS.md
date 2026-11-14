@@ -90,3 +90,4 @@ Experience the system's live capabilities within 45 seconds without configuring 
    - The user clicks the **Trust & Data Drawer** at the top right:
      - The sliding drawer reveals the exact validation scorecard: 0 integrity violations, London spatial arrival rank correlation ($\rho = 0.678$), and all SHA-256 ledger records.
    - The user is satisfied that the system is scientifically rigorous, completely honest about its data origins, and ready for production deployment.
+

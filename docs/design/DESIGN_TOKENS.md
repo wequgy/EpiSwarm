@@ -69,3 +69,4 @@ EpiSwarm Studio v2 uses an **"Arctic Scientific Glass"** aesthetic:
 ## 5. Accessibility & Contrast Verification
 - **Contrast**: All text pairs achieve a minimum contrast ratio of **4.8:1** (WCAG AA), with critical alerts achieving **7:1** (AAA).
 - **Colorblind Redundancy**: Color is never the sole carrier of meaning. State transitions and capacity alerts always combine color with geometric glyphs, pulsing rings, or text status badges.
+

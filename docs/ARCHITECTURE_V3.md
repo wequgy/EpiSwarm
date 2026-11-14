@@ -97,3 +97,4 @@ Spec 4.1 (venue-only mean-field mixing) by section 5; spec 10 (per-bucket LLM po
 
 ## 14. Risks
 Teacher bias propagates to the student (calibration and ensembles mitigate, tiers disclose); hierarchical priors may transfer poorly across cultures; onboarding agents can mis-extract numbers (second pass and influence-ranked review); explicit networks add memory and calibration work; real data are biased and revised; one reference site does not prove generality (hence the transportability study).
+

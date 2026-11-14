@@ -40,3 +40,4 @@ This document catalogs every domain capability currently unmodeled or stubbed in
 1. **Never render active sliders, toggles, or input fields** for items listed in this document.
 2. In the **Case File Parameter Explorer**, these items are tagged with a purple badge: `PLANNED (ENGINE GAP)`.
 3. Clicking a planned parameter opens an informative tooltip explaining: *"This capability is planned for Roadmap S6. The active vectorized simulation engine does not currently read this parameter."*
+

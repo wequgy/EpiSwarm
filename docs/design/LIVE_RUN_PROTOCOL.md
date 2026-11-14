@@ -144,3 +144,4 @@ interface LiveDayFrame {
 ## 4. Backpressure & Client Acknowledgement
 - In **Watch Mode**, the server maintains a frame buffer of at most 3 frames. It waits for the client to send `{ "type": "ack", "day": N }` before emitting the next frame, ensuring animation smoothness even on modest hardware.
 - In **Fast Mode**, frames stream at full computational speed and are persisted directly to the local chunked Frame Store on disk (`runs/{job_id}/frames.bin`) for subsequent scrubbing and replay.
+

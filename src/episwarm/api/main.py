@@ -37,9 +37,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Register RFC 7807 problem+json error handlers and mount API v1 router
+# Register RFC 7807 problem+json error handlers and mount API v1 & v2 routers
 register_problem_handlers(app)
 app.include_router(api_v1_router)
+
+from episwarm.api.v2.live import router as api_v2_router
+app.include_router(api_v2_router, prefix="/api")
 
 
 class SimulationRequest(BaseModel):

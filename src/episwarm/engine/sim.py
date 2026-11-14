@@ -61,6 +61,11 @@ class SimulationCheckpoint:
     rng_state: Any
     total_overflow_deaths: int = 0
     event_logs: List[str] = field(default_factory=list)
+    unserved_days: Optional[np.ndarray] = None
+    prev_area_measures_desc: Optional[Dict[int, str]] = None
+    prev_area_risk_bands: Optional[np.ndarray] = None
+    current_rumor_beliefs: Optional[np.ndarray] = None
+    current_compliance_fatigue: Optional[np.ndarray] = None
 
 
 @dataclass
@@ -552,6 +557,17 @@ def run_simulation(
             if t_id in daily_rumor_beliefs:
                 daily_rumor_beliefs[t_id][:min(horizon, len(cp_arr))] = cp_arr[:min(horizon, len(cp_arr))]
 
+        if getattr(checkpoint, "unserved_days", None) is not None:
+            unserved_days = np.copy(checkpoint.unserved_days)
+        if getattr(checkpoint, "prev_area_measures_desc", None) is not None:
+            prev_area_measures_desc = dict(checkpoint.prev_area_measures_desc)
+        if getattr(checkpoint, "prev_area_risk_bands", None) is not None:
+            prev_area_risk_bands = np.copy(checkpoint.prev_area_risk_bands)
+        if rumor_engine and getattr(checkpoint, "current_rumor_beliefs", None) is not None:
+            rumor_engine.beliefs = np.copy(checkpoint.current_rumor_beliefs)
+        if compliance_engine and getattr(checkpoint, "current_compliance_fatigue", None) is not None:
+            compliance_engine.fatigue = np.copy(checkpoint.current_compliance_fatigue)
+
     # 8. Day-by-day stepping loop
     sim_horizon = horizon
     for day in range(start_day, horizon):
@@ -902,7 +918,12 @@ def run_simulation(
                 target_r0=target_r0,
                 rng_state=rng.bit_generator.state,
                 total_overflow_deaths=total_overflow_deaths,
-                event_logs=list(event_logs)
+                event_logs=list(event_logs),
+                unserved_days=np.copy(unserved_days),
+                prev_area_measures_desc=dict(prev_area_measures_desc),
+                prev_area_risk_bands=np.copy(prev_area_risk_bands),
+                current_rumor_beliefs=np.copy(rumor_engine.beliefs) if rumor_engine else None,
+                current_compliance_fatigue=np.copy(compliance_engine.fatigue) if compliance_engine else None,
             )
             break
 
@@ -938,7 +959,12 @@ def run_simulation(
             target_r0=target_r0,
             rng_state=rng.bit_generator.state,
             total_overflow_deaths=total_overflow_deaths,
-            event_logs=list(event_logs)
+            event_logs=list(event_logs),
+            unserved_days=np.copy(unserved_days),
+            prev_area_measures_desc=dict(prev_area_measures_desc),
+            prev_area_risk_bands=np.copy(prev_area_risk_bands),
+            current_rumor_beliefs=np.copy(rumor_engine.beliefs) if rumor_engine else None,
+            current_compliance_fatigue=np.copy(compliance_engine.fatigue) if compliance_engine else None,
         )
 
     # Restore pop baseline compliance to prevent mutative side effects
