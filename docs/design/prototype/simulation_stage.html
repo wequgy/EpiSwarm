@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EpiSwarm Studio v2 - Live Simulation Stage Prototype</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+    body { background: #0b0f19; color: #f8fafc; overflow: hidden; width: 100vw; height: 100vh; position: relative; }
+    .mono { font-family: 'JetBrains Mono', 'Fira Code', monospace; font-variant-numeric: tabular-nums; }
+    
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.78);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      border-radius: 14px;
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+    }
+    .glass-card {
+      background: rgba(30, 41, 59, 0.65);
+      border: 1px solid rgba(148, 163, 184, 0.14);
+      border-radius: 10px;
+    }
+
+    /* Top Nav */
+    .top-nav {
+      height: 60px;
+      background: rgba(15, 23, 42, 0.92);
+      border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      z-index: 100;
+      position: relative;
+    }
+    .mode-pill {
+      display: flex;
+      background: rgba(30, 41, 59, 0.8);
+      padding: 4px;
+      border-radius: 8px;
+      gap: 4px;
+      border: 1px solid rgba(148, 163, 184, 0.15);
+    }
+    .mode-btn {
+      padding: 5px 16px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #94a3b8;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .mode-btn.active {
+      background: #2563eb;
+      color: #ffffff;
+      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.4);
+    }
+
+    /* Badges */
+    .badge-calibrated {
+      background: rgba(16, 185, 129, 0.15);
+      color: #10b981;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .badge-mock {
+      background: rgba(244, 63, 94, 0.25);
+      color: #fda4af;
+      border: 1px solid rgba(244, 63, 94, 0.5);
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      animation: pulse-mock 2s infinite;
+    }
+    @keyframes pulse-mock {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.65; }
+    }
+
+    /* Canvas Elements */
+    .borough-poly {
+      cursor: pointer;
+      transition: fill 0.6s ease, stroke 0.3s ease;
+      stroke-width: 1.5;
+    }
+    .borough-poly:hover {
+      stroke: #60a5fa !important;
+      stroke-width: 2.5;
+    }
+    .commuter-path {
+      stroke: rgba(96, 165, 250, 0.3);
+      stroke-width: 1.5;
+      stroke-dasharray: 4 4;
+      fill: none;
+    }
+
+    /* Animations */
+    @keyframes ripple {
+      0% { r: 6; opacity: 0.9; }
+      100% { r: 40; opacity: 0; }
+    }
+    .ripple-ring {
+      fill: none;
+      stroke: #f43f5e;
+      stroke-width: 2;
+      animation: ripple 2s infinite ease-out;
+    }
+
+    @keyframes pulse-alarm {
+      0%, 100% { stroke-width: 2; opacity: 1; }
+      50% { stroke-width: 5; opacity: 0.5; }
+    }
+    .alarm-icu {
+      animation: pulse-alarm 1s infinite;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Navigation Bar -->
+  <div class="top-nav">
+    <div style="display:flex; align-items:center; gap:16px;">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <div style="width:28px; height:28px; border-radius:6px; background:#2563eb; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:14px;">E</div>
+        <span style="font-weight:800; font-size:16px; letter-spacing:-0.02em;">EpiSwarm Studio <span style="color:#60a5fa; font-size:12px; font-weight:600;">v2</span></span>
+      </div>
+      <div class="mode-pill">
+        <div class="mode-btn" onclick="alert('Case File Mode: Guided intake for regional census, venues, hospital capacities, and disease graph.')">Case File</div>
+        <div class="mode-btn active">Simulate</div>
+        <div class="mode-btn" onclick="alert('Insights Mode: In-depth counterfactual comparisons, Pareto frontiers, and equity analysis.')">Insights</div>
+      </div>
+      <span class="badge-calibrated">● CALIBRATED (L2)</span>
+      <span class="badge-mock">MOCK DATA · STAGE S0 PROTOTYPE</span>
+    </div>
+
+    <!-- Center Heads-Up Display (HUD) -->
+    <div class="glass-panel" style="padding: 4px 20px; display:flex; gap:24px; align-items:center;">
+      <div style="text-align:center;">
+        <span style="font-size:10px; color:#94a3b8; font-weight:700; text-transform:uppercase;">Day / Date</span>
+        <div class="mono" id="hud-day" style="font-size:16px; font-weight:800; color:#ffffff;">Day 0</div>
+      </div>
+      <div style="text-align:center;">
+        <span style="font-size:10px; color:#94a3b8; font-weight:700; text-transform:uppercase;">Active Infected</span>
+        <div class="mono" id="hud-infected" style="font-size:16px; font-weight:800; color:#f43f5e;">120</div>
+      </div>
+      <div style="text-align:center;">
+        <span style="font-size:10px; color:#94a3b8; font-weight:700; text-transform:uppercase;">Hospital Acute</span>
+        <div class="mono" id="hud-acute" style="font-size:16px; font-weight:800; color:#f59e0b;">24%</div>
+      </div>
+      <div style="text-align:center;">
+        <span style="font-size:10px; color:#94a3b8; font-weight:700; text-transform:uppercase;">ICU Status</span>
+        <div class="mono" id="hud-icu" style="font-size:16px; font-weight:800; color:#10b981;">32% Nominal</div>
+      </div>
+      <div style="text-align:center;">
+        <span style="font-size:10px; color:#94a3b8; font-weight:700; text-transform:uppercase;">R_eff (Rt)</span>
+        <div class="mono" id="hud-rt" style="font-size:16px; font-weight:800; color:#60a5fa;">2.80</div>
+      </div>
+    </div>
+
+    <div style="display:flex; align-items:center; gap:12px;">
+      <span style="font-size:12px; color:#94a3b8;">Demo: London Wave 1</span>
+      <button class="glass-card" onclick="toggleDrawer()" style="padding:6px 14px; font-size:12px; font-weight:600; color:#cbd5e1; border:none; cursor:pointer;">
+        🛡️ Trust & Data Drawer ▾
+      </button>
+    </div>
+  </div>
+
+  <!-- Stage Canvas -->
+  <div style="position:relative; width:100%; height:calc(100vh - 60px); background:#0b0f19; overflow:hidden;">
+    <svg id="stage-svg" width="100%" height="100%" style="position:absolute; top:0; left:0;">
+      <defs>
+        <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+          <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(148, 163, 184, 0.04)" stroke-width="1"/>
+        </pattern>
+      </defs>
+      <rect width="100%" height="100%" fill="url(#grid)" />
+
+      <!-- Borough Nodes / Cartogram Polygons -->
+      <g id="boroughs-group"></g>
+
+      <!-- Commuter Flux Arcs -->
+      <g id="commuter-arcs"></g>
+
+      <!-- Active Infection Ripples -->
+      <g id="ripples-group"></g>
+
+      <!-- Sampled Animated Figures (Agents) -->
+      <g id="agents-group"></g>
+
+      <!-- Hospital Icons -->
+      <g id="hospitals-group"></g>
+    </svg>
+
+    <!-- Story Feed Ticker (Top Left) -->
+    <div class="glass-panel" style="position:absolute; top:20px; left:24px; width:340px; padding:16px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <span style="font-size:11px; text-transform:uppercase; font-weight:800; color:#60a5fa;">Epidemic Event Feed</span>
+        <span id="speed-label" style="font-size:10px; color:#94a3b8;">Speed: 1x</span>
+      </div>
+      <div id="story-feed" style="display:flex; flex-direction:column; gap:8px; font-size:12px; max-height:220px; overflow-y:hidden;">
+        <div style="background:rgba(59,130,246,0.15); border-left:3px solid #60a5fa; padding:6px 10px; border-radius:4px;">
+          <strong style="color:#60a5fa;">Day 0 · Outbreak Seeding</strong><br>
+          Initial seed of 120 index cases detected across central metropolitan boroughs.
+        </div>
+      </div>
+    </div>
+
+    <!-- Borough / Node Inspector Drawer (Right) -->
+    <div id="inspector-panel" class="glass-panel" style="position:absolute; top:20px; right:24px; width:330px; padding:20px; display:none;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+        <div>
+          <span style="font-size:10px; font-weight:700; color:#94a3b8; text-transform:uppercase;">Selected Borough</span>
+          <h3 id="insp-name" style="font-size:18px; font-weight:800;">Central Borough</h3>
+          <span id="insp-id" class="mono" style="font-size:11px; color:#64748b;">E09000007</span>
+        </div>
+        <button onclick="closeInspector()" style="background:none; border:none; color:#94a3b8; font-size:14px; cursor:pointer;">✕</button>
+      </div>
+
+      <div class="mono" style="margin-top:14px; font-size:12px; display:flex; flex-direction:column; gap:8px;">
+        <div style="display:flex; justify-content:space-between;">
+          <span style="color:#94a3b8;">Population:</span>
+          <span id="insp-pop">210,136</span>
+        </div>
+        <div style="display:flex; justify-content:space-between;">
+          <span style="color:#94a3b8;">Active Prevalence:</span>
+          <span id="insp-prev" style="color:#f43f5e; font-weight:700;">1.4%</span>
+        </div>
+        <div style="display:flex; justify-content:space-between;">
+          <span style="color:#94a3b8;">Public Compliance:</span>
+          <span id="insp-comp" style="color:#10b981;">74%</span>
+        </div>
+        <div style="display:flex; justify-content:space-between;">
+          <span style="color:#94a3b8;">Rumor Belief Rate:</span>
+          <span id="insp-rumor" style="color:#f59e0b;">12%</span>
+        </div>
+        <div style="display:flex; justify-content:space-between;">
+          <span style="color:#94a3b8;">Local Hospital ICU:</span>
+          <span id="insp-icu" style="color:#ef4444; font-weight:700;">88% Occupied</span>
+        </div>
+      </div>
+
+      <button onclick="injectInterventionForBorough()" style="width:100%; margin-top:16px; padding:8px; background:#1e293b; border:1px solid #475569; color:#60a5fa; border-radius:6px; font-size:11px; font-weight:700; cursor:pointer;">
+        Apply Targeted Local Measure →
+      </button>
+    </div>
+
+    <!-- Floating Playback Dock (Bottom Center) -->
+    <div class="glass-panel" style="position:absolute; bottom:28px; left:50%; transform:translateX(-50%); padding:12px 28px; display:flex; align-items:center; gap:20px; border-radius:18px;">
+      <button onclick="resetSim()" title="Restart Simulation" style="background:none; border:none; color:#cbd5e1; font-size:18px; cursor:pointer;">⏮</button>
+      <button id="play-btn" onclick="togglePlay()" style="background:#2563eb; border:none; width:44px; height:44px; border-radius:50%; color:white; font-size:18px; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 4px 12px rgba(37,99,235,0.4);">
+        ▶
+      </button>
+      <button onclick="stepForward(1)" title="Step +1 Day" style="background:none; border:none; color:#cbd5e1; font-size:18px; cursor:pointer;">⏭ +1d</button>
+
+      <!-- Scrubber -->
+      <div style="display:flex; flex-direction:column; gap:4px; width:300px;">
+        <div style="display:flex; justify-content:space-between; font-size:10px; color:#94a3b8;">
+          <span>Day 0</span>
+          <span id="scrubber-label" style="color:#60a5fa; font-weight:700;">Day 0 of 60</span>
+          <span>Day 60</span>
+        </div>
+        <input type="range" id="timeline-slider" min="0" max="60" value="0" oninput="seekToDay(this.value)" style="width:100%; accent-color:#2563eb;">
+      </div>
+
+      <!-- Speed Control -->
+      <div style="display:flex; background:rgba(30,41,59,0.8); border:1px solid rgba(148,163,184,0.2); border-radius:6px; padding:2px;">
+        <button id="speed-1x" onclick="setSpeed(1)" style="padding:4px 8px; font-size:11px; background:#2563eb; color:white; border:none; border-radius:4px; font-weight:700; cursor:pointer;">1x</button>
+        <button id="speed-2x" onclick="setSpeed(2)" style="padding:4px 8px; font-size:11px; background:none; color:#94a3b8; border:none; cursor:pointer;">2x</button>
+        <button id="speed-5x" onclick="setSpeed(5)" style="padding:4px 8px; font-size:11px; background:none; color:#94a3b8; border:none; cursor:pointer;">5x</button>
+      </div>
+
+      <!-- Live Actions -->
+      <div style="display:flex; gap:8px;">
+        <button onclick="openInterventionModal()" style="padding:8px 14px; background:#f59e0b; color:#0f172a; font-weight:800; font-size:11px; border:none; border-radius:8px; cursor:pointer;">
+          ⚡ Intervene Now
+        </button>
+        <button onclick="branchSimulation()" style="padding:8px 14px; background:#1e293b; border:1px solid #475569; color:#ffffff; font-weight:700; font-size:11px; border-radius:8px; cursor:pointer;">
+          ⎇ Branch Run
+        </button>
+      </div>
+    </div>
+
+    <!-- Visual Transparency Caption (Bottom Left) -->
+    <div style="position:absolute; bottom:12px; left:24px; font-size:11px; color:#64748b;">
+      ℹ️ <em>Visual interpolation: Animated figures illustrate daily commuter flows between home and work venues.</em>
+    </div>
+  </div>
+
+  <script>
+    // Synthetic Simulation Mock Data & State Machine
+    const boroughs = [
+      { id: "E09000007", name: "Camden (Central)", x: 960, y: 380, pop: 210136, r: 48, baseWeight: 1.0 },
+      { id: "E09000033", name: "Westminster", x: 920, y: 460, pop: 204236, r: 52, baseWeight: 1.2 },
+      { id: "E09000019", name: "Islington", x: 1040, y: 360, pop: 216667, r: 46, baseWeight: 0.9 },
+      { id: "E09000012", name: "Hackney", x: 1120, y: 400, pop: 259146, r: 50, baseWeight: 0.8 },
+      { id: "E09000028", name: "Southwark", x: 980, y: 550, pop: 307647, r: 56, baseWeight: 1.1 },
+      { id: "E09000022", name: "Lambeth", x: 900, y: 560, pop: 317517, r: 54, baseWeight: 1.0 },
+      { id: "E09000020", name: "Kensington & Chelsea", x: 820, y: 450, pop: 143376, r: 42, baseWeight: 0.7 },
+      { id: "E09000030", name: "Tower Hamlets", x: 1100, y: 480, pop: 310306, r: 52, baseWeight: 1.0 }
+    ];
+
+    let currentDay = 0;
+    let isPlaying = false;
+    let speed = 1;
+    let timer = null;
+    let intervened = false;
+
+    // Render Borough Polygons
+    const bgGroup = document.getElementById("boroughs-group");
+    const arcGroup = document.getElementById("commuter-arcs");
+    const agentGroup = document.getElementById("agents-group");
+    const hospGroup = document.getElementById("hospitals-group");
+    const ripGroup = document.getElementById("ripples-group");
+
+    boroughs.forEach((b, idx) => {
+      // Borough Circle / Area Node
+      const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      circle.setAttribute("cx", b.x);
+      circle.setAttribute("cy", b.y);
+      circle.setAttribute("r", b.r);
+      circle.setAttribute("fill", "rgba(30, 41, 59, 0.6)");
+      circle.setAttribute("stroke", "rgba(148, 163, 184, 0.3)");
+      circle.setAttribute("class", "borough-poly");
+      circle.setAttribute("id", "borough-" + b.id);
+      circle.onclick = () => selectBorough(b);
+      bgGroup.appendChild(circle);
+
+      // Label
+      const txt = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      txt.setAttribute("x", b.x);
+      txt.setAttribute("y", b.y - b.r - 8);
+      txt.setAttribute("text-anchor", "middle");
+      txt.setAttribute("fill", "#94a3b8");
+      txt.setAttribute("font-size", "11px");
+      txt.setAttribute("font-weight", "600");
+      txt.textContent = b.name;
+      bgGroup.appendChild(txt);
+
+      // Connect Commuter Arcs to Westminster (Central Business Hub)
+      if (idx !== 1) {
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        const cx = (b.x + boroughs[1].x) / 2 + (idx % 2 === 0 ? 30 : -30);
+        const cy = (b.y + boroughs[1].y) / 2 - 25;
+        path.setAttribute("d", `M ${b.x},${b.y} Q ${cx},${cy} ${boroughs[1].x},${boroughs[1].y}`);
+        path.setAttribute("class", "commuter-path");
+        arcGroup.appendChild(path);
+      }
+    });
+
+    // Add Central Hospital Node
+    const hosp = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    hosp.setAttribute("transform", "translate(960, 420)");
+    hosp.innerHTML = `
+      <circle id="hosp-ring" cx="0" cy="0" r="14" fill="rgba(239,68,68,0.2)" stroke="#ef4444" stroke-width="2"/>
+      <text x="0" y="4" text-anchor="middle" font-size="11">🏥</text>
+    `;
+    hosp.onclick = () => alert("Central NHS Trust Hospital: 850 Acute Beds, 64 ICU Beds.");
+    hospGroup.appendChild(hosp);
+
+    // Sampled Moving Commuters (24 Real Representative Agents)
+    const agents = [];
+    for (let i = 0; i < 30; i++) {
+      const src = boroughs[i % boroughs.length];
+      const dst = boroughs[(i + 1) % boroughs.length];
+      const dot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      dot.setAttribute("r", 3.5);
+      dot.setAttribute("fill", i < 6 ? "#f43f5e" : (i < 10 ? "#fb923c" : "#38bdf8"));
+      agentGroup.appendChild(dot);
+      agents.push({ el: dot, src, dst, t: Math.random(), speed: 0.005 + Math.random() * 0.008 });
+    }
+
+    // Animation Loop for Moving Commuter Figures (60fps)
+    function animateFigures() {
+      agents.forEach(a => {
+        a.t = (a.t + a.speed) % 1.0;
+        const x = a.src.x + (a.dst.x - a.src.x) * a.t;
+        const y = a.src.y + (a.dst.y - a.src.y) * a.t;
+        a.el.setAttribute("cx", x);
+        a.el.setAttribute("cy", y);
+
+        // Turn red during peak wave if infected
+        if (currentDay > 15 && Math.random() < 0.002) {
+          a.el.setAttribute("fill", "#f43f5e");
+        }
+      });
+      requestAnimationFrame(animateFigures);
+    }
+    requestAnimationFrame(animateFigures);
+
+    function updateSimulationDay(day) {
+      currentDay = day;
+      document.getElementById("hud-day").textContent = `Day ${day} (${day < 7 ? "Oct 1" : "Oct " + (day + 1)})`;
+      document.getElementById("scrubber-label").textContent = `Day ${day} of 60`;
+      document.getElementById("timeline-slider").value = day;
+
+      // Mathematical Wave Simulation (Peak at Day 28)
+      const wave = Math.exp(-0.5 * Math.pow((day - 28) / 8, 2));
+      const infected = Math.round(120 + 4700 * wave * (intervened ? 0.65 : 1.0));
+      const acutePct = Math.min(100, Math.round(24 + 72 * wave * (intervened ? 0.7 : 1.0)));
+      const icuPct = Math.min(115, Math.round(32 + 82 * wave * (intervened ? 0.68 : 1.0)));
+      const rt = (2.8 * Math.exp(-0.03 * day) * (intervened ? 0.75 : 1.0)).toFixed(2);
+
+      document.getElementById("hud-infected").textContent = infected.toLocaleString();
+      document.getElementById("hud-acute").textContent = `${acutePct}%`;
+      document.getElementById("hud-rt").textContent = rt;
+
+      const icuEl = document.getElementById("hud-icu");
+      const hospRing = document.getElementById("hosp-ring");
+      if (icuPct > 100) {
+        icuEl.textContent = `${icuPct}% BREACH`;
+        icuEl.style.color = "#ef4444";
+        hospRing.classList.add("alarm-icu");
+      } else if (icuPct > 85) {
+        icuEl.textContent = `${icuPct}% Stress`;
+        icuEl.style.color = "#f59e0b";
+        hospRing.classList.remove("alarm-icu");
+      } else {
+        icuEl.textContent = `${icuPct}% Nominal`;
+        icuEl.style.color = "#10b981";
+        hospRing.classList.remove("alarm-icu");
+      }
+
+      // Update Borough Fill Colors Based on Wave
+      boroughs.forEach(b => {
+        const poly = document.getElementById("borough-" + b.id);
+        const bPrevalence = wave * b.baseWeight;
+        if (bPrevalence > 0.6) {
+          poly.setAttribute("fill", "rgba(244, 63, 94, 0.65)");
+          poly.setAttribute("stroke", "#f43f5e");
+        } else if (bPrevalence > 0.25) {
+          poly.setAttribute("fill", "rgba(251, 146, 60, 0.45)");
+          poly.setAttribute("stroke", "#fb923c");
+        } else {
+          poly.setAttribute("fill", "rgba(30, 41, 59, 0.6)");
+          poly.setAttribute("stroke", "rgba(148, 163, 184, 0.3)");
+        }
+      });
+
+      // Story Captions Milestones
+      const feed = document.getElementById("story-feed");
+      if (day === 14 && !document.getElementById("story-14")) {
+        addStory("Day 14 · Public Advisory", "Metropolitan health officials issue initial indoor voluntary masking advisory.", "info", "story-14");
+      } else if (day === 23 && !document.getElementById("story-23")) {
+        addStory("Day 23 · School Closures", "Primary and secondary school sessions suspended across 33 boroughs.", "warning", "story-23");
+      } else if (day === 28 && !document.getElementById("story-28")) {
+        addStory("Day 28 · ICU Capacity Surge", "Central NHS Trust reaches 100% ICU capacity. Mutual aid diversions active.", "critical", "story-28");
+      } else if (day === 45 && !document.getElementById("story-45")) {
+        addStory("Day 45 · Epidemic Descent", "Effective R falls below 0.85; acute hospital bed pressure begins to stabilize.", "info", "story-45");
+      }
+    }
+
+    function addStory(title, desc, type, id) {
+      const feed = document.getElementById("story-feed");
+      const div = document.createElement("div");
+      div.id = id;
+      const borderCol = type === 'critical' ? '#ef4444' : (type === 'warning' ? '#f59e0b' : '#60a5fa');
+      const bgCol = type === 'critical' ? 'rgba(239,68,68,0.15)' : (type === 'warning' ? 'rgba(245,158,11,0.15)' : 'rgba(59,130,246,0.15)');
+      div.style.cssText = `background:${bgCol}; border-left:3px solid ${borderCol}; padding:6px 10px; border-radius:4px; animation:fadeIn 0.3s;`;
+      div.innerHTML = `<strong style="color:${borderCol};">${title}</strong><br>${desc}`;
+      feed.prepend(div);
+    }
+
+    function togglePlay() {
+      isPlaying = !isPlaying;
+      document.getElementById("play-btn").textContent = isPlaying ? "❚❚" : "▶";
+      if (isPlaying) {
+        timer = setInterval(() => {
+          if (currentDay < 60) {
+            updateSimulationDay(currentDay + 1);
+          } else {
+            togglePlay();
+          }
+        }, 1000 / speed);
+      } else {
+        clearInterval(timer);
+      }
+    }
+
+    function stepForward(n) {
+      if (currentDay + n <= 60) {
+        updateSimulationDay(currentDay + n);
+      }
+    }
+
+    function seekToDay(d) {
+      updateSimulationDay(parseInt(d));
+    }
+
+    function setSpeed(s) {
+      speed = s;
+      document.getElementById("speed-label").textContent = `Speed: ${s}x`;
+      document.getElementById("speed-1x").style.background = s === 1 ? "#2563eb" : "none";
+      document.getElementById("speed-2x").style.background = s === 2 ? "#2563eb" : "none";
+      document.getElementById("speed-5x").style.background = s === 5 ? "#2563eb" : "none";
+      if (isPlaying) {
+        clearInterval(timer);
+        timer = setInterval(() => {
+          if (currentDay < 60) {
+            updateSimulationDay(currentDay + 1);
+          } else {
+            togglePlay();
+          }
+        }, 1000 / speed);
+      }
+    }
+
+    function resetSim() {
+      if (isPlaying) togglePlay();
+      intervened = false;
+      document.getElementById("story-feed").innerHTML = `
+        <div style="background:rgba(59,130,246,0.15); border-left:3px solid #60a5fa; padding:6px 10px; border-radius:4px;">
+          <strong style="color:#60a5fa;">Day 0 · Outbreak Seeding</strong><br>
+          Initial seed of 120 index cases detected across central metropolitan boroughs.
+        </div>
+      `;
+      updateSimulationDay(0);
+    }
+
+    function selectBorough(b) {
+      document.getElementById("inspector-panel").style.display = "block";
+      document.getElementById("insp-name").textContent = b.name;
+      document.getElementById("insp-id").textContent = b.id;
+      document.getElementById("insp-pop").textContent = b.pop.toLocaleString();
+      const wave = Math.exp(-0.5 * Math.pow((currentDay - 28) / 8, 2));
+      document.getElementById("insp-prev").textContent = `${(wave * b.baseWeight * 2.5).toFixed(1)}%`;
+      document.getElementById("insp-comp").textContent = `${Math.round(75 - currentDay * 0.15)}%`;
+      document.getElementById("insp-rumor").textContent = `${Math.round(10 + currentDay * 0.2)}%`;
+      document.getElementById("insp-icu").textContent = `${Math.round(35 + 65 * wave * b.baseWeight)}% Occupied`;
+    }
+
+    function closeInspector() {
+      document.getElementById("inspector-panel").style.display = "none";
+    }
+
+    function openInterventionModal() {
+      intervened = true;
+      addStory(`Day ${currentDay} · Injected Intervention`, "User injected rapid emergency mask mandate & school closures. R_eff reduced by 25%.", "warning", "inject-" + currentDay);
+      alert(`[INTERVENTION INJECTED at Day ${currentDay}]: Emergency school suspension & mask promotion active.`);
+      updateSimulationDay(currentDay);
+    }
+
+    function branchSimulation() {
+      alert(`[BRANCH CREATED from Day ${currentDay}]: Forked checkpoint into 'Branch 1: Day ${currentDay} Alternate Intervention'. Available in Insights for comparative evaluation.`);
+    }
+
+    function toggleDrawer() {
+      alert("Trust & Data Drawer: Validation Scorecard (PASS), SHA-256 Ledger (Checked), Engine (NumPy Vectorized 19.8M agents/sec).");
+    }
+
+    // Initialize at Day 0
+    updateSimulationDay(0);
+  </script>
+</body>
+</html>
