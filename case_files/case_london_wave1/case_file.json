@@ -1,0 +1,186 @@
+{
+  "id": "case_london_wave1",
+  "title": "London Wave 1 (Spring 2020 Benchmark)",
+  "description": "Calibrated 33-borough metropolitan model matched against PHE/ONS hospitalizations.",
+  "author": "EpiSwarm Benchmark Suite",
+  "created_at": 1794672157.2007535,
+  "updated_at": 1794672157.2143614,
+  "version": 1,
+  "locked": false,
+  "locked_run_id": null,
+  "is_demo": true,
+  "completeness": 1.0,
+  "sections": {
+    "area_population": {
+      "region_name": "Greater London",
+      "country": "United Kingdom",
+      "admin_level_name": "Borough",
+      "total_population": 8982000,
+      "areas": [
+        {
+          "id": "camden",
+          "name": "Camden",
+          "population": 270000
+        },
+        {
+          "id": "westminster",
+          "name": "Westminster",
+          "population": 260000
+        },
+        {
+          "id": "lambeth",
+          "name": "Lambeth",
+          "population": 320000
+        },
+        {
+          "id": "southwark",
+          "name": "Southwark",
+          "population": 310000
+        },
+        {
+          "id": "tower_hamlets",
+          "name": "Tower Hamlets",
+          "population": 310000
+        }
+      ],
+      "age_distribution": {
+        "0-19": 0.23,
+        "20-64": 0.65,
+        "65+": 0.12
+      },
+      "density_sq_km": 5701.0,
+      "boundary_type": "geojson",
+      "is_complete": true
+    },
+    "work_schools": {
+      "workplaces": [
+        {
+          "name": "Central Business District",
+          "capacity": 450000
+        }
+      ],
+      "schools": [
+        {
+          "name": "Primary & Secondary Network",
+          "capacity": 220000
+        }
+      ],
+      "transit_hubs": [
+        {
+          "name": "Transport for London Network",
+          "flow": 1200000
+        }
+      ],
+      "commute_model": "gravity",
+      "commute_matrix": [],
+      "is_complete": true
+    },
+    "health_system": {
+      "hospitals": [
+        {
+          "name": "St Thomas' Hospital",
+          "acute_beds": 840,
+          "icu_beds": 82
+        },
+        {
+          "name": "Royal Free Hospital",
+          "acute_beds": 650,
+          "icu_beds": 54
+        },
+        {
+          "name": "King's College Hospital",
+          "acute_beds": 950,
+          "icu_beds": 90
+        }
+      ],
+      "total_acute_beds": 2440,
+      "total_icu_beds": 226,
+      "non_outbreak_occupancy_pct": 0.85,
+      "triage_transfer_enabled": true,
+      "is_complete": true
+    },
+    "disease": {
+      "preset_id": "respiratory_generic",
+      "name": "SARS-CoV-2 (Ancestral Wildtype)",
+      "target_r0": 2.5,
+      "incubation_mean_days": 5.1,
+      "infectious_mean_days": 4.5,
+      "hospitalization_rate_pct": 4.5,
+      "icu_rate_pct": 1.2,
+      "ifr_pct": 0.65,
+      "is_complete": true
+    },
+    "behavior": {
+      "behavior_mode": "rule",
+      "initial_compliance_pct": 82.0,
+      "compliance_fatigue_rate": 0.003,
+      "rumor_adoption_rate": 0.05,
+      "rumor_dispersion_rate": 0.03,
+      "trust_in_authorities_pct": 74.0,
+      "is_complete": true
+    },
+    "measures": {
+      "timeline": [
+        {
+          "day": 12,
+          "action": "school_closure",
+          "area": "all",
+          "stringency": 0.9
+        },
+        {
+          "day": 16,
+          "action": "stay_at_home",
+          "area": "all",
+          "stringency": 0.85
+        }
+      ],
+      "is_complete": true
+    },
+    "run_settings": {
+      "scale_agents": 5000,
+      "replicates": 3,
+      "horizon_days": 60,
+      "seed": 42,
+      "is_complete": true
+    },
+    "review": {
+      "assumptions_accepted": true,
+      "notes": "Pre-calibrated empirical reference case file.",
+      "is_complete": true
+    }
+  },
+  "evidence_ledger": {
+    "area_population.total_population": {
+      "field_path": "area_population.total_population",
+      "evidence_class": "sourced",
+      "source": "ONS Mid-Year Population Estimates 2020",
+      "citation": "Office for National Statistics, UK Gov",
+      "checksum": null
+    },
+    "health_system.total_acute_beds": {
+      "field_path": "health_system.total_acute_beds",
+      "evidence_class": "sourced",
+      "source": "NHS England Bed Availability and Occupancy",
+      "citation": "NHS England Monthly SitReps Q1 2020",
+      "checksum": null
+    },
+    "disease.target_r0": {
+      "field_path": "disease.target_r0",
+      "evidence_class": "sourced",
+      "source": "Imperial College COVID-19 Response Team Report 9",
+      "citation": "Ferguson et al., March 2020",
+      "checksum": null
+    }
+  },
+  "audit_log": [
+    {
+      "timestamp": 1794672157.2007535,
+      "user": "health_authority_officer",
+      "action": "CREATE_PRELOADED_DEMO",
+      "details": {
+        "name": "London Wave 1"
+      }
+    }
+  ],
+  "attached_files": []
+}
