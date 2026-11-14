@@ -14,6 +14,10 @@ import re
 import json
 import ast
 from pathlib import Path
+
+# Ensure src/ is on sys.path for direct script execution
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+
 from typing import List, Dict, Tuple, Any
 import pandas as pd
 import yaml
