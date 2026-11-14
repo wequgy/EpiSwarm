@@ -123,3 +123,51 @@ def evaluate_spatial_arrival_rank_correlation(
     passed = (rho >= 0.60)
     return rho, p, passed
 
+
+def compute_calibration_score(
+    pred_admissions: np.ndarray,
+    obs_admissions: np.ndarray,
+    pred_deaths: np.ndarray,
+    obs_deaths: np.ndarray
+) -> Dict[str, float]:
+    """Calculate mean squared error composite loss across admissions and deaths."""
+    min_len_adm = min(len(pred_admissions), len(obs_admissions))
+    min_len_dth = min(len(pred_deaths), len(obs_deaths))
+    
+    # Scale normalized losses
+    norm_adm = max(1.0, float(np.max(obs_admissions[:min_len_adm]) ** 2)) if min_len_adm > 0 else 1.0
+    norm_dth = max(1.0, float(np.max(obs_deaths[:min_len_dth]) ** 2)) if min_len_dth > 0 else 1.0
+    
+    loss_adm = float(np.mean((pred_admissions[:min_len_adm] - obs_admissions[:min_len_adm]) ** 2)) / norm_adm if min_len_adm > 0 else 0.0
+    loss_dth = float(np.mean((pred_deaths[:min_len_dth] - obs_deaths[:min_len_dth]) ** 2)) / norm_dth if min_len_dth > 0 else 0.0
+    total_loss = float(loss_adm + 3.0 * loss_dth)
+    return {"admissions_loss": loss_adm, "deaths_loss": loss_dth, "total_loss": total_loss}
+
+
+def compute_dynamic_time_warping(s1: np.ndarray, s2: np.ndarray) -> float:
+    """Compute DTW distance between two 1D series."""
+    n, m = len(s1), len(s2)
+    dtw_matrix = np.full((n + 1, m + 1), np.inf)
+    dtw_matrix[0, 0] = 0.0
+    for i in range(1, n + 1):
+        for j in range(1, m + 1):
+            cost = abs(float(s1[i - 1]) - float(s2[j - 1]))
+            dtw_matrix[i, j] = cost + min(dtw_matrix[i - 1, j], dtw_matrix[i, j - 1], dtw_matrix[i - 1, j - 1])
+    return float(dtw_matrix[n, m])
+
+
+def evaluate_peak_offset_error(observed: np.ndarray, simulated: np.ndarray) -> int:
+    """Return absolute difference in peak index."""
+    if len(observed) == 0 or len(simulated) == 0:
+        return 0
+    return int(abs(int(np.argmax(observed)) - int(np.argmax(simulated))))
+
+
+def compute_coverage_probability(observed: np.ndarray, lower: np.ndarray, upper: np.ndarray) -> float:
+    """Compute empirical coverage probability."""
+    min_len = min(len(observed), len(lower), len(upper))
+    if min_len == 0:
+        return 0.0
+    covered = (observed[:min_len] >= lower[:min_len]) & (observed[:min_len] <= upper[:min_len])
+    return float(np.mean(covered))
+

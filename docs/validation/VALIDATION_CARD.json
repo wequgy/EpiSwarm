@@ -47,7 +47,7 @@
     }
   },
   "ledger_authenticated": true,
-  "generated_at": "2026-11-14T10:59:38.889933+00:00",
+  "generated_at": "2026-11-14T13:46:42.757356+00:00",
   "assumptions": {
     "London Baseline ICU Capacity": {
       "value": "800 beds",

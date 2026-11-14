@@ -7,6 +7,10 @@ from episwarm.calibrate.metrics import (
 from episwarm.calibrate.engine import (
     CalibratedParameter, CalibrationResult, run_regional_calibration
 )
+from episwarm.calibrate.smc_abc import (
+    SMCABCConfig, Particle, PosteriorEnsemble,
+    run_smc_abc, run_twin_experiment, compute_trajectory_distance
+)
 
 __all__ = [
     "compute_calibration_score",
@@ -15,5 +19,11 @@ __all__ = [
     "compute_coverage_probability",
     "CalibratedParameter",
     "CalibrationResult",
-    "run_regional_calibration"
+    "run_regional_calibration",
+    "SMCABCConfig",
+    "Particle",
+    "PosteriorEnsemble",
+    "run_smc_abc",
+    "run_twin_experiment",
+    "compute_trajectory_distance",
 ]
