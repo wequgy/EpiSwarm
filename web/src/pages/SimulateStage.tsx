@@ -478,10 +478,12 @@ export const SimulateStage: React.FC = () => {
 
           {/* Speed Presets */}
           <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 ml-2">
+            <span className="text-[10px] text-slate-400 font-semibold uppercase px-1.5 select-none">Speed:</span>
             {[0.5, 1, 2, 5].map((spd) => (
               <button
                 key={spd}
                 onClick={() => setSpeedMultiplier(spd)}
+                title={`${spd} simulated days per second playback`}
                 className={`px-2 py-1 rounded text-xs font-mono font-medium transition ${
                   speedMultiplier === spd ? 'bg-white text-blue-600 shadow-2xs font-bold' : 'text-slate-500 hover:text-slate-900'
                 }`}
@@ -564,7 +566,7 @@ export const SimulateStage: React.FC = () => {
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
                 <Activity className="w-3.5 h-3.5 text-amber-500" />
-                Live Outbreak Trajectory Curves (Vectorized Telemetry)
+                Epidemic Trajectory Telemetry (Scrubbing Day {currentDay} of {maxHorizon})
               </span>
               <span className="text-[10px] font-mono text-slate-500">
                 Step: Day {currentDay} / {maxHorizon}
