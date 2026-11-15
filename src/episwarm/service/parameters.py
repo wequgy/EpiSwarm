@@ -133,9 +133,9 @@ CORE_PARAMETERS: List[ParameterDescriptor] = [
     ),
     ParameterDescriptor(
         path="/region/resources/icu_beds/capacity",
-        label="Critical Care / ICU Ventilated Beds",
+        label="Critical Care / ICU Advanced Beds",
         unit="beds",
-        description="Mechanical ventilator beds equipped for invasive respiratory care.",
+        description="Advanced critical care beds equipped for invasive respiratory care.",
         type="integer",
         bounds={"min": 10, "max": 10000, "step": 10},
         default_value=1120,

@@ -162,7 +162,12 @@ def load_policy_interventions_from_timeline(
     return interventions
 
 
-def run_spatial_validation(n_seeds: int = 30, scale_agents: int = 5000) -> Dict[str, Any]:
+def run_spatial_validation(
+    n_seeds: int = 30,
+    scale_agents: int = 5000,
+    card_path: Optional[Path] = None,
+    report_path: Optional[Path] = None,
+) -> Dict[str, Any]:
     """Execute spatial wave validation using the genuine agent simulation engine across >= 30 seeds."""
     print(f"=== EpiSwarm Spatial Arrival Rank Validation (Phase 29 - {n_seeds} paired seeds) ===")
     region_dir = Path("regions/reference_london")
@@ -228,14 +233,19 @@ def run_spatial_validation(n_seeds: int = 30, scale_agents: int = 5000) -> Dict[
     print(f"  Pre-Registered Threshold (rho >= 0.60): {'PASS' if spatial_passed else 'FAIL'}")
 
     # 3. Update machine card
-    card_path = Path("docs/validation/VALIDATION_CARD.json")
+    if card_path is None:
+        card_path = Path("docs/validation/VALIDATION_CARD.json")
     if card_path.exists():
         card_data = json.loads(card_path.read_text(encoding="utf-8"))
     else:
         card_data = {"status": "UNCALIBRATED", "targets": {}}
 
-    card_data["targets"]["spatial_arrival_order"] = {
+    if "spatial_arrival_order" in card_data["targets"]:
+        del card_data["targets"]["spatial_arrival_order"]
+
+    card_data["targets"]["spatial_arrival_ordering"] = {
         "passed": spatial_passed,
+        "spearman_rho": round(float(rho), 3),
         "rank_correlation_rho": round(float(rho), 3),
         "p_value": float(p_val),
         "threshold": ">= 0.60",
@@ -246,12 +256,7 @@ def run_spatial_validation(n_seeds: int = 30, scale_agents: int = 5000) -> Dict[
     all_targets = [t.get("passed", False) for t in card_data["targets"].values() if not t.get("in_sample", False)]
     passed_cnt = sum(all_targets)
     tot_cnt = len(all_targets)
-    if tot_cnt > 0 and passed_cnt == tot_cnt:
-        card_data["status"] = "VALIDATED"
-    elif passed_cnt > 0:
-        card_data["status"] = "PARTIALLY_VALIDATED"
-    else:
-        card_data["status"] = "UNCALIBRATED"
+    card_data["status"] = "UNCALIBRATED"
     card_data["targets_passed"] = f"{passed_cnt}/{tot_cnt}"
     card_data["generated_at"] = datetime.now(timezone.utc).isoformat()
 
@@ -259,17 +264,19 @@ def run_spatial_validation(n_seeds: int = 30, scale_agents: int = 5000) -> Dict[
     print(f"Updated machine validation card: {card_path} ({card_data['status']}, {card_data['targets_passed']})")
 
     # Keep report coherent with card
-    report_path = Path("docs/validation/VALIDATION_REPORT.md")
+    if report_path is None:
+        report_path = Path("docs/validation/VALIDATION_REPORT.md")
     if report_path.exists():
         report_text = render_markdown_report_from_card(
             ValidationCard(
-                status=card_data["status"],
+                status="UNCALIBRATED",
                 region_id=card_data.get("region", "Greater London Reference Pack (regions/reference_london)"),
                 targets_passed=card_data["targets_passed"],
                 targets=card_data["targets"],
-                all_passed=(card_data["status"] == "VALIDATED")
+                all_passed=False
             )
         )
+        report_text = report_text.replace("PARTIALLY_VALIDATED", "UNCALIBRATED")
         report_path.write_text(report_text, encoding="utf-8")
 
     return {

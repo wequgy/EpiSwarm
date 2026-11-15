@@ -9,16 +9,17 @@ import pytest
 from scripts.run_healthcare_validation_wave1 import run_healthcare_validation
 
 
-def test_healthcare_validation():
+def test_healthcare_validation(tmp_path):
     """Verify healthcare validation runs agent simulation without analytic stand-ins."""
-    res = run_healthcare_validation(n_seeds=2, scale_agents=1000)
+    tmp_card = tmp_path / "VALIDATION_CARD.json"
+    tmp_report = tmp_path / "VALIDATION_REPORT.md"
+    res = run_healthcare_validation(n_seeds=2, scale_agents=1000, card_path=tmp_card, report_path=tmp_report)
     assert "peak_ratio" in res
     assert "overflow_days_error" in res
     assert res["status"] in ("PASS", "FAIL")
 
-    card_path = Path("docs/validation/VALIDATION_CARD.json")
-    assert card_path.exists()
-    card = json.loads(card_path.read_text(encoding="utf-8"))
+    assert tmp_card.exists()
+    card = json.loads(tmp_card.read_text(encoding="utf-8"))
     assert "healthcare_overflow" in card["targets"]
     target = card["targets"]["healthcare_overflow"]
     assert target["method"] == "agent_simulator_30_seeds"

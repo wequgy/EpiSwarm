@@ -87,7 +87,7 @@ def update_section(case_id: str, section_key: str, req: UpdateSectionRequest):
 
 @router.post("/{case_id}/duplicate", response_model=Dict[str, Any])
 def duplicate_case_file(case_id: str, req: DuplicateCaseFileRequest):
-    """Duplicate a Case File (e.g. branch from London demo into an authority's local file)."""
+    """Duplicate a Case File (e.g. branch from a reference demo into an authority's local file)."""
     try:
         new_manifest = case_file_service.duplicate_case_file(case_id, new_title=req.new_title)
         return new_manifest.model_dump()

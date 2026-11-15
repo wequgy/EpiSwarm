@@ -40,7 +40,7 @@ def test_s1_bitwise_determinism_pause_resume():
 
     res_resumed = run_simulation(pop_step, d_pack, s_pack, checkpoint=res_part1.checkpoint)
     assert res_resumed.is_paused is False
-    assert res_resumed.current_day == 59
+    assert res_resumed.current_day == s_pack.horizon_days - 1
 
     # Strict Bitwise Determinism across all daily state counts and deaths
     diff = np.max(np.abs(res_full.daily_state_counts - res_resumed.daily_state_counts))

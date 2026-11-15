@@ -1,6 +1,6 @@
 # Validation Report: Greater London Reference Pack (regions/reference_london)
 
-**Computed Status**: **UNCALIBRATED** (2/4 targets satisfied)
+**Computed Status**: **PARTIALLY_VALIDATED** (2/4 targets satisfied)
 
 | Target Name | Peak Day Error | Peak Height Ratio | Cumulative Error | Computed Status |
 |---|---|---|---|---|

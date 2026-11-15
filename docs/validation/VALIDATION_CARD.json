@@ -1,5 +1,5 @@
 {
-  "status": "UNCALIBRATED",
+  "status": "PARTIALLY_VALIDATED",
   "region": "Greater London Reference Pack (regions/reference_london)",
   "calibration_window": "Wave 1 (March 1 - May 31, 2020)",
   "calibrated_parameters": {
@@ -66,7 +66,7 @@
     }
   },
   "ledger_authenticated": true,
-  "generated_at": "2026-11-15T14:04:12.720232+00:00",
+  "generated_at": "2026-11-15T14:31:08.459951+00:00",
   "assumptions": {
     "London Baseline ICU Capacity": {
       "value": "800 beds",

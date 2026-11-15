@@ -25,7 +25,7 @@ ACTIVE_LIVE_RUNS: Dict[str, LiveRun] = {}
 
 def get_or_create_live_run(
     job_id: str,
-    region_id: str = "reference_london",
+    region_id: str = "example_synthetic",
     disease_id: str = "respiratory_generic",
     scenario_id: str = "targeted_containment",
     scale_agents: int = 50000,

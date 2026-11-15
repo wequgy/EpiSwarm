@@ -53,9 +53,11 @@ class LiveRun:
         behavior_mode: str = "rule",
         storage_dir: Optional[Path] = None,
         base_date: str = "2020-03-01",
+        region_dir: str = "regions/example_synthetic",
     ):
         self.job_id = job_id
         self.pop = pop
+        self.region_dir = region_dir
         self.disease_pack = disease_pack
         self.scenario_pack = scenario_pack.model_copy(deep=True)
         self.behavior_pack = behavior_pack
@@ -168,7 +170,7 @@ class LiveRun:
         if target_day != self.current_day or cp is None:
             # Re-run from day 0 to target_day to obtain exact checkpoint
             pop_copy = build_synthetic_population(
-                region_dir="regions/reference_london",
+                region_dir=getattr(self, "region_dir", "regions/example_synthetic"),
                 scale_agents=self.pop.n_agents,
                 random_seed=self.scenario_pack.random_seed,
             )

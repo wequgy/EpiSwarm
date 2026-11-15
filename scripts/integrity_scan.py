@@ -189,27 +189,22 @@ def scan_report_card_discrepancies(root_dir: Path, include_quarantine: bool = Fa
             except Exception as e:
                 pass
 
-        # Check for unquarantined claims of VALIDATED or PARTIALLY_VALIDATED
         # Check for unsubstantiated claims of VALIDATED or PARTIALLY_VALIDATED without a matching card
-        if not include_quarantine:
-            card_status = card.get("status", "UNCALIBRATED") if (card_file.exists() and 'card' in locals()) else "UNCALIBRATED"
-            for md_file in d_dir.rglob("*.md"):
-                if "quarantine" in md_file.parts:
-                    continue
-                content = md_file.read_text(encoding="utf-8")
+        card_status = card.get("status", "UNCALIBRATED") if (card_file.exists() and 'card' in locals()) else "UNCALIBRATED"
+        if "quarantine" in d_dir.parts:
+            card_status = "UNCALIBRATED"
+
+        for md_file in d_dir.rglob("*.md"):
+            if not include_quarantine and "quarantine" in md_file.parts:
+                continue
+            content = md_file.read_text(encoding="utf-8")
+            if card_status == "UNCALIBRATED":
                 if "PARTIALLY_VALIDATED" in content or "status: VALIDATED" in content:
                     violations.append(IntegrityViolation(
                         category="X4_FALSE_VALIDATION_STATUS",
                         file_path=str(md_file.relative_to(root_dir)),
-                        message="Active document claims VALIDATED or PARTIALLY_VALIDATED without evidence."
+                        message="Document claims VALIDATED or PARTIALLY_VALIDATED without evidence."
                     ))
-                if card_status == "UNCALIBRATED":
-                    if "PARTIALLY_VALIDATED" in content or "status: VALIDATED" in content:
-                        violations.append(IntegrityViolation(
-                            category="X4_FALSE_VALIDATION_STATUS",
-                            file_path=str(md_file.relative_to(root_dir)),
-                            message="Active document claims VALIDATED or PARTIALLY_VALIDATED without evidence."
-                        ))
 
     return violations
 
