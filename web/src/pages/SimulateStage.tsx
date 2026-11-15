@@ -54,7 +54,7 @@ export const SimulateStage: React.FC = () => {
   const initialJobId = searchParams.get('jobId') || completedJobs[0]?.job_id || allJobs[0]?.job_id || '';
   const [selectedJobId, setSelectedJobId] = useState<string>(initialJobId);
 
-  // Sync selected job if list loads: always prefer the latest completed run with data
+  // Sync selected job if list loads: always prefer latest completed run with data
   useEffect(() => {
     if ((!selectedJobId || selectedJobId === 'job_4cd06fe860e6') && completedJobs.length > 0) {
       setSelectedJobId(completedJobs[0].job_id);
@@ -85,7 +85,7 @@ export const SimulateStage: React.FC = () => {
 
   // Playback & Scrubbing State
   const maxHorizon = timeseries?.horizon_days || activeJob?.total_days || 60;
-  const [currentDay, setCurrentDay] = useState<number>(1);
+  const [currentDay, setCurrentDay] = useState<number>(0);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [speedMultiplier, setSpeedMultiplier] = useState<number>(1.0);
   const [selectedArea, setSelectedArea] = useState<AreaSpatialPoint | null>(null);
@@ -100,7 +100,7 @@ export const SimulateStage: React.FC = () => {
   const [formRegion, setFormRegion] = useState('example_synthetic');
   const [formDisease, setFormDisease] = useState('respiratory_generic');
   const [formScenario, setFormScenario] = useState('targeted_containment');
-  const [formAgents, setFormAgents] = useState(10000);
+  const [formAgents, setFormAgents] = useState(50000);
   const [formHorizon, setFormHorizon] = useState(60);
   const [formBehaviorMode, setFormBehaviorMode] = useState<'none' | 'rule' | 'llm'>('rule');
   const [isLaunching, setIsLaunching] = useState(false);
@@ -153,11 +153,16 @@ export const SimulateStage: React.FC = () => {
     return () => clearInterval(interval);
   }, [isPlaying, speedMultiplier, maxHorizon]);
 
-  // Telemetry arrays from real simulation engine
-  const rawInfectious = timeseries?.daily_states?.['I'] || timeseries?.daily_states?.['infectious'] || [];
+  // Aggregate Infectious Series across both symptomatic and asymptomatic states
+  const isymp = timeseries?.daily_states?.['I_symp'] || [];
+  const iasymp = timeseries?.daily_states?.['I_asymp'] || [];
+  const rawInfectious = isymp.length > 0 || iasymp.length > 0
+    ? Array.from({ length: Math.max(isymp.length, iasymp.length) }, (_, d) => (isymp[d] || 0) + (iasymp[d] || 0))
+    : (timeseries?.daily_states?.['I'] || timeseries?.daily_states?.['infectious'] || []);
+
   const rawHospital = capacity?.daily_hospital_demand || [];
   const rawIcu = capacity?.daily_icu_demand || [];
-  const rawDeaths = timeseries?.daily_deaths || [];
+  const rawDeaths = timeseries?.daily_deaths || timeseries?.daily_states?.['D'] || [];
 
   // Metrics calculated at currentDay
   const curInfectious = rawInfectious[currentDay] ?? 0;
@@ -175,7 +180,29 @@ export const SimulateStage: React.FC = () => {
   const firstRumorArr = rawRumors && Object.values(rawRumors)[0];
   const rumorBeliefPct = firstRumorArr && firstRumorArr[currentDay] !== undefined
     ? Math.round(firstRumorArr[currentDay] * 100)
-    : 18;
+    : 0;
+
+  // Dynamic Epidemic Milestones (Computed directly from real simulation telemetry)
+  let peakInfDay = 0;
+  let maxInfCount = 0;
+  rawInfectious.forEach((v, d) => {
+    if (v > maxInfCount) {
+      maxInfCount = v;
+      peakInfDay = d;
+    }
+  });
+
+  let peakHospDay = 0;
+  let maxHospCount = 0;
+  rawHospital.forEach((v, d) => {
+    if (v > maxHospCount) {
+      maxHospCount = v;
+      peakHospDay = d;
+    }
+  });
+
+  const firstDetectionDay = rawInfectious.findIndex((v) => v > 0);
+  const totalCumulativeDeaths = rawDeaths.length > 0 ? rawDeaths[rawDeaths.length - 1] : 0;
 
   // Trajectory Curves for ECharts up to currentDay
   const daysArray = Array.from({ length: maxHorizon }, (_, i) => `D${i}`);
@@ -196,28 +223,28 @@ export const SimulateStage: React.FC = () => {
     backgroundColor: 'transparent',
     tooltip: {
       trigger: 'axis',
-      backgroundColor: '#0f172a',
-      borderColor: '#334155',
-      textStyle: { color: '#f8fafc', fontSize: 12 },
+      backgroundColor: '#ffffff',
+      borderColor: '#cbd5e1',
+      textStyle: { color: '#0f172a', fontSize: 12 },
     },
     legend: {
       data: ['Active Infectious', 'Acute Bed Demand', 'ICU Demand', 'Cumulative Deaths', 'Capacity Limit'],
-      textStyle: { color: '#94a3b8', fontSize: 11 },
+      textStyle: { color: '#475569', fontSize: 11 },
       top: 0,
       icon: 'circle',
     },
-    grid: { top: 40, left: 55, right: 25, bottom: 25 },
+    grid: { top: 35, left: 45, right: 25, bottom: 25 },
     xAxis: {
       type: 'category',
       data: daysArray,
-      axisLine: { lineStyle: { color: '#334155' } },
-      axisLabel: { color: '#94a3b8', fontSize: 10, interval: 4 },
+      axisLine: { lineStyle: { color: '#cbd5e1' } },
+      axisLabel: { color: '#64748b', fontSize: 10, interval: 4 },
       splitLine: { show: false },
     },
     yAxis: {
       type: 'value',
-      splitLine: { lineStyle: { color: '#1e293b' } },
-      axisLabel: { color: '#94a3b8', fontSize: 10 },
+      splitLine: { lineStyle: { color: '#f1f5f9' } },
+      axisLabel: { color: '#64748b', fontSize: 10 },
     },
     series: [
       {
@@ -226,6 +253,7 @@ export const SimulateStage: React.FC = () => {
         smooth: true,
         data: infectiousSeries,
         itemStyle: { color: '#f59e0b' },
+        lineStyle: { width: 3 },
         areaStyle: {
           color: {
             type: 'linear',
@@ -234,7 +262,7 @@ export const SimulateStage: React.FC = () => {
             x2: 0,
             y2: 1,
             colorStops: [
-              { offset: 0, color: 'rgba(245, 158, 11, 0.25)' },
+              { offset: 0, color: 'rgba(245, 158, 11, 0.22)' },
               { offset: 1, color: 'rgba(245, 158, 11, 0.0)' },
             ],
           },
@@ -245,15 +273,15 @@ export const SimulateStage: React.FC = () => {
         type: 'line',
         smooth: true,
         data: hospitalSeries,
-        itemStyle: { color: '#38bdf8' },
-        lineStyle: { width: 2 },
+        itemStyle: { color: '#2563eb' },
+        lineStyle: { width: 2.5 },
       },
       {
         name: 'ICU Demand',
         type: 'line',
         smooth: true,
         data: icuSeries,
-        itemStyle: { color: '#a855f7' },
+        itemStyle: { color: '#7c3aed' },
         lineStyle: { width: 2 },
       },
       {
@@ -261,7 +289,7 @@ export const SimulateStage: React.FC = () => {
         type: 'line',
         smooth: true,
         data: deathsSeries,
-        itemStyle: { color: '#f43f5e' },
+        itemStyle: { color: '#e11d48' },
         lineStyle: { width: 1.5, type: 'dashed' },
       },
       {
@@ -290,29 +318,29 @@ export const SimulateStage: React.FC = () => {
   const areasList = spatial?.areas && spatial.areas.length > 0 ? spatial.areas : [];
 
   return (
-    <div className="flex-1 flex flex-col bg-slate-900 text-slate-100 relative overflow-hidden select-none">
+    <div className="flex-1 flex flex-col bg-slate-50 text-slate-900 relative min-h-screen select-none">
       {/* Simulation Stage Header HUD */}
-      <div className="h-16 px-6 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 flex items-center justify-between z-20">
+      <div className="bg-white border-b border-slate-200/80 px-6 py-3 flex flex-wrap items-center justify-between shadow-2xs gap-3">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
             <span
               className={`w-2.5 h-2.5 rounded-full ${
                 activeJob?.status === 'RUNNING'
-                  ? 'bg-amber-400 animate-ping'
+                  ? 'bg-amber-500 animate-ping'
                   : isPlaying
                   ? 'bg-emerald-500 animate-pulse'
-                  : 'bg-blue-400'
+                  : 'bg-blue-600'
               }`}
             />
-            <span className="font-mono text-sm font-bold text-white tracking-wider">
+            <span className="font-mono text-sm font-bold text-slate-900 tracking-wider">
               DAY {currentDay.toString().padStart(2, '0')} / {maxHorizon}
             </span>
           </div>
-          <span className="text-xs text-slate-500">|</span>
+          <span className="text-xs text-slate-300">|</span>
 
           {/* Active Run Selector Dropdown */}
           <div className="flex items-center gap-2">
-            <span className="text-[11px] text-slate-400 uppercase font-semibold">Active Run:</span>
+            <span className="text-[11px] text-slate-500 uppercase font-semibold">Simulation Run:</span>
             {validJobs.length > 0 ? (
               <select
                 value={activeJobId}
@@ -321,11 +349,11 @@ export const SimulateStage: React.FC = () => {
                   setSearchParams({ jobId: e.target.value });
                   setCurrentDay(0);
                 }}
-                className="bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1 text-xs text-white font-mono focus:ring-1 focus:ring-blue-500"
+                className="bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1 text-xs text-slate-800 font-mono font-medium focus:ring-1 focus:ring-blue-500"
               >
                 {validJobs.map((j) => (
                   <option key={j.job_id} value={j.job_id}>
-                    {j.job_id} ({j.request?.region_id || 'synthetic'} • {j.request?.scale_agents?.toLocaleString() || '10,000'} agents • {j.status})
+                    {j.job_id} ({j.request?.region_id || 'synthetic'} • {(j.request?.scale_agents || 10000).toLocaleString()} agents • {j.status})
                   </option>
                 ))}
               </select>
@@ -337,7 +365,7 @@ export const SimulateStage: React.FC = () => {
           {/* Launch New Simulation Button */}
           <button
             onClick={() => setLaunchModalOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-sm transition"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm transition"
           >
             <PlusCircle className="w-3.5 h-3.5" />
             <span>New Run</span>
@@ -348,263 +376,48 @@ export const SimulateStage: React.FC = () => {
         <div className="flex items-center gap-6 text-xs">
           <div className="flex flex-col">
             <span className="text-slate-400 text-[10px] uppercase font-semibold">Reproduction R_eff</span>
-            <span className={`font-mono font-bold text-sm ${rEffective > 1 ? 'text-rose-400' : 'text-emerald-400'}`}>
+            <span className={`font-mono font-bold text-sm ${rEffective > 1 ? 'text-rose-600' : 'text-emerald-600'}`}>
               {rEffective.toFixed(2)}
             </span>
           </div>
 
           <div className="flex flex-col">
             <span className="text-slate-400 text-[10px] uppercase font-semibold">Active Infectious</span>
-            <span className="font-mono font-bold text-sm text-amber-400">
+            <span className="font-mono font-bold text-sm text-amber-600">
               {curInfectious.toLocaleString()}
             </span>
           </div>
 
           <div className="flex flex-col">
             <span className="text-slate-400 text-[10px] uppercase font-semibold">Hospital Bed Demand</span>
-            <span className={`font-mono font-bold text-sm ${hospitalOccupancyPct >= 95 ? 'text-rose-500 animate-pulse' : 'text-blue-400'}`}>
+            <span className={`font-mono font-bold text-sm ${hospitalOccupancyPct >= 95 ? 'text-rose-600 font-extrabold animate-pulse' : 'text-blue-600'}`}>
               {hospitalOccupancyPct}%
             </span>
           </div>
 
           <div className="flex flex-col">
             <span className="text-slate-400 text-[10px] uppercase font-semibold">Total Deaths</span>
-            <span className="font-mono font-bold text-sm text-slate-200">
+            <span className="font-mono font-bold text-sm text-slate-800">
               {curDeaths}
             </span>
           </div>
 
           <div className="flex flex-col">
             <span className="text-slate-400 text-[10px] uppercase font-semibold">Rumor Belief</span>
-            <span className="font-mono font-bold text-sm text-purple-400">
+            <span className="font-mono font-bold text-sm text-purple-600">
               {rumorBeliefPct}%
             </span>
           </div>
         </div>
       </div>
 
-      {/* Main Canvas & Stage Center */}
-      <div className="flex-1 flex relative overflow-hidden">
-        {/* Full-width Simulation Progress & Telemetry Workbench */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {/* Top Simulation Progress & Phase Overview */}
-          <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-5 shadow-xl">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-3">
-                <div
-                  className={`px-2.5 py-1 rounded-md text-xs font-mono font-bold flex items-center gap-2 ${
-                    activeJob?.status === 'RUNNING'
-                      ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
-                      : isPlaying
-                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-                      : currentDay >= maxHorizon - 1
-                      ? 'bg-blue-500/10 text-blue-400 border border-blue-500/30'
-                      : 'bg-slate-500/10 text-slate-400 border border-slate-500/30'
-                  }`}
-                >
-                  <span
-                    className={`w-2 h-2 rounded-full ${
-                      activeJob?.status === 'RUNNING'
-                        ? 'bg-amber-400 animate-ping'
-                        : isPlaying
-                        ? 'bg-emerald-400 animate-pulse'
-                        : currentDay >= maxHorizon - 1
-                        ? 'bg-blue-400'
-                        : 'bg-slate-400'
-                    }`}
-                  />
-                  {activeJob?.status === 'RUNNING'
-                    ? 'ENGINE EXECUTING IN BACKGROUND'
-                    : isPlaying
-                    ? 'PLAYBACK SCRUBBING'
-                    : currentDay >= maxHorizon - 1
-                    ? 'SIMULATION TIMELINE COMPLETED'
-                    : 'TIMELINE PAUSED'}
-                </div>
-                <span className="text-sm font-semibold text-white">
-                  Day {currentDay} of {maxHorizon} ({progressPercent}% Horizon Reached)
-                </span>
-              </div>
-
-              <div className="flex items-center gap-4 text-xs font-mono text-slate-400">
-                <span>Speed: <strong className="text-white">{speedMultiplier}x</strong></span>
-                <span>Region: <strong className="text-white">{activeJob?.request?.region_id || 'synthetic'}</strong></span>
-                <span>Agents: <strong className="text-white">{(activeJob?.request?.scale_agents || 10000).toLocaleString()}</strong></span>
-              </div>
-            </div>
-
-            {/* High-visibility Progress Track */}
-            <div className="relative w-full h-3.5 bg-slate-800/90 rounded-full overflow-hidden border border-slate-700/60 p-0.5">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-blue-600 via-indigo-500 to-emerald-400 transition-all duration-300 shadow-sm"
-                style={{ width: `${progressPercent}%` }}
-              />
-            </div>
-
-            {/* Milestone Phase Indicators */}
-            <div className="grid grid-cols-4 gap-2 mt-3 pt-3 border-t border-slate-800/60 text-[11px] font-mono text-slate-400">
-              <div className={`p-1.5 rounded border transition-colors ${currentDay < 15 ? 'border-amber-500/50 bg-amber-500/10 text-amber-300' : 'border-slate-800'}`}>
-                Phase 1 (Days 0-14): Seeding & Detection
-              </div>
-              <div className={`p-1.5 rounded border transition-colors ${currentDay >= 15 && currentDay < 28 ? 'border-amber-500/50 bg-amber-500/10 text-amber-300' : 'border-slate-800'}`}>
-                Phase 2 (Days 15-28): Exponential Spread
-              </div>
-              <div className={`p-1.5 rounded border transition-colors ${currentDay >= 28 && currentDay < 42 ? 'border-amber-500/50 bg-amber-500/10 text-amber-300' : 'border-slate-800'}`}>
-                Phase 3 (Days 28-42): Acute Bed Strain Peak
-              </div>
-              <div className={`p-1.5 rounded border transition-colors ${currentDay >= 42 ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-300' : 'border-slate-800'}`}>
-                Phase 4 (Days 43-60): Suppression & Post-Peak
-              </div>
-            </div>
-          </div>
-
-          {/* Trajectory & Clinical Demand Curves */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 bg-slate-950/80 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-                  <Activity className="w-3.5 h-3.5 text-amber-400" />
-                  Live Outbreak Trajectory Curves (Vectorized Telemetry)
-                </span>
-                <span className="text-[10px] font-mono text-slate-400">
-                  Step: Day {currentDay} / {maxHorizon}
-                </span>
-              </div>
-              <ReactECharts option={chartOption} style={{ height: '280px', width: '100%' }} />
-            </div>
-
-            <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-                <Hospital className="w-3.5 h-3.5 text-blue-400" />
-                Clinical System Strain
-              </span>
-
-              <div className="space-y-4 text-xs">
-                <div>
-                  <div className="flex justify-between text-slate-400 mb-1">
-                    <span>Acute General Beds</span>
-                    <span className="font-mono text-white">{curHospital.toLocaleString()} / {totalBeds.toLocaleString()} ({hospitalOccupancyPct}%)</span>
-                  </div>
-                  <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all duration-300 ${hospitalOccupancyPct >= 95 ? 'bg-rose-500' : hospitalOccupancyPct >= 75 ? 'bg-amber-400' : 'bg-blue-500'}`}
-                      style={{ width: `${Math.min(100, hospitalOccupancyPct)}%` }}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex justify-between text-slate-400 mb-1">
-                    <span>ICU / Ventilated Beds</span>
-                    <span className="font-mono text-white">{(rawIcu[currentDay] ?? 0)} / {capacity?.icu_capacity_beds || 200}</span>
-                  </div>
-                  <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-purple-500 rounded-full transition-all duration-300"
-                      style={{ width: `${Math.min(100, (((rawIcu[currentDay] ?? 0) / Math.max(1, capacity?.icu_capacity_beds || 200)) * 100))}%` }}
-                    />
-                  </div>
-                </div>
-
-                <div className="pt-3 border-t border-slate-800 text-slate-400 space-y-2 text-[11px]">
-                  <div className="flex justify-between">
-                    <span>Active Pathogen:</span>
-                    <span className="font-semibold text-white">{activeJob?.request?.disease_id || 'respiratory_generic'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Policy Scenario:</span>
-                    <span className="font-semibold text-white">{activeJob?.request?.scenario_id || 'baseline'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Cumulative Fatalities:</span>
-                    <span className="font-mono font-bold text-rose-400">{curDeaths}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Regional Healthcare & Area Incidence Table */}
-          <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-                  <Layers className="w-3.5 h-3.5 text-indigo-400" />
-                  Regional Healthcare & Area Incidence ({areasList.length} monitored sectors)
-                </h3>
-                <p className="text-[11px] text-slate-500 mt-0.5">
-                  Live spatial infection counts for Day {currentDay} derived from engine contact networks.
-                </p>
-              </div>
-              <button
-                onClick={() => navigate(`/insights?jobId=${activeJobId}`)}
-                className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 underline"
-              >
-                Open Full Insights Dashboard &rarr;
-              </button>
-            </div>
-
-            <div className="overflow-x-auto border border-slate-800/80 rounded-xl">
-              <table className="w-full text-xs divide-y divide-slate-800">
-                <thead className="bg-slate-900 text-slate-400 font-semibold text-[11px]">
-                  <tr>
-                    <th className="px-4 py-2.5 text-left">Sector / Area</th>
-                    <th className="px-4 py-2.5 text-right">Population</th>
-                    <th className="px-4 py-2.5 text-right">Daily Incident</th>
-                    <th className="px-4 py-2.5 text-right">Rate / 1k Pop</th>
-                    <th className="px-4 py-2.5 text-center">Alert Status</th>
-                    <th className="px-4 py-2.5 text-center">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800 bg-slate-950/40">
-                  {areasList.length > 0 ? (
-                    areasList.map((area) => {
-                      const dailyInc = area.daily_incident_infections?.[currentDay] ?? 0;
-                      const rate = area.population > 0 ? ((dailyInc / area.population) * 1000).toFixed(2) : '0.00';
-                      const isHigh = Number(rate) > 0.5;
-                      return (
-                        <tr key={area.area_id} className="hover:bg-slate-900/60 transition-colors">
-                          <td className="px-4 py-2.5 font-medium text-white">{area.name}</td>
-                          <td className="px-4 py-2.5 text-right font-mono text-slate-400">{area.population.toLocaleString()}</td>
-                          <td className="px-4 py-2.5 text-right font-mono font-bold text-amber-400">{dailyInc.toLocaleString()}</td>
-                          <td className="px-4 py-2.5 text-right font-mono text-slate-300">{rate}</td>
-                          <td className="px-4 py-2.5 text-center">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${isHigh ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'}`}>
-                              {isHigh ? 'Active Surge' : 'Baseline'}
-                            </span>
-                          </td>
-                          <td className="px-4 py-2.5 text-center">
-                            <button
-                              onClick={() => setSelectedArea(area)}
-                              className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-medium"
-                            >
-                              Inspect
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  ) : (
-                    <tr>
-                      <td colSpan={6} className="px-4 py-6 text-center text-slate-500 italic">
-                        No spatial sectors loaded. Run a simulation to generate area trajectories.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Bottom Timeline Control Deck */}
-      <div className="h-20 px-8 bg-slate-950/95 border-t border-slate-800 flex items-center justify-between z-20 shadow-2xl">
+      {/* TOP DECK CONTROLS (Sticky & Immediately Visible Without Scrolling) */}
+      <div className="bg-white border-b border-slate-200 px-6 py-3 sticky top-0 z-30 flex flex-wrap items-center justify-between shadow-xs gap-4">
         {/* Playback Controls */}
         <div className="flex items-center gap-2">
           <button
             onClick={() => setCurrentDay(0)}
-            className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all hover:scale-105"
+            className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition"
             title="Reset to Day 0"
           >
             <RotateCcw className="w-4 h-4" />
@@ -612,28 +425,29 @@ export const SimulateStage: React.FC = () => {
 
           <button
             onClick={() => setIsPlaying(!isPlaying)}
-            className="p-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold shadow-lg shadow-blue-600/30 transition-all hover:scale-105"
+            className="p-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-sm transition flex items-center gap-1.5 text-xs"
             title={isPlaying ? 'Pause Playback' : 'Play Simulation Telemetry'}
           >
             {isPlaying ? <Pause className="w-4 h-4 fill-white" /> : <Play className="w-4 h-4 fill-white" />}
+            <span>{isPlaying ? 'Pause' : 'Play'}</span>
           </button>
 
           <button
             onClick={handleStepForward}
-            className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all hover:scale-105"
+            className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition"
             title="Step 1 Day Forward"
           >
             <SkipForward className="w-4 h-4" />
           </button>
 
           {/* Speed Presets */}
-          <div className="flex items-center bg-slate-800/80 p-1 rounded-xl border border-slate-700/60 ml-2">
+          <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 ml-2">
             {[0.5, 1, 2, 5].map((spd) => (
               <button
                 key={spd}
                 onClick={() => setSpeedMultiplier(spd)}
-                className={`px-2 py-1 rounded-lg text-xs font-mono font-medium transition-all ${
-                  speedMultiplier === spd ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
+                className={`px-2 py-1 rounded text-xs font-mono font-medium transition ${
+                  speedMultiplier === spd ? 'bg-white text-blue-600 shadow-2xs font-bold' : 'text-slate-500 hover:text-slate-900'
                 }`}
               >
                 {spd}x
@@ -643,8 +457,8 @@ export const SimulateStage: React.FC = () => {
         </div>
 
         {/* Timeline Scrubber */}
-        <div className="flex-1 max-w-xl mx-8 flex items-center gap-4">
-          <span className="font-mono text-xs text-slate-400">Day 0</span>
+        <div className="flex-1 max-w-xl mx-4 flex items-center gap-3">
+          <span className="font-mono text-xs text-slate-400 font-semibold">Day 0</span>
           <input
             type="range"
             min={0}
@@ -654,41 +468,209 @@ export const SimulateStage: React.FC = () => {
               setCurrentDay(Number(e.target.value));
               setIsPlaying(false);
             }}
-            className="flex-1 h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-500"
+            className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
           />
-          <span className="font-mono text-xs text-slate-400">Day {maxHorizon}</span>
+          <span className="font-mono text-xs text-slate-400 font-semibold">Day {maxHorizon}</span>
         </div>
 
-        {/* Action Buttons: Intervene & Branch */}
-        <div className="flex items-center gap-3">
+        {/* Action Buttons */}
+        <div className="flex items-center gap-2">
           <button
             onClick={() => setInterveneModalOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold shadow-md transition-all hover:scale-102"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold shadow-xs transition"
           >
             <ShieldAlert className="w-3.5 h-3.5" />
-            <span>Intervene Now</span>
+            <span>Intervene</span>
           </button>
 
           <button
             onClick={() => setBranchModalOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md transition-all hover:scale-102"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition"
           >
             <GitBranch className="w-3.5 h-3.5" />
-            <span>Branch from Day {currentDay}</span>
+            <span>Branch</span>
           </button>
+        </div>
+      </div>
+
+      {/* Main Workspace Stage */}
+      <div className="p-6 space-y-6 max-w-7xl mx-auto w-full">
+        {/* Dynamic Epidemic Milestones (Computed directly from real simulation telemetry) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs space-y-1">
+            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Outbreak Seed Detection</span>
+            <div className="text-lg font-bold text-slate-800">Day {firstDetectionDay >= 0 ? firstDetectionDay : 0}</div>
+            <p className="text-[11px] text-slate-500">First active community transmission</p>
+          </div>
+
+          <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs space-y-1">
+            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Infection Wave Peak</span>
+            <div className="text-lg font-bold text-amber-600">Day {peakInfDay}</div>
+            <p className="text-[11px] text-slate-500">{maxInfCount.toLocaleString()} active infectious cases at peak</p>
+          </div>
+
+          <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs space-y-1">
+            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Peak Acute Hospital Strain</span>
+            <div className="text-lg font-bold text-blue-600">Day {peakHospDay}</div>
+            <p className="text-[11px] text-slate-500">{maxHospCount.toLocaleString()} acute beds required</p>
+          </div>
+
+          <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs space-y-1">
+            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Total Fatalities</span>
+            <div className="text-lg font-bold text-rose-600">{totalCumulativeDeaths.toLocaleString()} Deaths</div>
+            <p className="text-[11px] text-slate-500">Cumulative mortality across {maxHorizon} days</p>
+          </div>
+        </div>
+
+        {/* Trajectory & Clinical Demand Curves */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                <Activity className="w-3.5 h-3.5 text-amber-500" />
+                Live Outbreak Trajectory Curves (Vectorized Telemetry)
+              </span>
+              <span className="text-[10px] font-mono text-slate-500">
+                Step: Day {currentDay} / {maxHorizon}
+              </span>
+            </div>
+            <ReactECharts option={chartOption} style={{ height: '300px', width: '100%' }} />
+          </div>
+
+          <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs space-y-4">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+              <Hospital className="w-3.5 h-3.5 text-blue-600" />
+              Clinical System Strain
+            </span>
+
+            <div className="space-y-4 text-xs">
+              <div>
+                <div className="flex justify-between text-slate-600 mb-1">
+                  <span>Acute General Beds</span>
+                  <span className="font-mono font-semibold text-slate-900">{curHospital.toLocaleString()} / {totalBeds.toLocaleString()} ({hospitalOccupancyPct}%)</span>
+                </div>
+                <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-300 ${hospitalOccupancyPct >= 95 ? 'bg-rose-500' : hospitalOccupancyPct >= 75 ? 'bg-amber-500' : 'bg-blue-600'}`}
+                    style={{ width: `${Math.min(100, hospitalOccupancyPct)}%` }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex justify-between text-slate-600 mb-1">
+                  <span>ICU / Ventilated Beds</span>
+                  <span className="font-mono font-semibold text-slate-900">{(rawIcu[currentDay] ?? 0)} / {capacity?.icu_capacity_beds || 200}</span>
+                </div>
+                <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-purple-600 rounded-full transition-all duration-300"
+                    style={{ width: `${Math.min(100, (((rawIcu[currentDay] ?? 0) / Math.max(1, capacity?.icu_capacity_beds || 200)) * 100))}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 text-slate-600 space-y-2 text-[11px]">
+                <div className="flex justify-between">
+                  <span>Active Pathogen:</span>
+                  <span className="font-semibold text-slate-900">{activeJob?.request?.disease_id || 'respiratory_generic'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Policy Scenario:</span>
+                  <span className="font-semibold text-slate-900">{activeJob?.request?.scenario_id || 'targeted_containment'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Cumulative Fatalities:</span>
+                  <span className="font-mono font-bold text-rose-600">{curDeaths}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Regional Healthcare & Area Incidence Table */}
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                <Layers className="w-3.5 h-3.5 text-indigo-600" />
+                Regional Healthcare & Area Incidence ({areasList.length} monitored sectors)
+              </h3>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Live spatial infection counts for Day {currentDay} derived from engine contact networks.
+              </p>
+            </div>
+            <button
+              onClick={() => navigate(`/insights?jobId=${activeJobId}`)}
+              className="text-xs text-blue-600 hover:text-blue-700 font-semibold flex items-center gap-1"
+            >
+              Open Full Insights Dashboard &rarr;
+            </button>
+          </div>
+
+          <div className="overflow-x-auto border border-slate-200 rounded-xl">
+            <table className="w-full text-xs divide-y divide-slate-200">
+              <thead className="bg-slate-50 text-slate-600 font-semibold text-[11px]">
+                <tr>
+                  <th className="px-4 py-2.5 text-left">Sector / Area</th>
+                  <th className="px-4 py-2.5 text-right">Population</th>
+                  <th className="px-4 py-2.5 text-right">Daily Incident</th>
+                  <th className="px-4 py-2.5 text-right">Rate / 1k Pop</th>
+                  <th className="px-4 py-2.5 text-center">Alert Status</th>
+                  <th className="px-4 py-2.5 text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 bg-white">
+                {areasList.length > 0 ? (
+                  areasList.map((area) => {
+                    const dailyInc = area.daily_incident_infections?.[currentDay] ?? 0;
+                    const rate = area.population > 0 ? ((dailyInc / area.population) * 1000).toFixed(2) : '0.00';
+                    const isHigh = Number(rate) > 0.5;
+                    return (
+                      <tr key={area.area_id} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-4 py-2.5 font-medium text-slate-900">{area.name}</td>
+                        <td className="px-4 py-2.5 text-right font-mono text-slate-500">{area.population.toLocaleString()}</td>
+                        <td className="px-4 py-2.5 text-right font-mono font-bold text-amber-600">{dailyInc.toLocaleString()}</td>
+                        <td className="px-4 py-2.5 text-right font-mono text-slate-600">{rate}</td>
+                        <td className="px-4 py-2.5 text-center">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${isHigh ? 'bg-rose-50 text-rose-700 border border-rose-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}`}>
+                            {isHigh ? 'Active Surge' : 'Baseline'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2.5 text-center">
+                          <button
+                            onClick={() => setSelectedArea(area)}
+                            className="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-medium"
+                          >
+                            Inspect
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                ) : (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-6 text-center text-slate-500 italic">
+                      No spatial sectors loaded. Run a simulation to generate area trajectories.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
       {/* Launch New Simulation Modal */}
       {launchModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm">
-          <div className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl text-slate-100 space-y-4">
-            <div className="flex justify-between items-center pb-3 border-b border-slate-800">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-sm">
+          <div className="w-full max-w-lg bg-white border border-slate-200 rounded-2xl p-6 shadow-2xl text-slate-900 space-y-4">
+            <div className="flex justify-between items-center pb-3 border-b border-slate-100">
               <h3 className="text-base font-bold flex items-center gap-2">
-                <Play className="w-4 h-4 text-blue-500 fill-blue-500" />
+                <Play className="w-4 h-4 text-blue-600 fill-blue-600" />
                 Launch Vectorized Simulation Job
               </h3>
-              <button onClick={() => setLaunchModalOpen(false)} className="text-slate-400 hover:text-white">
+              <button onClick={() => setLaunchModalOpen(false)} className="text-slate-400 hover:text-slate-700">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -696,11 +678,11 @@ export const SimulateStage: React.FC = () => {
             <form onSubmit={handleLaunchSubmit} className="space-y-4 text-xs">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-slate-400 font-semibold mb-1">Region</label>
+                  <label className="block text-slate-600 font-semibold mb-1">Region</label>
                   <select
                     value={formRegion}
                     onChange={(e) => setFormRegion(e.target.value)}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-slate-800"
                   >
                     {regions?.map((r) => (
                       <option key={r.id} value={r.id}>{r.name}</option>
@@ -709,11 +691,11 @@ export const SimulateStage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-slate-400 font-semibold mb-1">Disease Pathogen</label>
+                  <label className="block text-slate-600 font-semibold mb-1">Disease Pathogen</label>
                   <select
                     value={formDisease}
                     onChange={(e) => setFormDisease(e.target.value)}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-slate-800"
                   >
                     {diseases?.map((d) => (
                       <option key={d.id} value={d.id}>{d.name}</option>
@@ -724,11 +706,11 @@ export const SimulateStage: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-slate-400 font-semibold mb-1">Intervention Scenario</label>
+                  <label className="block text-slate-600 font-semibold mb-1">Intervention Scenario</label>
                   <select
                     value={formScenario}
                     onChange={(e) => setFormScenario(e.target.value)}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-slate-800"
                   >
                     {scenarios?.map((s) => (
                       <option key={s.id} value={s.id}>{s.name}</option>
@@ -737,11 +719,11 @@ export const SimulateStage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-slate-400 font-semibold mb-1">Behavior Mode</label>
+                  <label className="block text-slate-600 font-semibold mb-1">Behavior Mode</label>
                   <select
                     value={formBehaviorMode}
                     onChange={(e) => setFormBehaviorMode(e.target.value as any)}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-slate-800"
                   >
                     <option value="rule">Rule-Based Vectorized (Fast)</option>
                     <option value="llm">LLM Decision Agent (Gemini / Ollama)</option>
@@ -752,7 +734,7 @@ export const SimulateStage: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-slate-400 font-semibold mb-1">Population Scale</label>
+                  <label className="block text-slate-600 font-semibold mb-1">Population Scale</label>
                   <input
                     type="number"
                     min={1000}
@@ -760,39 +742,39 @@ export const SimulateStage: React.FC = () => {
                     step={1000}
                     value={formAgents}
                     onChange={(e) => setFormAgents(Number(e.target.value))}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white font-mono"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-slate-800 font-mono"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-slate-400 font-semibold mb-1">Simulation Horizon (Days)</label>
+                  <label className="block text-slate-600 font-semibold mb-1">Simulation Horizon (Days)</label>
                   <input
                     type="number"
                     min={10}
                     max={180}
                     value={formHorizon}
                     onChange={(e) => setFormHorizon(Number(e.target.value))}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white font-mono"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-slate-800 font-mono"
                   />
                 </div>
               </div>
 
-              <div className="p-3 bg-blue-950/40 border border-blue-900/60 rounded-xl text-blue-300 text-[11px]">
-                🚀 Executes on the real Python simulation engine (NumPy vectorized transmission + healthcare allocation). Runs in background.
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-blue-700 text-[11px]">
+                Executes on the real Python simulation engine (NumPy vectorized transmission + healthcare allocation). Runs in background.
               </div>
 
-              <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
+              <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setLaunchModalOpen(false)}
-                  className="px-4 py-2 rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800 text-xs"
+                  className="px-4 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isLaunching}
-                  className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs flex items-center gap-2"
+                  className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs flex items-center gap-2 shadow-sm"
                 >
                   {isLaunching ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
                   <span>{isLaunching ? 'Launching...' : 'Start Real Simulation'}</span>
@@ -805,28 +787,28 @@ export const SimulateStage: React.FC = () => {
 
       {/* Intervene Modal */}
       {interveneModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl text-slate-100 space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-sm">
+          <div className="w-full max-w-md bg-white border border-slate-200 rounded-2xl p-6 shadow-2xl text-slate-900 space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="text-base font-semibold">Live Intervention Injection (Day {currentDay})</h3>
-              <button onClick={() => setInterveneModalOpen(false)} className="text-slate-400 hover:text-white">
+              <button onClick={() => setInterveneModalOpen(false)} className="text-slate-400 hover:text-slate-700">
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-slate-500">
               Injects policy counter-measures directly into the current simulation run or branches an alternative timeline.
             </p>
             <div className="space-y-3 text-xs">
-              <label className="block font-medium text-slate-300">Select Countermeasure:</label>
-              <select className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white">
+              <label className="block font-medium text-slate-700">Select Countermeasure:</label>
+              <select className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-slate-800">
                 <option>Emergency Transit Circuit Breaker (-65% travel)</option>
                 <option>Mandatory Indoor Mask Promotion</option>
                 <option>Regional ICU Mutual-Aid Surge</option>
                 <option>Targeted Misinformation Fact-Checking Campaign</option>
               </select>
             </div>
-            <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
-              <button onClick={() => setInterveneModalOpen(false)} className="px-4 py-2 rounded-lg border border-slate-700 text-xs text-slate-300">
+            <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+              <button onClick={() => setInterveneModalOpen(false)} className="px-4 py-2 rounded-lg border border-slate-200 text-xs text-slate-600">
                 Cancel
               </button>
               <button
@@ -834,7 +816,7 @@ export const SimulateStage: React.FC = () => {
                   setInterveneModalOpen(false);
                   navigate(`/insights?tab=advisor&prompt=${encodeURIComponent(`Evaluate injecting an emergency circuit breaker at Day ${currentDay}`)}`);
                 }}
-                className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold shadow-md"
+                className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold shadow-sm"
               >
                 Analyze with Gemini Advisor &rarr;
               </button>
@@ -845,31 +827,31 @@ export const SimulateStage: React.FC = () => {
 
       {/* Branch Modal */}
       {branchModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl text-slate-100 space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-sm">
+          <div className="w-full max-w-md bg-white border border-slate-200 rounded-2xl p-6 shadow-2xl text-slate-900 space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="text-base font-semibold">Branch Counterfactual from Day {currentDay}</h3>
-              <button onClick={() => setBranchModalOpen(false)} className="text-slate-400 hover:text-white">
+              <button onClick={() => setBranchModalOpen(false)} className="text-slate-400 hover:text-slate-700">
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-slate-500">
               Forks the exact state at Day {currentDay} into an independent "what-if" counterfactual for comparative evaluation in Insights.
             </p>
             <div className="space-y-2 text-xs">
-              <label className="block font-medium text-slate-300">Branch Scenario Title:</label>
+              <label className="block font-medium text-slate-700">Branch Scenario Title:</label>
               <input
                 type="text"
                 value={branchName}
                 onChange={(e) => setBranchName(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white text-xs font-medium"
+                className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-slate-800 text-xs font-medium"
               />
             </div>
-            <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
-              <button onClick={() => setBranchModalOpen(false)} className="px-4 py-2 rounded-lg border border-slate-700 text-xs text-slate-300">
+            <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+              <button onClick={() => setBranchModalOpen(false)} className="px-4 py-2 rounded-lg border border-slate-200 text-xs text-slate-600">
                 Cancel
               </button>
-              <button onClick={handleCreateBranch} className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md">
+              <button onClick={handleCreateBranch} className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm">
                 Fork & Compare in Insights
               </button>
             </div>

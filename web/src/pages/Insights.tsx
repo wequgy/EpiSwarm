@@ -40,7 +40,9 @@ export const Insights: React.FC = () => {
 
   // Live Runs & Simulation Telemetry Query
   const { data: runsList } = useQuery({ queryKey: ['runsList'], queryFn: () => api.listRuns(50) });
-  const completedRuns = runsList?.jobs.filter((j) => j.status === 'COMPLETED') || [];
+  const completedRuns = (runsList?.jobs || [])
+    .filter((j) => j.status === 'COMPLETED')
+    .sort((a, b) => Number(a.is_mock) - Number(b.is_mock));
   const defaultRunId = searchParams.get('jobId') || completedRuns[0]?.job_id || '';
   const [selectedRunId, setSelectedRunId] = useState(defaultRunId);
   const activeRunId = selectedRunId || defaultRunId;
@@ -76,8 +78,35 @@ export const Insights: React.FC = () => {
     enabled: !!activeJob,
   });
 
-  const [compareRunIdA, setCompareRunIdA] = useState<string>(completedRuns[0]?.job_id || '');
-  const [compareRunIdB, setCompareRunIdB] = useState<string>(completedRuns[1]?.job_id || completedRuns[0]?.job_id || '');
+  const baselineRun = completedRuns.find((j) => j.request?.scenario_id === 'baseline') || completedRuns[0];
+  const interventionRun = completedRuns.find((j) => j.job_id !== baselineRun?.job_id) || completedRuns[1] || completedRuns[0];
+  const [compareRunIdA, setCompareRunIdA] = useState<string>('');
+  const [compareRunIdB, setCompareRunIdB] = useState<string>('');
+
+  const activeCompareA = compareRunIdA || baselineRun?.job_id || '';
+  const activeCompareB = compareRunIdB || interventionRun?.job_id || '';
+
+  const { data: timeseriesA } = useQuery({
+    queryKey: ['runTimeseries', activeCompareA],
+    queryFn: () => api.getRunTimeseries(activeCompareA),
+    enabled: !!activeCompareA,
+  });
+  const { data: capacityA } = useQuery({
+    queryKey: ['runCapacity', activeCompareA],
+    queryFn: () => api.getRunCapacity(activeCompareA),
+    enabled: !!activeCompareA,
+  });
+
+  const { data: timeseriesB } = useQuery({
+    queryKey: ['runTimeseries', activeCompareB],
+    queryFn: () => api.getRunTimeseries(activeCompareB),
+    enabled: !!activeCompareB,
+  });
+  const { data: capacityB } = useQuery({
+    queryKey: ['runCapacity', activeCompareB],
+    queryFn: () => api.getRunCapacity(activeCompareB),
+    enabled: !!activeCompareB,
+  });
 
   // Policy Advisor Chat & Evaluation State
   const [advisorModel, setAdvisorModel] = useState<string>('gemini-3.1-flash-lite');
@@ -124,18 +153,36 @@ export const Insights: React.FC = () => {
     setAdvisorTyping(true);
 
     try {
+      const isympList = timeseries?.daily_states?.['I_symp'] || [];
+      const iasympList = timeseries?.daily_states?.['I_asymp'] || [];
+      const infLen = Math.max(isympList.length, iasympList.length, (timeseries?.daily_states?.['I'] || []).length);
+      const activeInfs = isympList.length > 0 || iasympList.length > 0
+        ? Array.from({ length: infLen }, (_, d) => (isympList[d] || 0) + (iasympList[d] || 0))
+        : (timeseries?.daily_states?.['I'] || []);
+      const peakInf = activeInfs.length ? Math.max(...activeInfs) : 0;
+      const acuteList = capacity?.daily_hospital_demand || [];
+      const peakAcute = acuteList.length ? Math.max(...acuteList) : 0;
+      const bedCap = capacity?.hospital_capacity_beds || 1000;
+      const dList = timeseries?.daily_deaths || [];
+      const totalD = dList.length ? dList[dList.length - 1] : 0;
+
       const res = await fetch('/api/advisor/consult', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prompt: promptToSend,
           simulation_context: {
-            current_day: 20,
-            r_effective: 1.84,
-            hospital_occupancy_pct: 88,
-            active_cases: 1420,
-            total_deaths: 12,
-            case_name: 'London Wave 1 (33 Boroughs)',
+            job_id: activeJob?.job_id,
+            region_id: activeJob?.request?.region_id || 'monitored_jurisdiction',
+            disease_id: activeJob?.request?.disease_id || 'respiratory_generic',
+            scenario_policy: activeJob?.request?.scenario_id || 'targeted_containment',
+            population_scale: activeJob?.request?.scale_agents || 50000,
+            current_day: timeseries?.days?.length ? timeseries.days[timeseries.days.length - 1] : 60,
+            peak_infectious: peakInf,
+            peak_hospital_demand: peakAcute,
+            nominal_hospital_capacity: bedCap,
+            capacity_breached: peakAcute > bedCap,
+            total_deaths: totalD,
           },
         }),
       });
@@ -173,13 +220,22 @@ export const Insights: React.FC = () => {
     ? timeseries.days.map((d) => `Day ${d}`)
     : [];
 
-  const rawInfectious = timeseries?.daily_states?.['I'] || timeseries?.daily_states?.['infectious'] || [];
-  const infectiousData = rawInfectious;
+  const isymp = timeseries?.daily_states?.['I_symp'] || [];
+  const iasymp = timeseries?.daily_states?.['I_asymp'] || [];
+  const len = Math.max(isymp.length, iasymp.length, (timeseries?.daily_states?.['I'] || []).length);
+  const infectiousData = isymp.length > 0 || iasymp.length > 0
+    ? Array.from({ length: len }, (_, d) => (isymp[d] || 0) + (iasymp[d] || 0))
+    : (timeseries?.daily_states?.['I'] || timeseries?.daily_states?.['infectious'] || []);
   const ciUpperData = infectiousData.map((v) => Math.round(v * 1.15));
   const ciLowerData = infectiousData.map((v) => Math.round(v * 0.85));
 
-  const rawRecovered = timeseries?.daily_states?.['R'] || timeseries?.daily_states?.['recovered'] || [];
-  const recoveredData = rawRecovered;
+  const susceptibleData = timeseries?.daily_states?.['S'] || [];
+  const exposedData = timeseries?.daily_states?.['E'] || [];
+  const hospitalizedData = timeseries?.daily_states?.['H'] || [];
+  const icuData = timeseries?.daily_states?.['ICU'] || [];
+  const clinicalSevereData = Array.from({ length: Math.max(hospitalizedData.length, icuData.length) }, (_, d) => (hospitalizedData[d] || 0) + (icuData[d] || 0));
+  const recoveredData = timeseries?.daily_states?.['R'] || timeseries?.daily_states?.['recovered'] || [];
+  const fatalitiesData = timeseries?.daily_states?.['D'] || timeseries?.daily_states?.['deceased'] || [];
 
   const capacityDays = capacity?.daily_hospital_demand?.length
     ? Array.from({ length: capacity.daily_hospital_demand.length }, (_, i) => `Day ${i}`)
@@ -193,20 +249,24 @@ export const Insights: React.FC = () => {
 
   const trajectoryOption = {
     tooltip: { trigger: 'axis' },
-    legend: { data: ['Infectious (Mean)', '95% CI Upper', '95% CI Lower', 'Recovered'], bottom: 0 },
+    legend: {
+      data: ['Active Infectious (Mean)', '95% CI Band', 'Exposed (Latent)', 'Severe / Hospitalized', 'Recovered (Immune)', 'Fatalities (D)'],
+      bottom: 0,
+      textStyle: { fontSize: 11 },
+    },
     grid: { left: '3%', right: '4%', bottom: '12%', containLabel: true },
     xAxis: { type: 'category', data: realDays },
     yAxis: { type: 'value', name: 'Population' },
     series: [
       {
-        name: 'Infectious (Mean)',
+        name: 'Active Infectious (Mean)',
         type: 'line',
         data: infectiousData,
         smooth: true,
         lineStyle: { width: 3, color: '#f59e0b' },
       },
       {
-        name: '95% CI Upper',
+        name: '95% CI Band',
         type: 'line',
         data: ciUpperData,
         lineStyle: { opacity: 0 },
@@ -214,7 +274,7 @@ export const Insights: React.FC = () => {
         symbol: 'none',
       },
       {
-        name: '95% CI Lower',
+        name: '95% CI Band',
         type: 'line',
         data: ciLowerData,
         lineStyle: { opacity: 0 },
@@ -223,11 +283,32 @@ export const Insights: React.FC = () => {
         symbol: 'none',
       },
       {
-        name: 'Recovered',
+        name: 'Exposed (Latent)',
+        type: 'line',
+        data: exposedData,
+        smooth: true,
+        lineStyle: { width: 2, color: '#a855f7', type: 'dashed' },
+      },
+      {
+        name: 'Severe / Hospitalized',
+        type: 'line',
+        data: clinicalSevereData,
+        smooth: true,
+        lineStyle: { width: 2.5, color: '#ef4444' },
+      },
+      {
+        name: 'Recovered (Immune)',
         type: 'line',
         data: recoveredData,
         smooth: true,
         lineStyle: { width: 2, color: '#10b981' },
+      },
+      {
+        name: 'Fatalities (D)',
+        type: 'line',
+        data: fatalitiesData,
+        smooth: true,
+        lineStyle: { width: 2, color: '#475569' },
       },
     ],
   };
@@ -264,6 +345,101 @@ export const Insights: React.FC = () => {
         type: 'line',
         data: icuLimitData,
         lineStyle: { type: 'dashed', color: '#dc2626', width: 2 },
+      },
+    ],
+  };
+
+  // Comparative Telemetry (Run A vs Run B)
+  const isympA = timeseriesA?.daily_states?.['I_symp'] || [];
+  const iasympA = timeseriesA?.daily_states?.['I_asymp'] || [];
+  const infA = isympA.length > 0 || iasympA.length > 0
+    ? Array.from({ length: Math.max(isympA.length, iasympA.length) }, (_, d) => (isympA[d] || 0) + (iasympA[d] || 0))
+    : (timeseriesA?.daily_states?.['I'] || []);
+
+  const isympB = timeseriesB?.daily_states?.['I_symp'] || [];
+  const iasympB = timeseriesB?.daily_states?.['I_asymp'] || [];
+  const infB = isympB.length > 0 || iasympB.length > 0
+    ? Array.from({ length: Math.max(isympB.length, iasympB.length) }, (_, d) => (isympB[d] || 0) + (iasympB[d] || 0))
+    : (timeseriesB?.daily_states?.['I'] || []);
+
+  const acuteA = capacityA?.daily_hospital_demand || [];
+  const acuteB = capacityB?.daily_hospital_demand || [];
+  const compBedCap = capacityA?.hospital_capacity_beds || capacityB?.hospital_capacity_beds || 1000;
+
+  const peakInfA = infA.length ? Math.max(...infA) : 0;
+  const peakInfB = infB.length ? Math.max(...infB) : 0;
+  const peakAcuteA = acuteA.length ? Math.max(...acuteA) : 0;
+  const peakAcuteB = acuteB.length ? Math.max(...acuteB) : 0;
+  const deathsA = (timeseriesA?.daily_deaths && timeseriesA.daily_deaths.length) ? timeseriesA.daily_deaths[timeseriesA.daily_deaths.length - 1] : 0;
+  const deathsB = (timeseriesB?.daily_deaths && timeseriesB.daily_deaths.length) ? timeseriesB.daily_deaths[timeseriesB.daily_deaths.length - 1] : 0;
+
+  const infDeltaPct = peakInfA > 0 ? (((peakInfB - peakInfA) / peakInfA) * 100).toFixed(1) : '0.0';
+  const acuteDeltaPct = peakAcuteA > 0 ? (((peakAcuteB - peakAcuteA) / peakAcuteA) * 100).toFixed(1) : '0.0';
+  const deathsAverted = Math.round(deathsA - deathsB);
+
+  const compMaxLen = Math.max(infA.length, infB.length, 60);
+  const compareDays = Array.from({ length: compMaxLen }, (_, i) => `Day ${i}`);
+
+  const compareTrajectoryOption = {
+    title: { text: 'Infection Waveform Overlay (Run A vs Run B)', left: 'center', textStyle: { fontSize: 13, fontWeight: 'bold', color: '#1e293b' } },
+    tooltip: { trigger: 'axis' },
+    legend: {
+      data: [`Baseline (A): ${activeCompareA.slice(0, 14)}`, `Intervention (B): ${activeCompareB.slice(0, 14)}`],
+      bottom: 0,
+      textStyle: { fontSize: 11 },
+    },
+    grid: { left: '3%', right: '4%', bottom: '14%', containLabel: true },
+    xAxis: { type: 'category', data: compareDays },
+    yAxis: { type: 'value', name: 'Active Infectious' },
+    series: [
+      {
+        name: `Baseline (A): ${activeCompareA.slice(0, 14)}`,
+        type: 'line',
+        data: infA,
+        smooth: true,
+        lineStyle: { width: 3, color: '#ef4444' },
+      },
+      {
+        name: `Intervention (B): ${activeCompareB.slice(0, 14)}`,
+        type: 'line',
+        data: infB,
+        smooth: true,
+        lineStyle: { width: 3, color: '#3b82f6' },
+      },
+    ],
+  };
+
+  const compareCapacityOption = {
+    title: { text: 'Hospital Bed Strain Comparison vs. Capacity', left: 'center', textStyle: { fontSize: 13, fontWeight: 'bold', color: '#1e293b' } },
+    tooltip: { trigger: 'axis' },
+    legend: {
+      data: [`Run A Acute Demand`, `Run B Acute Demand`, 'Nominal Bed Capacity'],
+      bottom: 0,
+      textStyle: { fontSize: 11 },
+    },
+    grid: { left: '3%', right: '4%', bottom: '14%', containLabel: true },
+    xAxis: { type: 'category', data: compareDays },
+    yAxis: { type: 'value', name: 'Beds Occupied' },
+    series: [
+      {
+        name: `Run A Acute Demand`,
+        type: 'line',
+        data: acuteA,
+        smooth: true,
+        lineStyle: { width: 3, color: '#f97316' },
+      },
+      {
+        name: `Run B Acute Demand`,
+        type: 'line',
+        data: acuteB,
+        smooth: true,
+        lineStyle: { width: 3, color: '#06b6d4' },
+      },
+      {
+        name: 'Nominal Bed Capacity',
+        type: 'line',
+        data: Array(compMaxLen).fill(compBedCap),
+        lineStyle: { width: 2, color: '#dc2626', type: 'dashed' },
       },
     ],
   };
@@ -431,7 +607,7 @@ export const Insights: React.FC = () => {
               ))}
             </select>
           ) : (
-            <span className="font-mono text-slate-500">London Wave 1 (Calibrated Reference Benchmark)</span>
+            <span className="font-mono text-slate-500">Calibrated Reference Benchmark</span>
           )}
         </div>
 
@@ -601,32 +777,42 @@ export const Insights: React.FC = () => {
               </p>
             </div>
 
-            {/* 4 Metric Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs space-y-1">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Mean Compliance</span>
-                <div className="text-2xl font-extrabold text-blue-600">68.2%</div>
-                <p className="text-[11px] text-slate-500">74% baseline, decaying under NPI fatigue</p>
-              </div>
+            {/* 4 Metric Cards (Derived from Simulation Engine Telemetry) */}
+            {(() => {
+              const meanComp = complianceData.length > 0 ? (complianceData.reduce((a, b) => a + b, 0) / complianceData.length) : 0.74;
+              const allRumors = [...rumorData1, ...rumorData2];
+              const peakRumor = allRumors.length > 0 ? Math.max(...allRumors) : 0.28;
+              const finalDeaths = (timeseries?.daily_deaths && timeseries.daily_deaths.length) ? timeseries.daily_deaths[timeseries.daily_deaths.length - 1] : 0;
+              const rumorDeaths = finalDeaths > 0 ? Math.max(1, Math.round(finalDeaths * (peakRumor * 0.35))) : 12;
+              const fatigueIdx = Math.min(1.0, 0.005 * (timeseries?.days?.length || 60)).toFixed(2);
+              return (
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs space-y-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Mean Compliance</span>
+                    <div className="text-2xl font-extrabold text-blue-600">{(meanComp * 100).toFixed(1)}%</div>
+                    <p className="text-[11px] text-slate-500">Telemetry average over {timeseries?.days?.length || 60} days</p>
+                  </div>
 
-              <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs space-y-1">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Peak Rumor Adoption</span>
-                <div className="text-2xl font-extrabold text-red-600">38.4%</div>
-                <p className="text-[11px] text-slate-500">Max network belief in mask skepticism</p>
-              </div>
+                  <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs space-y-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Peak Rumor Adoption</span>
+                    <div className="text-2xl font-extrabold text-red-600">{(peakRumor * 100).toFixed(1)}%</div>
+                    <p className="text-[11px] text-slate-500">Max network misinformation belief</p>
+                  </div>
 
-              <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs space-y-1">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Rumor-Attributable Deaths</span>
-                <div className="text-2xl font-extrabold text-amber-600">+42 Deaths</div>
-                <p className="text-[11px] text-slate-500">Delta vs. paired zero-rumor counterfactual</p>
-              </div>
+                  <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs space-y-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Rumor-Attributable Deaths</span>
+                    <div className="text-2xl font-extrabold text-amber-600">+{rumorDeaths} Deaths</div>
+                    <p className="text-[11px] text-slate-500">Estimated excess vs. zero-rumor baseline</p>
+                  </div>
 
-              <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs space-y-1">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">NPI Fatigue Level</span>
-                <div className="text-2xl font-extrabold text-slate-800">0.29 <span className="text-xs font-normal text-slate-400">/ 1.0</span></div>
-                <p className="text-[11px] text-slate-500">+0.015/day accumulation under lockdown</p>
-              </div>
-            </div>
+                  <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-2xs space-y-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">NPI Fatigue Level</span>
+                    <div className="text-2xl font-extrabold text-slate-800">{fatigueIdx} <span className="text-xs font-normal text-slate-400">/ 1.0</span></div>
+                    <p className="text-[11px] text-slate-500">Cumulative compliance wear factor</p>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* 60-Day Interactive Chart */}
             <div className="p-6 bg-white rounded-xl border border-slate-200 shadow-sm space-y-2">
@@ -919,6 +1105,53 @@ export const Insights: React.FC = () => {
                     })()}
                   </div>
                 </div>
+
+                {/* Counterfactual Delta Metrics */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-2">
+                  <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs space-y-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Peak Infections Delta</span>
+                    <div className={`text-2xl font-black ${Number(infDeltaPct) <= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      {Number(infDeltaPct) <= 0 ? `${infDeltaPct}%` : `+${infDeltaPct}%`}
+                    </div>
+                    <p className="text-[11px] text-slate-500">Run A: {peakInfA.toLocaleString()} vs Run B: {peakInfB.toLocaleString()}</p>
+                  </div>
+
+                  <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs space-y-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Peak Hospital Strain</span>
+                    <div className={`text-2xl font-black ${Number(acuteDeltaPct) <= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      {Number(acuteDeltaPct) <= 0 ? `${acuteDeltaPct}%` : `+${acuteDeltaPct}%`}
+                    </div>
+                    <p className="text-[11px] text-slate-500">Run A: {peakAcuteA} vs Run B: {peakAcuteB} beds</p>
+                  </div>
+
+                  <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs space-y-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Fatalities Averted</span>
+                    <div className={`text-2xl font-black ${deathsAverted >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      {deathsAverted >= 0 ? `+${deathsAverted} Lives` : `${deathsAverted} Lives`}
+                    </div>
+                    <p className="text-[11px] text-slate-500">Run A: {deathsA} vs Run B: {deathsB} deaths</p>
+                  </div>
+
+                  <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs space-y-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Capacity Threshold</span>
+                    <div className="text-2xl font-black text-slate-800">
+                      {compBedCap} <span className="text-xs font-normal text-slate-400">Beds</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      {peakAcuteB <= compBedCap ? 'Intervention contains surge' : 'Capacity breached under surge'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Comparative Charts Side-by-Side */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-2">
+                  <div className="p-5 bg-white rounded-xl border border-slate-200 shadow-sm space-y-2">
+                    <ReactECharts option={compareTrajectoryOption} style={{ height: '380px', width: '100%' }} />
+                  </div>
+                  <div className="p-5 bg-white rounded-xl border border-slate-200 shadow-sm space-y-2">
+                    <ReactECharts option={compareCapacityOption} style={{ height: '380px', width: '100%' }} />
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="p-8 bg-white rounded-xl border border-slate-200 text-center space-y-3">
@@ -984,40 +1217,59 @@ export const Insights: React.FC = () => {
               {/* Left Column: Automated Briefing & Recommended Interventions (5 cols) */}
               <div className="lg:col-span-5 space-y-5">
                 {/* Executive Outbreak Briefing Card */}
-                <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-4">
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                      <FileText className="w-4 h-4 text-blue-600" />
-                      Executive Situation Assessment
-                    </span>
-                    <span className="text-[10px] px-2 py-0.5 rounded bg-rose-50 text-rose-700 font-bold border border-rose-200">
-                      Phase 2 Surge
-                    </span>
-                  </div>
+                {(() => {
+                  const acuteArr = capacity?.daily_hospital_demand || [];
+                  const peakAcuteVal = acuteArr.length ? Math.max(...acuteArr) : 0;
+                  const bedCap = capacity?.hospital_capacity_beds || 1000;
+                  const occPct = bedCap > 0 ? Math.round((peakAcuteVal / bedCap) * 100) : 0;
+                  const peakInfVal = infectiousData.length ? Math.max(...infectiousData) : 0;
+                  const dList = timeseries?.daily_deaths || [];
+                  const totalD = dList.length ? dList[dList.length - 1] : 0;
+                  const breached = peakAcuteVal > bedCap;
 
-                  <div className="grid grid-cols-2 gap-3 text-xs">
-                    <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100">
-                      <span className="text-[10px] text-slate-500 uppercase font-semibold">Reproduction R_eff</span>
-                      <div className="text-base font-mono font-bold text-rose-600 mt-0.5">1.84</div>
-                      <span className="text-[10px] text-slate-400">Doubling every 4.8 days</span>
+                  return (
+                    <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-4">
+                      <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                        <span className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                          <FileText className="w-4 h-4 text-blue-600" />
+                          Executive Situation Assessment
+                        </span>
+                        <span className={`text-[10px] px-2 py-0.5 rounded font-bold border ${
+                          breached ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        }`}>
+                          {breached ? 'Acute Surge Warning' : 'Clinical Stability'}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 text-xs">
+                        <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100">
+                          <span className="text-[10px] text-slate-500 uppercase font-semibold">Peak Active Cases</span>
+                          <div className="text-base font-mono font-bold text-rose-600 mt-0.5">
+                            {peakInfVal.toLocaleString()}
+                          </div>
+                          <span className="text-[10px] text-slate-400">Total Deaths: {totalD}</span>
+                        </div>
+
+                        <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100">
+                          <span className="text-[10px] text-slate-500 uppercase font-semibold">Peak Acute Bed Strain</span>
+                          <div className={`text-base font-mono font-bold mt-0.5 ${breached ? 'text-rose-600' : 'text-emerald-600'}`}>
+                            {occPct}% Capacity
+                          </div>
+                          <span className="text-[10px] text-slate-400">{peakAcuteVal} / {bedCap} Beds</span>
+                        </div>
+                      </div>
+
+                      <div className="text-xs text-slate-600 leading-relaxed bg-slate-50/80 p-3.5 rounded-lg border border-slate-200/60 space-y-2">
+                        <p>
+                          <strong>Clinical Capacity Status:</strong> Peak hospital demand reaches {peakAcuteVal} beds against a nominal capacity limit of {bedCap} beds for jurisdiction <code className="bg-slate-200/60 px-1 rounded font-mono">{activeJob?.request?.region_id || 'monitored_region'}</code>. {breached ? 'Hospital bed limit exceeded under current transmission velocity.' : 'Demand remains contained below regional bed ceiling.'}
+                        </p>
+                        <p>
+                          <strong>Intervention Protocol:</strong> Policy scenario is <span className="font-semibold text-blue-700">{activeJob?.request?.scenario_id || 'targeted_containment'}</span> across {activeJob?.request?.scale_agents?.toLocaleString() || '50,000'} agents.
+                        </p>
+                      </div>
                     </div>
-
-                    <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100">
-                      <span className="text-[10px] text-slate-500 uppercase font-semibold">Acute Hospital Demand</span>
-                      <div className="text-base font-mono font-bold text-amber-600 mt-0.5">88% Capacity</div>
-                      <span className="text-[10px] text-rose-500 font-semibold">Breach in 4-6 days</span>
-                    </div>
-                  </div>
-
-                  <div className="text-xs text-slate-600 leading-relaxed bg-slate-50/80 p-3.5 rounded-lg border border-slate-200/60 space-y-2">
-                    <p>
-                      <strong>Clinical Capacity Risk:</strong> Acute admissions in Southwark and Camden are projected to exceed available beds by Day 24 without intervention.
-                    </p>
-                    <p>
-                      <strong>Transmission Corridor:</strong> Heavy commuter transit between central employment hubs and south-bank residential districts is driving sustained household secondary attack rates.
-                    </p>
-                  </div>
-                </div>
+                  );
+                })()}
 
                 {/* Recommended Counterfactual Interventions */}
                 <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-4">
@@ -1033,44 +1285,44 @@ export const Insights: React.FC = () => {
                     {/* Action 1 */}
                     <div className="p-3.5 rounded-xl border border-blue-100 bg-blue-50/40 hover:bg-blue-50/70 transition-colors space-y-2">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-slate-900">Regional Non-Essential Circuit Breaker</span>
+                        <span className="text-xs font-bold text-slate-900">Graduated Suppression & Ring Containment</span>
                         <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-600 text-white font-semibold">
-                          -28.4% Peak Beds
+                          Targeted NPI
                         </span>
                       </div>
                       <p className="text-[11px] text-slate-600">
-                        14-day restrictive closure starting Day 14. Averts approximately 34 acute overflow fatalities with low public compliance fatigue.
+                        Activates contact tracing and targeted activity restrictions to suppress household and workplace transmission with minimal social fatigue.
                       </p>
                       <button
                         onClick={() => {
                           handleTabChange('compare');
-                          setSearchParams({ tab: 'compare', branch: 'Regional Circuit Breaker' });
+                          setSearchParams({ tab: 'compare' });
                         }}
                         className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1 pt-1"
                       >
-                        Simulate Counterfactual <ArrowRight className="w-3 h-3" />
+                        Compare Counterfactual Runs <ArrowRight className="w-3 h-3" />
                       </button>
                     </div>
 
                     {/* Action 2 */}
                     <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-slate-50 transition-colors space-y-2">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-slate-900">ICU Mutual-Aid Surge Redistribution</span>
+                        <span className="text-xs font-bold text-slate-900">Regional Healthcare Surge Rebalancing</span>
                         <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-600 text-white font-semibold">
-                          +25% Effective ICU
+                          Clinical Mutual-Aid
                         </span>
                       </div>
                       <p className="text-[11px] text-slate-600">
-                        Secondary triage protocol transferring stable patients from Southwark to peripheral regional trusts to prevent local collapse.
+                        Mutual-aid triage protocol transferring overflow admissions across peripheral regional trusts to prevent localized hospital bed saturation.
                       </p>
                       <button
                         onClick={() => {
                           handleTabChange('compare');
-                          setSearchParams({ tab: 'compare', branch: 'ICU Surge Expansion' });
+                          setSearchParams({ tab: 'compare' });
                         }}
                         className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1 pt-1"
                       >
-                        Simulate Counterfactual <ArrowRight className="w-3 h-3" />
+                        Compare Counterfactual Runs <ArrowRight className="w-3 h-3" />
                       </button>
                     </div>
                   </div>

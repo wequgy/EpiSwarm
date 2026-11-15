@@ -416,40 +416,52 @@ async def consult_advisor(req: AdvisorConsultRequest):
     from episwarm.advisor.llm_client import LLMAgentRuntime
 
     ctx = req.simulation_context or {}
-    day = ctx.get("current_day", 20)
-    r_eff = ctx.get("r_effective", 1.84)
-    hosp_pct = ctx.get("hospital_occupancy_pct", 88)
-    cases = ctx.get("active_cases", 1420)
-    deaths = ctx.get("total_deaths", 12)
+    job_id = ctx.get("job_id", "unspecified")
     case_name = ctx.get("case_name", "Active Simulation Run")
+    pop_scale = ctx.get("population_scale", 50000)
+    scenario_policy = ctx.get("scenario_policy", "targeted_containment")
+    day = ctx.get("current_day", 60)
+    r_eff = ctx.get("r_effective", 1.0)
+    cases = ctx.get("active_cases", ctx.get("peak_infectious", 0))
+    peak_cases = ctx.get("peak_infectious", cases)
+    hosp_pct = ctx.get("hospital_occupancy_pct", 0)
+    peak_beds = ctx.get("peak_hospital_demand", 0)
+    bed_capacity = ctx.get("nominal_hospital_capacity", 1000)
+    breached = ctx.get("capacity_breached", False)
+    deaths = ctx.get("total_deaths", 0)
 
     system_prompt = (
         "You are the Senior Epidemiological Policy Advisor for EpiSwarm Studio, advising a government health authority. "
-        "Analyze the outbreak simulation trajectory honestly and objectively. "
+        "Analyze the outbreak simulation trajectory honestly, rigorously, and objectively using the real simulation data provided. "
         "Detect clinical hospital bed breaches, identify transmission drivers, evaluate compliance trade-offs, "
         "and provide clear, structured, actionable policy interventions with estimated impacts. "
         "Format your answer with clear markdown headings, bullet points, and high-priority recommendations."
     )
 
-    user_query = req.prompt or "Provide comprehensive situation analysis and top 2 recommended policy interventions."
+    user_query = req.prompt or "Provide comprehensive situation analysis and top 2 recommended policy interventions based on this simulation."
     full_prompt = (
-        f"Active Simulation Case: {case_name}\n"
-        f"Simulated Day: {day} of 60\n"
-        f"Reproduction Number R_eff: {r_eff}\n"
-        f"Active Infectious Cases: {cases}\n"
-        f"Acute Hospital Bed Demand: {hosp_pct}% capacity\n"
-        f"Cumulative Fatalities: {deaths}\n\n"
-        f"User Inquiry:\n{user_query}"
+        f"### Real Simulation Telemetry\n"
+        f"- **Job ID**: {job_id}\n"
+        f"- **Case / Region**: {case_name}\n"
+        f"- **Synthetic Population Scale**: {pop_scale:,} agents\n"
+        f"- **Active Intervention Scenario**: {scenario_policy}\n"
+        f"- **Simulated Timeline**: Day {day} (Complete 60-day horizon)\n"
+        f"- **Effective Reproduction Number R_eff**: {r_eff:.2f}\n"
+        f"- **Peak Active Infectious Cases**: {peak_cases:,} agents\n"
+        f"- **Peak Acute Hospital Demand**: {peak_beds:,} beds against {bed_capacity:,} nominal capacity ({hosp_pct}% occupancy)\n"
+        f"- **Capacity Breach Status**: {'CRITICAL BREACH' if breached else 'WITHIN NOMINAL CAPACITY'}\n"
+        f"- **Total Cumulative Deaths**: {deaths:,} fatalities\n\n"
+        f"### Authority Official Inquiry:\n{user_query}"
     )
 
     def fallback_analysis():
         return (
-            f"### Automated Epidemiological Advisory: Day {day}\n\n"
-            f"- **Clinical Capacity Alert**: Acute hospital bed occupancy stands at {hosp_pct}%. If transmission continues at R_eff = {r_eff:.2f}, acute beds are projected to breach capacity limits.\n"
-            f"- **Transmission Assessment**: Active community spread is driving secondary household and workplace clusters across high-density zones.\n\n"
+            f"### Automated Epidemiological Advisory: Simulation {job_id}\n\n"
+            f"- **Outbreak Burden**: Across a synthetic population of {pop_scale:,} agents, the epidemic recorded {peak_cases:,} peak active infections and {deaths:,} cumulative fatalities under policy `{scenario_policy}`.\n"
+            f"- **Clinical Capacity Assessment**: Peak acute hospital demand reached {peak_beds:,} beds ({hosp_pct}% of {bed_capacity:,} bed capacity). {'Capacity was exceeded, triggering unserved overflow mortality.' if breached else 'Healthcare demand remained within surge limits.'}\n\n"
             f"#### High-Priority Policy Recommendations:\n"
-            f"1. **Trigger Targeted Transit Circuit Breaker (Day {min(day + 2, 60)})**: Restrict passenger travel density across central transit links by 60-70% to decelerate geographic dispersal.\n"
-            f"2. **Activate Regional Hospital Mutual-Aid**: Redistribute acute patient load across neighboring healthcare facilities to prevent local ICU capacity saturation."
+            f"1. **Targeted Mobility Suppression**: Implement graduated non-pharmaceutical interventions at onset to decelerate transmission before hospital strain reaches 75% capacity.\n"
+            f"2. **Capacity Mutual-Aid Protocol**: Establish dynamic patient transfer corridors to neighboring health districts during peak demand."
         )
 
     runtime = LLMAgentRuntime(
