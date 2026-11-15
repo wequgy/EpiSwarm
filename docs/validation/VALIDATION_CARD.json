@@ -3,8 +3,17 @@
   "region": "Greater London Reference Pack (regions/reference_london)",
   "calibration_window": "Wave 1 (March 1 - May 31, 2020)",
   "calibrated_parameters": {
-    "R0_pre_lockdown": 3.6,
-    "R_post_lockdown": 0.4,
+    "R0_posterior_mean": 2.28,
+    "R0_95_ci": [
+      2.202,
+      2.404
+    ],
+    "I0_initial_seeds": 34.2,
+    "kappa_npi_reduction": 0.829,
+    "kappa_95_ci": [
+      0.791,
+      0.848
+    ],
     "generation_time_days": 4.0,
     "delay_parameter": 5.34
   },
@@ -58,7 +67,7 @@
     }
   },
   "ledger_authenticated": true,
-  "generated_at": "2026-11-14T14:09:52.319620+00:00",
+  "generated_at": "2026-11-15T10:27:57.203519+00:00",
   "assumptions": {
     "London Baseline ICU Capacity": {
       "value": "800 beds",

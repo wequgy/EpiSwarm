@@ -201,7 +201,7 @@ class SimulationService:
             scale_agents=req.scale_agents,
             n_replicates=req.n_replicates,
             metrics=metrics,
-            validation_status="UNCALIBRATED" if region_dir.name != "reference_london" else "PARTIALLY_VALIDATED",
+            validation_status="UNCALIBRATED",
             validation_card_url="/api/v1/validation/card",
             is_mock=False,
         )

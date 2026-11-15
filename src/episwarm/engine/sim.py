@@ -414,7 +414,9 @@ def run_simulation(
     policy_backend = "none"
     if enable_behavior:
         if active_policy is None:
-            active_policy, policy_backend = create_decision_policy()
+            active_policy, policy_backend = create_decision_policy(
+                preferred_mode=scenario_pack.behavior_mode if scenario_pack else "auto"
+            )
         else:
             policy_backend = active_policy.__class__.__name__.lower().replace("policy", "")
 

@@ -26,6 +26,8 @@ share/python-wheels/
 MANIFEST
 
 # Ephemeral runtime databases and caches
+runs/
+case_files/
 *.manifest
 *.sqlite
 *.sqlite3

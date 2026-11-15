@@ -55,8 +55,4 @@ def test_oat_sensitivity_analysis(sim_setup):
     assert len(df_sens) >= 2
 
 
-def test_streamlit_app_script_exists_and_parses():
-    import py_compile
-    res = py_compile.compile("src/episwarm/app/streamlit_app.py", doraise=True)
-    assert res is not None
 

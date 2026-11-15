@@ -1,7 +1,8 @@
-"""Onboarding Agent: Autonomous system and pack validation assistant (Stage A5).
+"""Rule-Based Onboarding Assistant: Deterministic system and pack validation (Stage A5).
 
 Validates input regions, disease packs, scenario packs, and evidence ledger entries,
 providing structured diagnostics and actionable remediation instructions.
+Note: Real LLM dialogue is deferred to Stage R3.3.
 """
 
 from dataclasses import dataclass, field

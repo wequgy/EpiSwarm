@@ -1,7 +1,7 @@
-"""Scenario Author Agent: Translates policy briefs into valid, verified ScenarioPacks (Stage A5).
+"""Rule-Based Scenario Parser: Translates structured policy briefs into valid ScenarioPacks (Stage A5).
 
-Parses structured intentions (e.g. school closures, workplace mandates, stay-at-home orders)
-into typed InterventionAction sequences with validated timing, costs, and compliance expectations.
+Deterministic rule-based parser that maps keyword patterns (e.g. school closures, workplace mandates)
+into typed InterventionAction sequences with validated timing and parameters. Note: Real LLM generation is deferred to Stage R3.3.
 """
 
 from dataclasses import dataclass

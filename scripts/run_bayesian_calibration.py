@@ -42,9 +42,10 @@ from scripts.run_healthcare_validation_wave1 import download_healthcare_data
 
 
 def run_full_calibration_and_diagnostics(
+    scale_agents: int = 50000,
     output_report_path: Path = Path("docs/validation/DIAGNOSTIC_REPORT.md")
 ) -> Dict[str, Any]:
-    print("=== Stage A3: Bayesian Calibration & Posterior Diagnostics ===")
+    print(f"=== Stage A3: Bayesian Calibration & Diagnostics (scale_agents={scale_agents}) ===")
     t_start = time.time()
     region_dir = Path("regions/reference_london")
     ledger = EvidenceLedger()
@@ -119,7 +120,7 @@ def run_full_calibration_and_diagnostics(
                      (df_hosp["date"] <= "2020-05-31")].dropna().sort_values("date")
     obs_peak_icu = float(w1_icu["patients"].max())
 
-    pop = build_synthetic_population(str(region_dir), scale_agents=5000, random_seed=42)
+    pop = build_synthetic_population(str(region_dir), scale_agents=scale_agents, random_seed=42)
     with open("diseases/respiratory_generic.yaml", "r", encoding="utf-8") as f:
         d_dict = yaml.safe_load(f)
     dp = DiseasePack(**d_dict)
@@ -249,8 +250,8 @@ def _render_diagnostic_report(
         "",
         "| Target Domain | Metric | Target Threshold | Posterior Ensemble Mean | Assessment |",
         "|---|---|:---:|:---:|:---:|",
-        f"| **Spatial Wavefront** | Spearman $\\rho$ | $\\ge 0.60$ | **{mean_rho:.3f}** | Moderate monotonic agreement across London Local Authorities |",
-        f"| **Healthcare Capacity** | Peak ICU Bed Ratio | [0.75, 1.25] | **{mean_peak_ratio:.3f}** | Multi-scale convergence indicates ratio stabilizes as agent resolution increases |",
+        f"| **Spatial Wavefront** | Spearman $\\rho$ | $\\ge 0.60$ | **{mean_rho:.3f}** | {'**PASS**' if mean_rho >= 0.60 else f'**FAIL**: Missed threshold >= 0.60 (rho = {mean_rho:.3f})'} |",
+        f"| **Healthcare Capacity** | Peak ICU Bed Ratio | [0.75, 1.25] | **{mean_peak_ratio:.3f}** | {'**PASS**' if 0.75 <= mean_peak_ratio <= 1.25 else f'**FAIL**: Outside threshold [0.75, 1.25] (ratio = {mean_peak_ratio:.3f})'} |",
         "",
         "---",
         "*Report generated automatically by `scripts/run_bayesian_calibration.py`.*"
@@ -260,4 +261,8 @@ def _render_diagnostic_report(
 
 
 if __name__ == "__main__":
-    run_full_calibration_and_diagnostics()
+    import argparse
+    parser = argparse.ArgumentParser(description="Stage A3 Bayesian Calibration")
+    parser.add_argument("--scale-agents", type=int, default=50000, help="Microscopic agent resolution (convergence default: 50000)")
+    args = parser.parse_args()
+    run_full_calibration_and_diagnostics(scale_agents=args.scale_agents)

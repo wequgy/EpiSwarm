@@ -14,12 +14,13 @@ from episwarm.behavior.cache import DecisionCache
 logger = logging.getLogger(__name__)
 
 
-def create_decision_policy(cache: Optional[DecisionCache] = None) -> Tuple[DecisionPolicy, str]:
+def create_decision_policy(preferred_mode: str = "auto", cache: Optional[DecisionCache] = None) -> Tuple[DecisionPolicy, str]:
     """Select and instantiate behavioral decision policy according to configuration hierarchy.
 
     Order of priority:
+    0. If preferred_mode == "rule": RulePolicy (deterministic fast rule policy)
     1. JevPolicy (if TYPESAFE_API_KEY is present and non-empty)
-    2. LocalLogprobPolicy (if LOCAL_LLM_BASE_URL is reachable)
+    2. LocalLogprobPolicy (if LOCAL_LLM_BASE_URL is reachable and preferred_mode == "llm" or "auto")
     3. RulePolicy (deterministic fallback)
 
     Returns:
@@ -27,6 +28,10 @@ def create_decision_policy(cache: Optional[DecisionCache] = None) -> Tuple[Decis
         backend_name: string identifier of selected active backend
     """
     cache = cache or DecisionCache()
+
+    # 0. Strict Rule Override
+    if preferred_mode in ("rule", "none"):
+        return RulePolicy(cache=cache), preferred_mode
 
     # 1. Jev Check
     jev_key = os.getenv("TYPESAFE_API_KEY", "").strip()

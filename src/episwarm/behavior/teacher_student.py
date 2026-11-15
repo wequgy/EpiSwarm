@@ -70,7 +70,10 @@ class TeacherArchetypePrior:
 
 
 class CoMixEmpiricalTeacher:
-    """Teacher model: Generates macro/archetype priors calibrated to CoMix contact survey."""
+    """CoMix Empirical Prior: Generates macro/archetype priors calibrated to CoMix contact survey (Jarvis et al.).
+
+    Note: Uses empirical survey data or fitted logistic heuristic. Not an LLM ensemble (Stage R3.3 introduces real Gemini decision calling).
+    """
 
     def __init__(self, data_path: Optional[Path] = None):
         self.data_path = data_path or Path("evidence/raw/comix_contact_matrices_england.csv")

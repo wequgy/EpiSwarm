@@ -1,10 +1,11 @@
-"""Policy Critic Agent: Multi-attribute feasibility, equity, and fatigue critique (Stage A5).
+"""Rule-Based Policy Critic: Multi-attribute feasibility, equity, and fatigue critique (Stage A5).
 
-Evaluates policy packages across four dimensions:
+Deterministic heuristic scoring across four dimensions:
 1. Operational feasibility & temporal consistency
 2. Socioeconomic equity & age distribution impact
 3. Budget efficiency (cost per hospitalization averted)
 4. Behavioral fatigue and compliance exhaustion risk
+Note: Real LLM evaluation is deferred to Stage R3.3.
 """
 
 from dataclasses import dataclass, field

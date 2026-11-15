@@ -40,8 +40,8 @@ Stage A3 calibration replaces single-point numerical heuristics with a fully ide
 
 | Target Domain | Metric | Target Threshold | Posterior Ensemble Mean | Assessment |
 |---|---|:---:|:---:|:---:|
-| **Spatial Wavefront** | Spearman $\rho$ | $\ge 0.60$ | **0.162** | Moderate monotonic agreement across London Local Authorities |
-| **Healthcare Capacity** | Peak ICU Bed Ratio | [0.75, 1.25] | **7.949** | Multi-scale convergence indicates ratio stabilizes as agent resolution increases |
+| **Spatial Wavefront** | Spearman $\rho$ | $\ge 0.60$ | **0.162** | **FAIL**: Missed threshold $\ge 0.60$ ($\rho = 0.162$) |
+| **Healthcare Capacity** | Peak ICU Bed Ratio | [0.75, 1.25] | **7.949** | **FAIL**: Outside threshold [0.75, 1.25] (ratio = 7.949) |
 
 ---
 *Report generated automatically by `scripts/run_bayesian_calibration.py`.*

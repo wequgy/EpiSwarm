@@ -128,11 +128,11 @@ class TrustService:
                 notes="External patient inflow fraction into regional hospitals",
             ),
             AssumptionItem(
-                parameter="london_baseline_icu_capacity",
+                parameter="regional_baseline_icu_capacity",
                 value=800,
-                source="assumed (NHS England / Phase 26)",
+                source="assumed (Regional Health Authority / NHS England)",
                 status="ASSUMED",
-                notes="Nominal pre-surge regional ICU bed baseline without Nightingale capacity",
+                notes="Nominal pre-surge regional ICU bed baseline without temporary surge capacity",
             ),
             AssumptionItem(
                 parameter="icu_admission_fraction",
