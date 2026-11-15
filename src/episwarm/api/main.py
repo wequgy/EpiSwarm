@@ -42,9 +42,7 @@ register_problem_handlers(app)
 app.include_router(api_v1_router)
 
 from episwarm.api.v2.live import router as api_v2_router
-from episwarm.api.v2.case_files import router as case_files_router
 app.include_router(api_v2_router, prefix="/api")
-app.include_router(case_files_router, prefix="/api/v2")
 
 
 class SimulationRequest(BaseModel):
