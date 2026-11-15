@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import ReactECharts from 'echarts-for-react';
 import {
   Play,
   Pause,
@@ -15,8 +16,14 @@ import {
   Clock,
   Sparkles,
   X,
-  Volume2,
   Sliders,
+  AlertTriangle,
+  CheckCircle2,
+  TrendingUp,
+  TrendingDown,
+  ArrowUpRight,
+  ShieldCheck,
+  Cpu,
 } from 'lucide-react';
 
 interface BoroughNode {
@@ -64,35 +71,14 @@ export const SimulateStage: React.FC = () => {
     { day: 14, text: 'St Thomas Hospital acute occupancy reaches 88%. ICU surge capacity on standby.', type: 'alert' },
   ]);
 
-  // Schematic boroughs for London
-  const [boroughs, setBoroughs] = useState<BoroughNode[]>([
+  // Baseline Boroughs for London
+  const [boroughs] = useState<BoroughNode[]>([
     { id: 'camden', name: 'Camden', x: 280, y: 160, population: 270000, infected: 320, bedsTotal: 650, bedsUsed: 540 },
     { id: 'westminster', name: 'Westminster', x: 380, y: 260, population: 260000, infected: 410, bedsTotal: 840, bedsUsed: 780 },
     { id: 'southwark', name: 'Southwark', x: 500, y: 310, population: 310000, infected: 380, bedsTotal: 950, bedsUsed: 910 },
     { id: 'lambeth', name: 'Lambeth', x: 420, y: 380, population: 320000, infected: 210, bedsTotal: 500, bedsUsed: 390 },
     { id: 'tower_hamlets', name: 'Tower Hamlets', x: 620, y: 220, population: 310000, infected: 290, bedsTotal: 480, bedsUsed: 360 },
   ]);
-
-  // Commute routes
-  const routes = [
-    { from: 'camden', to: 'westminster', flow: 45000 },
-    { from: 'westminster', to: 'southwark', flow: 60000 },
-    { from: 'southwark', to: 'lambeth', flow: 38000 },
-    { from: 'westminster', to: 'tower_hamlets', flow: 42000 },
-    { from: 'camden', to: 'tower_hamlets', flow: 25000 },
-  ];
-
-  // 60 fps Commuter Particle Animation Loop
-  const [animTime, setAnimTime] = useState<number>(0);
-  useEffect(() => {
-    let animId: number;
-    const updateAnim = () => {
-      setAnimTime((prev) => (prev + 0.015) % 1.0);
-      animId = requestAnimationFrame(updateAnim);
-    };
-    animId = requestAnimationFrame(updateAnim);
-    return () => cancelAnimationFrame(animId);
-  }, []);
 
   // Live stepping timer
   useEffect(() => {
@@ -125,6 +111,12 @@ export const SimulateStage: React.FC = () => {
             ...s,
           ]);
         }
+        if (nextDay === 35) {
+          setStoryLogs((s) => [
+            { day: 35, text: 'Transmission decelerates below replacement: R_eff drops to 0.88.', type: 'info' },
+            ...s,
+          ]);
+        }
         return nextDay;
       });
     }, 1200 / speedMultiplier);
@@ -151,13 +143,149 @@ export const SimulateStage: React.FC = () => {
     navigate(`/insights?tab=compare&branch=${encodeURIComponent(branchName)}&fromDay=${currentDay}`);
   };
 
+  // Trajectory Curves Calculation for ECharts up to currentDay
+  const daysArray = Array.from({ length: maxHorizon + 1 }, (_, i) => `D${i}`);
+  const infectiousSeries: (number | null)[] = [];
+  const hospitalSeries: (number | null)[] = [];
+  const icuSeries: (number | null)[] = [];
+  const deathsSeries: (number | null)[] = [];
+
+  for (let d = 0; d <= maxHorizon; d++) {
+    if (d > currentDay) {
+      infectiousSeries.push(null);
+      hospitalSeries.push(null);
+      icuSeries.push(null);
+      deathsSeries.push(null);
+    } else {
+      const bell = Math.exp(-Math.pow((d - 24) / 9.5, 2));
+      const inf = Math.round(25 + 3200 * bell);
+      const hospBell = Math.exp(-Math.pow((d - 28) / 10.5, 2));
+      const hosp = Math.round(10 + 1080 * hospBell);
+      const icu = Math.round(hosp * 0.22);
+      const deaths = Math.round(38 / (1 + Math.exp(-0.22 * (d - 27))));
+
+      infectiousSeries.push(inf);
+      hospitalSeries.push(hosp);
+      icuSeries.push(icu);
+      deathsSeries.push(deaths);
+    }
+  }
+
+  const chartOption = {
+    backgroundColor: 'transparent',
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: '#0f172a',
+      borderColor: '#334155',
+      textStyle: { color: '#f8fafc', fontSize: 12 },
+    },
+    legend: {
+      data: ['Active Infectious', 'Acute Bed Demand', 'ICU Demand', 'Cumulative Deaths', 'Capacity Threshold (1,000 Beds)'],
+      textStyle: { color: '#94a3b8', fontSize: 11 },
+      top: 0,
+      icon: 'circle',
+    },
+    grid: {
+      top: 40,
+      left: 55,
+      right: 25,
+      bottom: 25,
+    },
+    xAxis: {
+      type: 'category',
+      data: daysArray,
+      axisLine: { lineStyle: { color: '#334155' } },
+      axisLabel: { color: '#94a3b8', fontSize: 10, interval: 4 },
+      splitLine: { show: false },
+    },
+    yAxis: {
+      type: 'value',
+      splitLine: { lineStyle: { color: '#1e293b' } },
+      axisLabel: { color: '#94a3b8', fontSize: 10 },
+    },
+    series: [
+      {
+        name: 'Active Infectious',
+        type: 'line',
+        smooth: true,
+        data: infectiousSeries,
+        itemStyle: { color: '#f59e0b' },
+        areaStyle: {
+          color: {
+            type: 'linear',
+            x: 0,
+            y: 0,
+            x2: 0,
+            y2: 1,
+            colorStops: [
+              { offset: 0, color: 'rgba(245, 158, 11, 0.25)' },
+              { offset: 1, color: 'rgba(245, 158, 11, 0.0)' },
+            ],
+          },
+        },
+      },
+      {
+        name: 'Acute Bed Demand',
+        type: 'line',
+        smooth: true,
+        data: hospitalSeries,
+        itemStyle: { color: '#38bdf8' },
+        lineStyle: { width: 2 },
+      },
+      {
+        name: 'ICU Demand',
+        type: 'line',
+        smooth: true,
+        data: icuSeries,
+        itemStyle: { color: '#a855f7' },
+        lineStyle: { width: 2 },
+      },
+      {
+        name: 'Cumulative Deaths',
+        type: 'line',
+        smooth: true,
+        data: deathsSeries,
+        itemStyle: { color: '#f43f5e' },
+        lineStyle: { width: 1.5, type: 'dashed' },
+      },
+      {
+        name: 'Capacity Threshold (1,000 Beds)',
+        type: 'line',
+        data: Array(maxHorizon + 1).fill(1000),
+        lineStyle: { color: '#ef4444', type: 'dashed', width: 2 },
+        symbol: 'none',
+      },
+    ],
+  };
+
+  // Dynamic Borough Computations
+  const currentBoroughs = boroughs.map((b) => {
+    const waveProgress = currentDay <= 26 ? currentDay / 26 : Math.max(0.2, 1 - ((currentDay - 26) / 34) * 0.7);
+    const infected = Math.round(b.infected * (0.3 + waveProgress * 1.4));
+    const bedsUsed = Math.min(b.bedsTotal, Math.round(b.bedsUsed * (0.35 + waveProgress * 1.1)));
+    const occupancyPct = Math.round((bedsUsed / b.bedsTotal) * 100);
+    const incidencePer100k = Math.round((infected / b.population) * 100000);
+    const status = occupancyPct >= 95 ? 'CRITICAL' : occupancyPct >= 75 ? 'SURGE' : 'NORMAL';
+
+    return {
+      ...b,
+      currentInfected: infected,
+      currentBedsUsed: bedsUsed,
+      occupancyPct,
+      incidencePer100k,
+      status,
+    };
+  });
+
+  const progressPercent = Math.round((currentDay / maxHorizon) * 100);
+
   return (
     <div className="flex-1 flex flex-col bg-slate-900 text-slate-100 relative overflow-hidden select-none">
       {/* Simulation Stage Header HUD */}
       <div className="h-16 px-6 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 flex items-center justify-between z-20">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
+            <span className={`w-2.5 h-2.5 rounded-full ${isPlaying ? 'bg-emerald-500 animate-ping' : 'bg-amber-400'}`} />
             <span className="font-mono text-sm font-bold text-white tracking-wider">
               DAY {currentDay.toString().padStart(2, '0')} / {maxHorizon}
             </span>
@@ -208,148 +336,288 @@ export const SimulateStage: React.FC = () => {
       </div>
 
       {/* Main Canvas & Stage Center */}
-      <div className="flex-1 flex relative">
-        {/* Interactive Spatial SVG Stage */}
-        <div className="flex-1 relative flex items-center justify-center p-4">
-          <svg
-            className="w-full h-full max-w-4xl max-h-[600px] bg-slate-950/60 rounded-2xl border border-slate-800 shadow-2xl"
-            viewBox="0 0 900 520"
-          >
-            {/* Background Grid Lines */}
-            <defs>
-              <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="1" />
-              </pattern>
-              <linearGradient id="commuteGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.4" />
-                <stop offset="100%" stopColor="#818cf8" stopOpacity="0.4" />
-              </linearGradient>
-            </defs>
-            <rect width="900" height="520" fill="url(#grid)" />
-
-            {/* Commute Routes & 60 fps Particle Motion */}
-            {routes.map((r, idx) => {
-              const fromB = boroughs.find((b) => b.id === r.from)!;
-              const toB = boroughs.find((b) => b.id === r.to)!;
-              // Particle along route
-              const pX = fromB.x + (toB.x - fromB.x) * animTime;
-              const pY = fromB.y + (toB.y - fromB.y) * animTime;
-
-              return (
-                <g key={idx}>
-                  <line
-                    x1={fromB.x}
-                    y1={fromB.y}
-                    x2={toB.x}
-                    y2={toB.y}
-                    stroke="url(#commuteGradient)"
-                    strokeWidth="3"
-                    strokeDasharray="4 4"
-                  />
-                  {/* Moving Commuter Figure */}
-                  <circle
-                    cx={pX}
-                    cy={pY}
-                    r="4"
-                    fill="#38bdf8"
-                    className="shadow-lg filter drop-shadow(0 0 6px #38bdf8)"
-                  />
-                </g>
-              );
-            })}
-
-            {/* Borough Nodes & Heatmap Indicators */}
-            {boroughs.map((b) => {
-              const infectionRatio = b.infected / (b.population * 0.005);
-              let fillColor = '#10b981'; // green
-              if (infectionRatio > 0.4) fillColor = '#f59e0b'; // amber
-              if (infectionRatio > 0.8) fillColor = '#ef4444'; // red
-
-              const isBedBreached = b.bedsUsed / b.bedsTotal >= 0.95;
-
-              return (
-                <g
-                  key={b.id}
-                  transform={`translate(${b.x}, ${b.y})`}
-                  className="cursor-pointer transition-transform hover:scale-110"
-                  onClick={() => setSelectedBorough(b)}
+      <div className="flex-1 flex relative overflow-hidden">
+        {/* Full-width Simulation Progress & Telemetry Workbench */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {/* 1. Large Top Simulation Progress & Phase Overview */}
+          <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-5 shadow-xl">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-3">
+                <div
+                  className={`px-2.5 py-1 rounded-md text-xs font-mono font-bold flex items-center gap-2 ${
+                    isPlaying
+                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                      : currentDay >= maxHorizon
+                      ? 'bg-blue-500/10 text-blue-400 border border-blue-500/30'
+                      : 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
+                  }`}
                 >
-                  {/* Pulsing Infection Halo */}
-                  <circle
-                    r="45"
-                    fill={fillColor}
-                    fillOpacity="0.15"
-                    className="animate-pulse"
+                  <span
+                    className={`w-2 h-2 rounded-full ${
+                      isPlaying ? 'bg-emerald-400 animate-ping' : currentDay >= maxHorizon ? 'bg-blue-400' : 'bg-amber-400'
+                    }`}
                   />
-                  <circle
-                    r="32"
-                    fill="#1e293b"
-                    stroke={fillColor}
-                    strokeWidth="3"
-                  />
+                  {isPlaying ? 'ENGINE RUNNING' : currentDay >= maxHorizon ? 'SIMULATION COMPLETED' : 'ENGINE PAUSED'}
+                </div>
+                <span className="font-mono text-base font-bold text-white">
+                  Day {currentDay} of {maxHorizon}
+                </span>
+                <span className="text-xs text-slate-400 font-medium">({progressPercent}% Complete)</span>
+              </div>
 
-                  {/* Borough Label & Case Count */}
-                  <text
-                    y="-5"
-                    textAnchor="middle"
-                    fill="#f8fafc"
-                    fontSize="11"
-                    fontWeight="bold"
-                    fontFamily="sans-serif"
+              <div className="flex items-center gap-4 text-xs font-mono text-slate-400">
+                <div>
+                  <span className="text-slate-500">Speed: </span>
+                  <span className="text-slate-200 font-semibold">{speedMultiplier}x</span>
+                </div>
+                <div>
+                  <span className="text-slate-500">Est. Remaining: </span>
+                  <span className="text-slate-200 font-semibold">
+                    {isPlaying ? `${Math.max(0, (maxHorizon - currentDay) * (1.2 / speedMultiplier)).toFixed(1)}s` : 'Paused'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-500">Agents: </span>
+                  <span className="text-slate-200 font-semibold">50,000 (1:178 Scale)</span>
+                </div>
+              </div>
+            </div>
+
+            {/* High-visibility Progress Bar */}
+            <div className="relative w-full h-4 bg-slate-900 rounded-full overflow-hidden p-0.5 border border-slate-800">
+              <div
+                className="h-full bg-gradient-to-r from-blue-600 via-indigo-500 to-emerald-500 rounded-full transition-all duration-300 relative shadow-lg shadow-blue-500/30"
+                style={{ width: `${Math.min(100, progressPercent)}%` }}
+              />
+            </div>
+
+            {/* Epidemic Phases Grid under Progress Bar */}
+            <div className="grid grid-cols-4 gap-2 mt-3 text-[11px]">
+              <div
+                className={`p-2 rounded-lg border transition-colors ${
+                  currentDay <= 14 ? 'border-blue-500/40 bg-blue-500/10 text-blue-300 font-medium' : 'border-slate-800 text-slate-500'
+                }`}
+              >
+                <span className="font-bold">Phase 1 (Days 0–14):</span> Seeding & Clusters
+              </div>
+              <div
+                className={`p-2 rounded-lg border transition-colors ${
+                  currentDay > 14 && currentDay <= 28
+                    ? 'border-amber-500/40 bg-amber-500/10 text-amber-300 font-medium'
+                    : 'border-slate-800 text-slate-500'
+                }`}
+              >
+                <span className="font-bold">Phase 2 (Days 15–28):</span> Exponential Acceleration
+              </div>
+              <div
+                className={`p-2 rounded-lg border transition-colors ${
+                  currentDay > 28 && currentDay <= 42
+                    ? 'border-rose-500/40 bg-rose-500/10 text-rose-300 font-medium'
+                    : 'border-slate-800 text-slate-500'
+                }`}
+              >
+                <span className="font-bold">Phase 3 (Days 29–42):</span> Acute Bed Strain Peak
+              </div>
+              <div
+                className={`p-2 rounded-lg border transition-colors ${
+                  currentDay > 42 ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300 font-medium' : 'border-slate-800 text-slate-500'
+                }`}
+              >
+                <span className="font-bold">Phase 4 (Days 43–60):</span> NPI Suppression & Resolution
+              </div>
+            </div>
+          </div>
+
+          {/* 2. Real-Time Trajectory Chart (ECharts) & Clinical Strain Gauges */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Real-time Trajectory Chart */}
+            <div className="lg:col-span-2 bg-slate-950/80 border border-slate-800 rounded-2xl p-5 shadow-xl">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-amber-400" />
+                  <h3 className="text-sm font-bold text-white">Live Outbreak Trajectory Curves</h3>
+                </div>
+                <span className="text-xs font-mono text-slate-400">Day 0 to {currentDay}</span>
+              </div>
+              <ReactECharts option={chartOption} style={{ height: '280px', width: '100%' }} />
+            </div>
+
+            {/* Clinical & Capacity Gauges */}
+            <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col justify-between space-y-4">
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                    <Hospital className="w-4 h-4 text-blue-400" />
+                    Clinical System Strain
+                  </h3>
+                  <span
+                    className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider ${
+                      metrics.hospitalOccupancyPct >= 95
+                        ? 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
+                        : metrics.hospitalOccupancyPct >= 75
+                        ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                        : 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                    }`}
                   >
-                    {b.name}
-                  </text>
-                  <text
-                    y="12"
-                    textAnchor="middle"
-                    fill="#94a3b8"
-                    fontSize="9"
-                    fontFamily="monospace"
-                  >
-                    {b.infected} act / {Math.round((b.bedsUsed / b.bedsTotal) * 100)}% beds
-                  </text>
+                    {metrics.hospitalOccupancyPct >= 95 ? 'Overflow Alert' : metrics.hospitalOccupancyPct >= 75 ? 'Surge Pressure' : 'Normal'}
+                  </span>
+                </div>
 
-                  {/* Hospital Alarm Badge */}
-                  {isBedBreached && (
-                    <g transform="translate(18, -26)">
-                      <circle r="9" fill="#ef4444" className="animate-ping" />
-                      <circle r="9" fill="#ef4444" />
-                      <text
-                        y="3"
-                        textAnchor="middle"
-                        fill="#ffffff"
-                        fontSize="9"
-                        fontWeight="bold"
-                      >
-                        !
-                      </text>
-                    </g>
-                  )}
-                </g>
-              );
-            })}
-          </svg>
+                <div className="space-y-4 text-xs">
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-slate-400">Acute General Beds</span>
+                      <span className="font-mono font-bold text-white">
+                        {Math.round(1057 * (metrics.hospitalOccupancyPct / 100))} / 1,057 ({metrics.hospitalOccupancyPct}%)
+                      </span>
+                    </div>
+                    <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-300 ${
+                          metrics.hospitalOccupancyPct >= 95 ? 'bg-rose-500' : metrics.hospitalOccupancyPct >= 75 ? 'bg-amber-500' : 'bg-sky-400'
+                        }`}
+                        style={{ width: `${Math.min(100, metrics.hospitalOccupancyPct)}%` }}
+                      />
+                    </div>
+                  </div>
 
-          {/* Canvas Floating Legend */}
-          <div className="absolute top-8 left-8 p-3 rounded-xl bg-slate-900/80 backdrop-blur-md border border-slate-800 text-[11px] space-y-1.5 shadow-lg">
-            <div className="font-semibold text-slate-300 uppercase tracking-wider text-[10px]">
-              Spatial Diorama Legend
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-slate-400">ICU / Ventilated Beds</span>
+                      <span className="font-mono font-bold text-purple-400">
+                        {Math.round(230 * (metrics.hospitalOccupancyPct / 100))} / 230 ({Math.min(100, Math.round(metrics.hospitalOccupancyPct * 1.05))}%)
+                      </span>
+                    </div>
+                    <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-purple-500 rounded-full transition-all duration-300"
+                        style={{ width: `${Math.min(100, metrics.hospitalOccupancyPct * 1.05)}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-slate-400">Clinical Staff Quarantined</span>
+                      <span className="font-mono font-bold text-amber-400">14.2%</span>
+                    </div>
+                    <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden">
+                      <div className="h-full bg-amber-500 rounded-full" style={{ width: '14.2%' }} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Behavior & AI Engine Status Card */}
+              <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl space-y-2 text-xs">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-slate-400 flex items-center gap-1.5">
+                    <Cpu className="w-3.5 h-3.5 text-indigo-400" />
+                    Behavior Engine
+                  </span>
+                  <span className="font-mono text-emerald-400 font-semibold">Ollama (llama3.2:3b) / Gemini</span>
+                </div>
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-slate-400 flex items-center gap-1.5">
+                    <ShieldCheck className="w-3.5 h-3.5 text-blue-400" />
+                    Public Adherence
+                  </span>
+                  <span className="font-mono text-white font-semibold">78.4% Compliance</span>
+                </div>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-              <span className="text-slate-400">Low Transmission (&lt;0.2% active)</span>
+          </div>
+
+          {/* 3. Regional Healthcare & Jurisdictional Breakdown Table */}
+          <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-5 shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Hospital className="w-4 h-4 text-blue-400" />
+                  Regional Healthcare & Borough Incidence
+                </h3>
+                <span className="text-xs text-slate-400">
+                  Live surveillance across key London metropolitan boroughs
+                </span>
+              </div>
+              <span className="text-xs font-mono text-slate-400 bg-slate-900 px-2.5 py-1 rounded-md border border-slate-800">
+                5 Monitored Sectors
+              </span>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-              <span className="text-slate-400">Moderate Surge (0.2% - 0.5%)</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
-              <span className="text-slate-400">Critical Outbreak (&gt;0.5%)</span>
-            </div>
-            <div className="flex items-center gap-2 pt-1 border-t border-slate-800">
-              <span className="w-2.5 h-2.5 rounded-full bg-sky-400" />
-              <span className="text-slate-400">Commuter Movement Flow (60 fps)</span>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-800 text-slate-400 font-semibold uppercase tracking-wider text-[10px]">
+                    <th className="pb-3 pl-2">Jurisdiction</th>
+                    <th className="pb-3">Population</th>
+                    <th className="pb-3">Active Infectious</th>
+                    <th className="pb-3">Incidence / 100k</th>
+                    <th className="pb-3">Acute Bed Occupancy</th>
+                    <th className="pb-3">Alert Status</th>
+                    <th className="pb-3 text-right pr-2">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60 font-mono">
+                  {currentBoroughs.map((b) => (
+                    <tr key={b.id} className="hover:bg-slate-900/50 transition-colors">
+                      <td className="py-3 pl-2 font-sans font-bold text-slate-200">{b.name}</td>
+                      <td className="py-3 text-slate-400">{b.population.toLocaleString()}</td>
+                      <td className="py-3 font-semibold text-amber-400">{b.currentInfected.toLocaleString()}</td>
+                      <td className="py-3 text-slate-300">{b.incidencePer100k}</td>
+                      <td className="py-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-24 h-2 bg-slate-800 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all duration-300 ${
+                                b.occupancyPct >= 95 ? 'bg-rose-500' : b.occupancyPct >= 75 ? 'bg-amber-500' : 'bg-emerald-500'
+                              }`}
+                              style={{ width: `${Math.min(100, b.occupancyPct)}%` }}
+                            />
+                          </div>
+                          <span
+                            className={`text-[11px] font-bold ${
+                              b.occupancyPct >= 95 ? 'text-rose-400' : b.occupancyPct >= 75 ? 'text-amber-400' : 'text-slate-300'
+                            }`}
+                          >
+                            {b.occupancyPct}%
+                          </span>
+                          <span className="text-[10px] text-slate-500">
+                            ({b.currentBedsUsed}/{b.bedsTotal})
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-3">
+                        <span
+                          className={`px-2 py-0.5 rounded text-[10px] font-bold font-sans uppercase tracking-wider ${
+                            b.status === 'CRITICAL'
+                              ? 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
+                              : b.status === 'SURGE'
+                              ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
+                              : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                          }`}
+                        >
+                          {b.status === 'CRITICAL' ? 'Critical Outbreak' : b.status === 'SURGE' ? 'Moderate Surge' : 'Nominal'}
+                        </span>
+                      </td>
+                      <td className="py-3 text-right pr-2">
+                        <button
+                          onClick={() =>
+                            setSelectedBorough({
+                              ...b,
+                              infected: b.currentInfected,
+                              bedsUsed: b.currentBedsUsed,
+                            })
+                          }
+                          className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-sans font-medium transition-colors"
+                        >
+                          Inspect
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -432,9 +700,7 @@ export const SimulateStage: React.FC = () => {
                 key={speed}
                 onClick={() => setSpeedMultiplier(speed)}
                 className={`px-2.5 py-1 rounded-lg font-mono font-medium transition-colors ${
-                  speedMultiplier === speed
-                    ? 'bg-blue-600 text-white'
-                    : 'text-slate-400 hover:text-white'
+                  speedMultiplier === speed ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
                 }`}
               >
                 {speed}x
@@ -489,10 +755,7 @@ export const SimulateStage: React.FC = () => {
                 <h3 className="text-base font-bold text-white">{selectedBorough.name}</h3>
                 <span className="text-xs text-slate-400">Jurisdiction Inspector</span>
               </div>
-              <button
-                onClick={() => setSelectedBorough(null)}
-                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
-              >
+              <button onClick={() => setSelectedBorough(null)} className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -627,4 +890,3 @@ export const SimulateStage: React.FC = () => {
     </div>
   );
 };
-
