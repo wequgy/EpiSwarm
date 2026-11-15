@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { api } from '../api/client';
+import { RunCreateRequest, JobRecord, AreaSpatialPoint } from '../api/types';
 import ReactECharts from 'echarts-for-react';
 import {
   Play,
@@ -24,152 +27,166 @@ import {
   ArrowUpRight,
   ShieldCheck,
   Cpu,
+  PlusCircle,
+  RefreshCw,
 } from 'lucide-react';
 
-interface BoroughNode {
-  id: string;
-  name: string;
-  x: number;
-  y: number;
-  population: number;
-  infected: number;
-  bedsTotal: number;
-  bedsUsed: number;
-}
-
 export const SimulateStage: React.FC = () => {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-  const caseId = searchParams.get('case') || 'case_london_wave1';
+  const queryClient = useQueryClient();
 
-  // Playback State
-  const [isPlaying, setIsPlaying] = useState<boolean>(true);
-  const [currentDay, setCurrentDay] = useState<number>(14);
-  const [maxHorizon, setMaxHorizon] = useState<number>(60);
-  const [speedMultiplier, setSpeedMultiplier] = useState<number>(1.0);
-  const [selectedBorough, setSelectedBorough] = useState<BoroughNode | null>(null);
+  // Queries for real backend data
+  const { data: runsList, refetch: refetchRuns } = useQuery({
+    queryKey: ['runsList'],
+    queryFn: () => api.listRuns(50),
+    refetchInterval: 2500,
+  });
+  const { data: regions } = useQuery({ queryKey: ['regions'], queryFn: api.getRegions });
+  const { data: diseases } = useQuery({ queryKey: ['diseases'], queryFn: api.getDiseases });
+  const { data: scenarios } = useQuery({ queryKey: ['scenarios'], queryFn: api.getScenarios });
 
-  // Modals
-  const [interveneModalOpen, setInterveneModalOpen] = useState<boolean>(false);
-  const [branchModalOpen, setBranchModalOpen] = useState<boolean>(false);
-  const [branchName, setBranchName] = useState<string>('School Closure + Mask Mandate Branch');
+  const completedJobs = runsList?.jobs || [];
+  const initialJobId = searchParams.get('jobId') || completedJobs[0]?.job_id || '';
+  const [selectedJobId, setSelectedJobId] = useState<string>(initialJobId);
 
-  // Simulation Metrics
-  const [metrics, setMetrics] = useState({
-    rEffective: 1.84,
-    activeCases: 1420,
-    hospitalOccupancyPct: 88,
-    totalDeaths: 12,
-    rumorBeliefPct: 18,
+  // Sync selected job if list loads
+  useEffect(() => {
+    if (!selectedJobId && completedJobs.length > 0) {
+      setSelectedJobId(completedJobs[0].job_id);
+    }
+  }, [completedJobs, selectedJobId]);
+
+  const activeJob = completedJobs.find((j) => j.job_id === selectedJobId) || completedJobs[0];
+  const activeJobId = activeJob?.job_id || '';
+
+  // Telemetry Queries for the active simulation run
+  const { data: timeseries, isLoading: isTimeseriesLoading } = useQuery({
+    queryKey: ['runTimeseries', activeJobId],
+    queryFn: () => api.getRunTimeseries(activeJobId),
+    enabled: !!activeJobId,
   });
 
-  // Story feed items
-  const [storyLogs, setStoryLogs] = useState<Array<{ day: number; text: string; type: 'info' | 'alert' | 'policy' }>>([
-    { day: 0, text: 'Simulated outbreak seeded with 25 primary index cases across central transit hubs.', type: 'info' },
-    { day: 7, text: 'Community transmission detected in Southwark and Camden. R_eff estimated at 2.45.', type: 'info' },
-    { day: 12, text: 'Precautionary advisory issued. Commuting mobility drops by 18%.', type: 'policy' },
-    { day: 14, text: 'St Thomas Hospital acute occupancy reaches 88%. ICU surge capacity on standby.', type: 'alert' },
-  ]);
+  const { data: capacity } = useQuery({
+    queryKey: ['runCapacity', activeJobId],
+    queryFn: () => api.getRunCapacity(activeJobId),
+    enabled: !!activeJobId,
+  });
 
-  // Baseline Boroughs for London
-  const [boroughs] = useState<BoroughNode[]>([
-    { id: 'camden', name: 'Camden', x: 280, y: 160, population: 270000, infected: 320, bedsTotal: 650, bedsUsed: 540 },
-    { id: 'westminster', name: 'Westminster', x: 380, y: 260, population: 260000, infected: 410, bedsTotal: 840, bedsUsed: 780 },
-    { id: 'southwark', name: 'Southwark', x: 500, y: 310, population: 310000, infected: 380, bedsTotal: 950, bedsUsed: 910 },
-    { id: 'lambeth', name: 'Lambeth', x: 420, y: 380, population: 320000, infected: 210, bedsTotal: 500, bedsUsed: 390 },
-    { id: 'tower_hamlets', name: 'Tower Hamlets', x: 620, y: 220, population: 310000, infected: 290, bedsTotal: 480, bedsUsed: 360 },
-  ]);
+  const { data: spatial } = useQuery({
+    queryKey: ['runSpatial', activeJobId],
+    queryFn: () => api.getRunSpatial(activeJobId),
+    enabled: !!activeJobId,
+  });
 
-  // Live stepping timer
+  // Playback & Scrubbing State
+  const maxHorizon = timeseries?.horizon_days || activeJob?.total_days || 60;
+  const [currentDay, setCurrentDay] = useState<number>(1);
+  const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  const [speedMultiplier, setSpeedMultiplier] = useState<number>(1.0);
+  const [selectedArea, setSelectedArea] = useState<AreaSpatialPoint | null>(null);
+
+  // Modals
+  const [launchModalOpen, setLaunchModalOpen] = useState<boolean>(false);
+  const [interveneModalOpen, setInterveneModalOpen] = useState<boolean>(false);
+  const [branchModalOpen, setBranchModalOpen] = useState<boolean>(false);
+  const [branchName, setBranchName] = useState<string>('Targeted Containment Branch');
+
+  // Launch Form State
+  const [formRegion, setFormRegion] = useState('example_synthetic');
+  const [formDisease, setFormDisease] = useState('respiratory_generic');
+  const [formScenario, setFormScenario] = useState('targeted_containment');
+  const [formAgents, setFormAgents] = useState(10000);
+  const [formHorizon, setFormHorizon] = useState(60);
+  const [formBehaviorMode, setFormBehaviorMode] = useState<'none' | 'rule' | 'llm'>('rule');
+  const [isLaunching, setIsLaunching] = useState(false);
+
+  const launchMutation = useMutation({
+    mutationFn: (req: RunCreateRequest) => api.launchRun(req),
+    onSuccess: (job: JobRecord) => {
+      queryClient.invalidateQueries({ queryKey: ['runsList'] });
+      setSelectedJobId(job.job_id);
+      setSearchParams({ jobId: job.job_id });
+      setLaunchModalOpen(false);
+      setIsLaunching(false);
+      setCurrentDay(0);
+      setIsPlaying(true);
+    },
+    onError: (err: any) => {
+      alert(`Simulation launch failed: ${err.message}`);
+      setIsLaunching(false);
+    },
+  });
+
+  const handleLaunchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLaunching(true);
+    launchMutation.mutate({
+      region_id: formRegion,
+      disease_id: formDisease,
+      scenario_id: formScenario,
+      scale_agents: formAgents,
+      horizon_days: formHorizon,
+      behavior_mode: formBehaviorMode,
+      n_replicates: 1,
+      use_mock: false,
+    });
+  };
+
+  // Playback timer (scrubs through recorded real daily simulation steps)
   useEffect(() => {
     if (!isPlaying) return;
     const interval = setInterval(() => {
       setCurrentDay((prev) => {
-        if (prev >= maxHorizon) {
+        if (prev >= maxHorizon - 1) {
           setIsPlaying(false);
-          return prev;
+          return maxHorizon - 1;
         }
-        const nextDay = prev + 1;
-        // Update metrics stochastically
-        setMetrics((m) => ({
-          rEffective: Math.max(0.6, Number((m.rEffective - 0.02).toFixed(2))),
-          activeCases: Math.min(8000, Math.round(m.activeCases * (nextDay < 25 ? 1.08 : 0.96))),
-          hospitalOccupancyPct: Math.min(105, Math.round(m.hospitalOccupancyPct + (nextDay < 22 ? 1 : -0.5))),
-          totalDeaths: m.totalDeaths + (nextDay % 3 === 0 ? 2 : 0),
-          rumorBeliefPct: Math.min(45, Math.round(m.rumorBeliefPct + 0.4)),
-        }));
-
-        if (nextDay === 16) {
-          setStoryLogs((s) => [
-            { day: 16, text: 'Stay-at-home order in effect. Commuter flow contracts by 72%.', type: 'policy' },
-            ...s,
-          ]);
-        }
-        if (nextDay === 20) {
-          setStoryLogs((s) => [
-            { day: 20, text: 'CRITICAL ALERT: Southwark acute hospital beds exceed 100% capacity.', type: 'alert' },
-            ...s,
-          ]);
-        }
-        if (nextDay === 35) {
-          setStoryLogs((s) => [
-            { day: 35, text: 'Transmission decelerates below replacement: R_eff drops to 0.88.', type: 'info' },
-            ...s,
-          ]);
-        }
-        return nextDay;
+        return prev + 1;
       });
-    }, 1200 / speedMultiplier);
+    }, 1000 / speedMultiplier);
 
     return () => clearInterval(interval);
   }, [isPlaying, speedMultiplier, maxHorizon]);
 
-  const handleStepForward = () => {
-    if (currentDay < maxHorizon) {
-      setCurrentDay((d) => d + 1);
-    }
-  };
+  // Telemetry arrays from real simulation engine
+  const rawInfectious = timeseries?.daily_states?.['I'] || timeseries?.daily_states?.['infectious'] || [];
+  const rawHospital = capacity?.daily_hospital_demand || [];
+  const rawIcu = capacity?.daily_icu_demand || [];
+  const rawDeaths = timeseries?.daily_deaths || [];
 
-  const handleInjectIntervention = () => {
-    setInterveneModalOpen(false);
-    setStoryLogs((s) => [
-      { day: currentDay, text: `Emergency Intervention injected at Day ${currentDay}: Regional Circuit Breaker + Rapid Triage.`, type: 'policy' },
-      ...s,
-    ]);
-  };
+  // Metrics calculated at currentDay
+  const curInfectious = rawInfectious[currentDay] ?? 0;
+  const prevInfectious = rawInfectious[Math.max(0, currentDay - 4)] ?? Math.max(1, curInfectious);
+  const rEffective = prevInfectious > 0 && curInfectious > 0
+    ? Number(Math.max(0.4, curInfectious / prevInfectious).toFixed(2))
+    : 1.0;
 
-  const handleCreateBranch = () => {
-    setBranchModalOpen(false);
-    navigate(`/insights?tab=compare&branch=${encodeURIComponent(branchName)}&fromDay=${currentDay}`);
-  };
+  const curHospital = rawHospital[currentDay] ?? 0;
+  const totalBeds = capacity?.hospital_capacity_beds || 1000;
+  const hospitalOccupancyPct = totalBeds > 0 ? Math.round((curHospital / totalBeds) * 100) : 0;
+  const curDeaths = rawDeaths[currentDay] ?? 0;
 
-  // Trajectory Curves Calculation for ECharts up to currentDay
-  const daysArray = Array.from({ length: maxHorizon + 1 }, (_, i) => `D${i}`);
-  const infectiousSeries: (number | null)[] = [];
-  const hospitalSeries: (number | null)[] = [];
-  const icuSeries: (number | null)[] = [];
-  const deathsSeries: (number | null)[] = [];
+  const rawRumors = timeseries?.daily_rumor_beliefs;
+  const firstRumorArr = rawRumors && Object.values(rawRumors)[0];
+  const rumorBeliefPct = firstRumorArr && firstRumorArr[currentDay] !== undefined
+    ? Math.round(firstRumorArr[currentDay] * 100)
+    : 18;
 
-  for (let d = 0; d <= maxHorizon; d++) {
-    if (d > currentDay) {
-      infectiousSeries.push(null);
-      hospitalSeries.push(null);
-      icuSeries.push(null);
-      deathsSeries.push(null);
-    } else {
-      const bell = Math.exp(-Math.pow((d - 24) / 9.5, 2));
-      const inf = Math.round(25 + 3200 * bell);
-      const hospBell = Math.exp(-Math.pow((d - 28) / 10.5, 2));
-      const hosp = Math.round(10 + 1080 * hospBell);
-      const icu = Math.round(hosp * 0.22);
-      const deaths = Math.round(38 / (1 + Math.exp(-0.22 * (d - 27))));
-
-      infectiousSeries.push(inf);
-      hospitalSeries.push(hosp);
-      icuSeries.push(icu);
-      deathsSeries.push(deaths);
-    }
-  }
+  // Trajectory Curves for ECharts up to currentDay
+  const daysArray = Array.from({ length: maxHorizon }, (_, i) => `D${i}`);
+  const infectiousSeries: (number | null)[] = daysArray.map((_, d) =>
+    d <= currentDay ? (rawInfectious[d] ?? null) : null
+  );
+  const hospitalSeries: (number | null)[] = daysArray.map((_, d) =>
+    d <= currentDay ? (rawHospital[d] ?? null) : null
+  );
+  const icuSeries: (number | null)[] = daysArray.map((_, d) =>
+    d <= currentDay ? (rawIcu[d] ?? null) : null
+  );
+  const deathsSeries: (number | null)[] = daysArray.map((_, d) =>
+    d <= currentDay ? (rawDeaths[d] ?? null) : null
+  );
 
   const chartOption = {
     backgroundColor: 'transparent',
@@ -180,17 +197,12 @@ export const SimulateStage: React.FC = () => {
       textStyle: { color: '#f8fafc', fontSize: 12 },
     },
     legend: {
-      data: ['Active Infectious', 'Acute Bed Demand', 'ICU Demand', 'Cumulative Deaths', 'Capacity Threshold (1,000 Beds)'],
+      data: ['Active Infectious', 'Acute Bed Demand', 'ICU Demand', 'Cumulative Deaths', 'Capacity Limit'],
       textStyle: { color: '#94a3b8', fontSize: 11 },
       top: 0,
       icon: 'circle',
     },
-    grid: {
-      top: 40,
-      left: 55,
-      right: 25,
-      bottom: 25,
-    },
+    grid: { top: 40, left: 55, right: 25, bottom: 25 },
     xAxis: {
       type: 'category',
       data: daysArray,
@@ -249,35 +261,29 @@ export const SimulateStage: React.FC = () => {
         lineStyle: { width: 1.5, type: 'dashed' },
       },
       {
-        name: 'Capacity Threshold (1,000 Beds)',
+        name: 'Capacity Limit',
         type: 'line',
-        data: Array(maxHorizon + 1).fill(1000),
-        lineStyle: { color: '#ef4444', type: 'dashed', width: 2 },
+        data: Array(maxHorizon).fill(totalBeds),
+        itemStyle: { color: '#ef4444' },
+        lineStyle: { type: 'dashed', width: 1.5 },
         symbol: 'none',
       },
     ],
   };
 
-  // Dynamic Borough Computations
-  const currentBoroughs = boroughs.map((b) => {
-    const waveProgress = currentDay <= 26 ? currentDay / 26 : Math.max(0.2, 1 - ((currentDay - 26) / 34) * 0.7);
-    const infected = Math.round(b.infected * (0.3 + waveProgress * 1.4));
-    const bedsUsed = Math.min(b.bedsTotal, Math.round(b.bedsUsed * (0.35 + waveProgress * 1.1)));
-    const occupancyPct = Math.round((bedsUsed / b.bedsTotal) * 100);
-    const incidencePer100k = Math.round((infected / b.population) * 100000);
-    const status = occupancyPct >= 95 ? 'CRITICAL' : occupancyPct >= 75 ? 'SURGE' : 'NORMAL';
+  const handleStepForward = () => {
+    if (currentDay < maxHorizon - 1) {
+      setCurrentDay((d) => d + 1);
+    }
+  };
 
-    return {
-      ...b,
-      currentInfected: infected,
-      currentBedsUsed: bedsUsed,
-      occupancyPct,
-      incidencePer100k,
-      status,
-    };
-  });
+  const handleCreateBranch = () => {
+    setBranchModalOpen(false);
+    navigate(`/insights?tab=compare&branch=${encodeURIComponent(branchName)}&fromDay=${currentDay}&jobId=${activeJobId}`);
+  };
 
-  const progressPercent = Math.round((currentDay / maxHorizon) * 100);
+  const progressPercent = Math.round(((currentDay + 1) / maxHorizon) * 100);
+  const areasList = spatial?.areas && spatial.areas.length > 0 ? spatial.areas : [];
 
   return (
     <div className="flex-1 flex flex-col bg-slate-900 text-slate-100 relative overflow-hidden select-none">
@@ -285,51 +291,89 @@ export const SimulateStage: React.FC = () => {
       <div className="h-16 px-6 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 flex items-center justify-between z-20">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <span className={`w-2.5 h-2.5 rounded-full ${isPlaying ? 'bg-emerald-500 animate-ping' : 'bg-amber-400'}`} />
+            <span
+              className={`w-2.5 h-2.5 rounded-full ${
+                activeJob?.status === 'RUNNING'
+                  ? 'bg-amber-400 animate-ping'
+                  : isPlaying
+                  ? 'bg-emerald-500 animate-pulse'
+                  : 'bg-blue-400'
+              }`}
+            />
             <span className="font-mono text-sm font-bold text-white tracking-wider">
               DAY {currentDay.toString().padStart(2, '0')} / {maxHorizon}
             </span>
           </div>
           <span className="text-xs text-slate-500">|</span>
-          <span className="text-xs text-slate-300 font-medium">
-            Case: {caseId === 'case_london_wave1' ? 'London Wave 1 (33 Boroughs)' : 'Sandbox Mini-City'}
-          </span>
+
+          {/* Active Run Selector Dropdown */}
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-slate-400 uppercase font-semibold">Active Run:</span>
+            {completedJobs.length > 0 ? (
+              <select
+                value={activeJobId}
+                onChange={(e) => {
+                  setSelectedJobId(e.target.value);
+                  setSearchParams({ jobId: e.target.value });
+                  setCurrentDay(0);
+                }}
+                className="bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1 text-xs text-white font-mono focus:ring-1 focus:ring-blue-500"
+              >
+                {completedJobs.map((j) => (
+                  <option key={j.job_id} value={j.job_id}>
+                    {j.job_id} ({j.request.region_id} • {j.request.scale_agents} agents • {j.status})
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span className="text-xs text-slate-400 italic">No runs available</span>
+            )}
+          </div>
+
+          {/* Launch New Simulation Button */}
+          <button
+            onClick={() => setLaunchModalOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-sm transition"
+          >
+            <PlusCircle className="w-3.5 h-3.5" />
+            <span>New Run</span>
+          </button>
         </div>
 
         {/* Live Outbreak Telemetry */}
         <div className="flex items-center gap-6 text-xs">
           <div className="flex flex-col">
             <span className="text-slate-400 text-[10px] uppercase font-semibold">Reproduction R_eff</span>
-            <span className={`font-mono font-bold text-sm ${metrics.rEffective > 1 ? 'text-rose-400' : 'text-emerald-400'}`}>
-              {metrics.rEffective.toFixed(2)}
+            <span className={`font-mono font-bold text-sm ${rEffective > 1 ? 'text-rose-400' : 'text-emerald-400'}`}>
+              {rEffective.toFixed(2)}
             </span>
           </div>
 
           <div className="flex flex-col">
             <span className="text-slate-400 text-[10px] uppercase font-semibold">Active Infectious</span>
             <span className="font-mono font-bold text-sm text-amber-400">
-              {metrics.activeCases.toLocaleString()}
+              {curInfectious.toLocaleString()}
             </span>
           </div>
 
           <div className="flex flex-col">
             <span className="text-slate-400 text-[10px] uppercase font-semibold">Hospital Bed Demand</span>
-            <span className={`font-mono font-bold text-sm ${metrics.hospitalOccupancyPct >= 95 ? 'text-rose-500 animate-pulse' : 'text-blue-400'}`}>
-              {metrics.hospitalOccupancyPct}%
+            <span className={`font-mono font-bold text-sm ${hospitalOccupancyPct >= 95 ? 'text-rose-500 animate-pulse' : 'text-blue-400'}`}>
+              {hospitalOccupancyPct}%
             </span>
           </div>
 
           <div className="flex flex-col">
             <span className="text-slate-400 text-[10px] uppercase font-semibold">Total Deaths</span>
             <span className="font-mono font-bold text-sm text-slate-200">
-              {metrics.totalDeaths}
+              {curDeaths}
             </span>
           </div>
 
           <div className="flex flex-col">
             <span className="text-slate-400 text-[10px] uppercase font-semibold">Rumor Belief</span>
             <span className="font-mono font-bold text-sm text-purple-400">
-              {metrics.rumorBeliefPct}%
+              {rumorBeliefPct}%
             </span>
           </div>
         </div>
@@ -339,371 +383,256 @@ export const SimulateStage: React.FC = () => {
       <div className="flex-1 flex relative overflow-hidden">
         {/* Full-width Simulation Progress & Telemetry Workbench */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {/* 1. Large Top Simulation Progress & Phase Overview */}
+          {/* Top Simulation Progress & Phase Overview */}
           <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-5 shadow-xl">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-3">
                 <div
                   className={`px-2.5 py-1 rounded-md text-xs font-mono font-bold flex items-center gap-2 ${
-                    isPlaying
+                    activeJob?.status === 'RUNNING'
+                      ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
+                      : isPlaying
                       ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-                      : currentDay >= maxHorizon
+                      : currentDay >= maxHorizon - 1
                       ? 'bg-blue-500/10 text-blue-400 border border-blue-500/30'
-                      : 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
+                      : 'bg-slate-500/10 text-slate-400 border border-slate-500/30'
                   }`}
                 >
                   <span
                     className={`w-2 h-2 rounded-full ${
-                      isPlaying ? 'bg-emerald-400 animate-ping' : currentDay >= maxHorizon ? 'bg-blue-400' : 'bg-amber-400'
+                      activeJob?.status === 'RUNNING'
+                        ? 'bg-amber-400 animate-ping'
+                        : isPlaying
+                        ? 'bg-emerald-400 animate-pulse'
+                        : currentDay >= maxHorizon - 1
+                        ? 'bg-blue-400'
+                        : 'bg-slate-400'
                     }`}
                   />
-                  {isPlaying ? 'ENGINE RUNNING' : currentDay >= maxHorizon ? 'SIMULATION COMPLETED' : 'ENGINE PAUSED'}
+                  {activeJob?.status === 'RUNNING'
+                    ? 'ENGINE EXECUTING IN BACKGROUND'
+                    : isPlaying
+                    ? 'PLAYBACK SCRUBBING'
+                    : currentDay >= maxHorizon - 1
+                    ? 'SIMULATION TIMELINE COMPLETED'
+                    : 'TIMELINE PAUSED'}
                 </div>
-                <span className="font-mono text-base font-bold text-white">
-                  Day {currentDay} of {maxHorizon}
+                <span className="text-sm font-semibold text-white">
+                  Day {currentDay} of {maxHorizon} ({progressPercent}% Horizon Reached)
                 </span>
-                <span className="text-xs text-slate-400 font-medium">({progressPercent}% Complete)</span>
               </div>
 
               <div className="flex items-center gap-4 text-xs font-mono text-slate-400">
-                <div>
-                  <span className="text-slate-500">Speed: </span>
-                  <span className="text-slate-200 font-semibold">{speedMultiplier}x</span>
-                </div>
-                <div>
-                  <span className="text-slate-500">Est. Remaining: </span>
-                  <span className="text-slate-200 font-semibold">
-                    {isPlaying ? `${Math.max(0, (maxHorizon - currentDay) * (1.2 / speedMultiplier)).toFixed(1)}s` : 'Paused'}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-500">Agents: </span>
-                  <span className="text-slate-200 font-semibold">50,000 (1:178 Scale)</span>
-                </div>
+                <span>Speed: <strong className="text-white">{speedMultiplier}x</strong></span>
+                <span>Region: <strong className="text-white">{activeJob?.request?.region_id || 'synthetic'}</strong></span>
+                <span>Agents: <strong className="text-white">{(activeJob?.request?.scale_agents || 10000).toLocaleString()}</strong></span>
               </div>
             </div>
 
-            {/* High-visibility Progress Bar */}
-            <div className="relative w-full h-4 bg-slate-900 rounded-full overflow-hidden p-0.5 border border-slate-800">
+            {/* High-visibility Progress Track */}
+            <div className="relative w-full h-3.5 bg-slate-800/90 rounded-full overflow-hidden border border-slate-700/60 p-0.5">
               <div
-                className="h-full bg-gradient-to-r from-blue-600 via-indigo-500 to-emerald-500 rounded-full transition-all duration-300 relative shadow-lg shadow-blue-500/30"
-                style={{ width: `${Math.min(100, progressPercent)}%` }}
+                className="h-full rounded-full bg-gradient-to-r from-blue-600 via-indigo-500 to-emerald-400 transition-all duration-300 shadow-sm"
+                style={{ width: `${progressPercent}%` }}
               />
             </div>
 
-            {/* Epidemic Phases Grid under Progress Bar */}
-            <div className="grid grid-cols-4 gap-2 mt-3 text-[11px]">
-              <div
-                className={`p-2 rounded-lg border transition-colors ${
-                  currentDay <= 14 ? 'border-blue-500/40 bg-blue-500/10 text-blue-300 font-medium' : 'border-slate-800 text-slate-500'
-                }`}
-              >
-                <span className="font-bold">Phase 1 (Days 0–14):</span> Seeding & Clusters
+            {/* Milestone Phase Indicators */}
+            <div className="grid grid-cols-4 gap-2 mt-3 pt-3 border-t border-slate-800/60 text-[11px] font-mono text-slate-400">
+              <div className={`p-1.5 rounded border transition-colors ${currentDay < 15 ? 'border-amber-500/50 bg-amber-500/10 text-amber-300' : 'border-slate-800'}`}>
+                Phase 1 (Days 0-14): Seeding & Detection
               </div>
-              <div
-                className={`p-2 rounded-lg border transition-colors ${
-                  currentDay > 14 && currentDay <= 28
-                    ? 'border-amber-500/40 bg-amber-500/10 text-amber-300 font-medium'
-                    : 'border-slate-800 text-slate-500'
-                }`}
-              >
-                <span className="font-bold">Phase 2 (Days 15–28):</span> Exponential Acceleration
+              <div className={`p-1.5 rounded border transition-colors ${currentDay >= 15 && currentDay < 28 ? 'border-amber-500/50 bg-amber-500/10 text-amber-300' : 'border-slate-800'}`}>
+                Phase 2 (Days 15-28): Exponential Spread
               </div>
-              <div
-                className={`p-2 rounded-lg border transition-colors ${
-                  currentDay > 28 && currentDay <= 42
-                    ? 'border-rose-500/40 bg-rose-500/10 text-rose-300 font-medium'
-                    : 'border-slate-800 text-slate-500'
-                }`}
-              >
-                <span className="font-bold">Phase 3 (Days 29–42):</span> Acute Bed Strain Peak
+              <div className={`p-1.5 rounded border transition-colors ${currentDay >= 28 && currentDay < 42 ? 'border-amber-500/50 bg-amber-500/10 text-amber-300' : 'border-slate-800'}`}>
+                Phase 3 (Days 28-42): Acute Bed Strain Peak
               </div>
-              <div
-                className={`p-2 rounded-lg border transition-colors ${
-                  currentDay > 42 ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300 font-medium' : 'border-slate-800 text-slate-500'
-                }`}
-              >
-                <span className="font-bold">Phase 4 (Days 43–60):</span> NPI Suppression & Resolution
+              <div className={`p-1.5 rounded border transition-colors ${currentDay >= 42 ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-300' : 'border-slate-800'}`}>
+                Phase 4 (Days 43-60): Suppression & Post-Peak
               </div>
             </div>
           </div>
 
-          {/* 2. Real-Time Trajectory Chart (ECharts) & Clinical Strain Gauges */}
+          {/* Trajectory & Clinical Demand Curves */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Real-time Trajectory Chart */}
-            <div className="lg:col-span-2 bg-slate-950/80 border border-slate-800 rounded-2xl p-5 shadow-xl">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <Activity className="w-4 h-4 text-amber-400" />
-                  <h3 className="text-sm font-bold text-white">Live Outbreak Trajectory Curves</h3>
-                </div>
-                <span className="text-xs font-mono text-slate-400">Day 0 to {currentDay}</span>
+            <div className="lg:col-span-2 bg-slate-950/80 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                  <Activity className="w-3.5 h-3.5 text-amber-400" />
+                  Live Outbreak Trajectory Curves (Vectorized Telemetry)
+                </span>
+                <span className="text-[10px] font-mono text-slate-400">
+                  Step: Day {currentDay} / {maxHorizon}
+                </span>
               </div>
               <ReactECharts option={chartOption} style={{ height: '280px', width: '100%' }} />
             </div>
 
-            {/* Clinical & Capacity Gauges */}
-            <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col justify-between space-y-4">
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                    <Hospital className="w-4 h-4 text-blue-400" />
-                    Clinical System Strain
-                  </h3>
-                  <span
-                    className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider ${
-                      metrics.hospitalOccupancyPct >= 95
-                        ? 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
-                        : metrics.hospitalOccupancyPct >= 75
-                        ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
-                        : 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                    }`}
-                  >
-                    {metrics.hospitalOccupancyPct >= 95 ? 'Overflow Alert' : metrics.hospitalOccupancyPct >= 75 ? 'Surge Pressure' : 'Normal'}
-                  </span>
-                </div>
+            <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                <Hospital className="w-3.5 h-3.5 text-blue-400" />
+                Clinical System Strain
+              </span>
 
-                <div className="space-y-4 text-xs">
-                  <div>
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="text-slate-400">Acute General Beds</span>
-                      <span className="font-mono font-bold text-white">
-                        {Math.round(1057 * (metrics.hospitalOccupancyPct / 100))} / 1,057 ({metrics.hospitalOccupancyPct}%)
-                      </span>
-                    </div>
-                    <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all duration-300 ${
-                          metrics.hospitalOccupancyPct >= 95 ? 'bg-rose-500' : metrics.hospitalOccupancyPct >= 75 ? 'bg-amber-500' : 'bg-sky-400'
-                        }`}
-                        style={{ width: `${Math.min(100, metrics.hospitalOccupancyPct)}%` }}
-                      />
-                    </div>
+              <div className="space-y-4 text-xs">
+                <div>
+                  <div className="flex justify-between text-slate-400 mb-1">
+                    <span>Acute General Beds</span>
+                    <span className="font-mono text-white">{curHospital.toLocaleString()} / {totalBeds.toLocaleString()} ({hospitalOccupancyPct}%)</span>
                   </div>
-
-                  <div>
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="text-slate-400">ICU / Ventilated Beds</span>
-                      <span className="font-mono font-bold text-purple-400">
-                        {Math.round(230 * (metrics.hospitalOccupancyPct / 100))} / 230 ({Math.min(100, Math.round(metrics.hospitalOccupancyPct * 1.05))}%)
-                      </span>
-                    </div>
-                    <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-purple-500 rounded-full transition-all duration-300"
-                        style={{ width: `${Math.min(100, metrics.hospitalOccupancyPct * 1.05)}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="text-slate-400">Clinical Staff Quarantined</span>
-                      <span className="font-mono font-bold text-amber-400">14.2%</span>
-                    </div>
-                    <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden">
-                      <div className="h-full bg-amber-500 rounded-full" style={{ width: '14.2%' }} />
-                    </div>
+                  <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-300 ${hospitalOccupancyPct >= 95 ? 'bg-rose-500' : hospitalOccupancyPct >= 75 ? 'bg-amber-400' : 'bg-blue-500'}`}
+                      style={{ width: `${Math.min(100, hospitalOccupancyPct)}%` }}
+                    />
                   </div>
                 </div>
-              </div>
 
-              {/* Behavior & AI Engine Status Card */}
-              <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl space-y-2 text-xs">
-                <div className="flex items-center justify-between text-[11px]">
-                  <span className="text-slate-400 flex items-center gap-1.5">
-                    <Cpu className="w-3.5 h-3.5 text-indigo-400" />
-                    Behavior Engine
-                  </span>
-                  <span className="font-mono text-emerald-400 font-semibold">Ollama (llama3.2:3b) / Gemini</span>
+                <div>
+                  <div className="flex justify-between text-slate-400 mb-1">
+                    <span>ICU / Ventilated Beds</span>
+                    <span className="font-mono text-white">{(rawIcu[currentDay] ?? 0)} / {capacity?.icu_capacity_beds || 200}</span>
+                  </div>
+                  <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-purple-500 rounded-full transition-all duration-300"
+                      style={{ width: `${Math.min(100, (((rawIcu[currentDay] ?? 0) / Math.max(1, capacity?.icu_capacity_beds || 200)) * 100))}%` }}
+                    />
+                  </div>
                 </div>
-                <div className="flex items-center justify-between text-[11px]">
-                  <span className="text-slate-400 flex items-center gap-1.5">
-                    <ShieldCheck className="w-3.5 h-3.5 text-blue-400" />
-                    Public Adherence
-                  </span>
-                  <span className="font-mono text-white font-semibold">78.4% Compliance</span>
+
+                <div className="pt-3 border-t border-slate-800 text-slate-400 space-y-2 text-[11px]">
+                  <div className="flex justify-between">
+                    <span>Active Pathogen:</span>
+                    <span className="font-semibold text-white">{activeJob?.request?.disease_id || 'respiratory_generic'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Policy Scenario:</span>
+                    <span className="font-semibold text-white">{activeJob?.request?.scenario_id || 'baseline'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Cumulative Fatalities:</span>
+                    <span className="font-mono font-bold text-rose-400">{curDeaths}</span>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* 3. Regional Healthcare & Jurisdictional Breakdown Table */}
-          <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-5 shadow-xl">
-            <div className="flex items-center justify-between mb-4">
+          {/* Regional Healthcare & Area Incidence Table */}
+          <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-3">
+            <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                  <Hospital className="w-4 h-4 text-blue-400" />
-                  Regional Healthcare & Borough Incidence
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                  <Layers className="w-3.5 h-3.5 text-indigo-400" />
+                  Regional Healthcare & Area Incidence ({areasList.length} monitored sectors)
                 </h3>
-                <span className="text-xs text-slate-400">
-                  Live surveillance across key London metropolitan boroughs
-                </span>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Live spatial infection counts for Day {currentDay} derived from engine contact networks.
+                </p>
               </div>
-              <span className="text-xs font-mono text-slate-400 bg-slate-900 px-2.5 py-1 rounded-md border border-slate-800">
-                5 Monitored Sectors
-              </span>
+              <button
+                onClick={() => navigate(`/insights?jobId=${activeJobId}`)}
+                className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 underline"
+              >
+                Open Full Insights Dashboard &rarr;
+              </button>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-slate-800 text-slate-400 font-semibold uppercase tracking-wider text-[10px]">
-                    <th className="pb-3 pl-2">Jurisdiction</th>
-                    <th className="pb-3">Population</th>
-                    <th className="pb-3">Active Infectious</th>
-                    <th className="pb-3">Incidence / 100k</th>
-                    <th className="pb-3">Acute Bed Occupancy</th>
-                    <th className="pb-3">Alert Status</th>
-                    <th className="pb-3 text-right pr-2">Action</th>
+            <div className="overflow-x-auto border border-slate-800/80 rounded-xl">
+              <table className="w-full text-xs divide-y divide-slate-800">
+                <thead className="bg-slate-900 text-slate-400 font-semibold text-[11px]">
+                  <tr>
+                    <th className="px-4 py-2.5 text-left">Sector / Area</th>
+                    <th className="px-4 py-2.5 text-right">Population</th>
+                    <th className="px-4 py-2.5 text-right">Daily Incident</th>
+                    <th className="px-4 py-2.5 text-right">Rate / 1k Pop</th>
+                    <th className="px-4 py-2.5 text-center">Alert Status</th>
+                    <th className="px-4 py-2.5 text-center">Action</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/60 font-mono">
-                  {currentBoroughs.map((b) => (
-                    <tr key={b.id} className="hover:bg-slate-900/50 transition-colors">
-                      <td className="py-3 pl-2 font-sans font-bold text-slate-200">{b.name}</td>
-                      <td className="py-3 text-slate-400">{b.population.toLocaleString()}</td>
-                      <td className="py-3 font-semibold text-amber-400">{b.currentInfected.toLocaleString()}</td>
-                      <td className="py-3 text-slate-300">{b.incidencePer100k}</td>
-                      <td className="py-3">
-                        <div className="flex items-center gap-2">
-                          <div className="w-24 h-2 bg-slate-800 rounded-full overflow-hidden">
-                            <div
-                              className={`h-full rounded-full transition-all duration-300 ${
-                                b.occupancyPct >= 95 ? 'bg-rose-500' : b.occupancyPct >= 75 ? 'bg-amber-500' : 'bg-emerald-500'
-                              }`}
-                              style={{ width: `${Math.min(100, b.occupancyPct)}%` }}
-                            />
-                          </div>
-                          <span
-                            className={`text-[11px] font-bold ${
-                              b.occupancyPct >= 95 ? 'text-rose-400' : b.occupancyPct >= 75 ? 'text-amber-400' : 'text-slate-300'
-                            }`}
-                          >
-                            {b.occupancyPct}%
-                          </span>
-                          <span className="text-[10px] text-slate-500">
-                            ({b.currentBedsUsed}/{b.bedsTotal})
-                          </span>
-                        </div>
-                      </td>
-                      <td className="py-3">
-                        <span
-                          className={`px-2 py-0.5 rounded text-[10px] font-bold font-sans uppercase tracking-wider ${
-                            b.status === 'CRITICAL'
-                              ? 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
-                              : b.status === 'SURGE'
-                              ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
-                              : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-                          }`}
-                        >
-                          {b.status === 'CRITICAL' ? 'Critical Outbreak' : b.status === 'SURGE' ? 'Moderate Surge' : 'Nominal'}
-                        </span>
-                      </td>
-                      <td className="py-3 text-right pr-2">
-                        <button
-                          onClick={() =>
-                            setSelectedBorough({
-                              ...b,
-                              infected: b.currentInfected,
-                              bedsUsed: b.currentBedsUsed,
-                            })
-                          }
-                          className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-sans font-medium transition-colors"
-                        >
-                          Inspect
-                        </button>
+                <tbody className="divide-y divide-slate-800 bg-slate-950/40">
+                  {areasList.length > 0 ? (
+                    areasList.map((area) => {
+                      const dailyInc = area.daily_incident_infections?.[currentDay] ?? 0;
+                      const rate = area.population > 0 ? ((dailyInc / area.population) * 1000).toFixed(2) : '0.00';
+                      const isHigh = Number(rate) > 0.5;
+                      return (
+                        <tr key={area.area_id} className="hover:bg-slate-900/60 transition-colors">
+                          <td className="px-4 py-2.5 font-medium text-white">{area.name}</td>
+                          <td className="px-4 py-2.5 text-right font-mono text-slate-400">{area.population.toLocaleString()}</td>
+                          <td className="px-4 py-2.5 text-right font-mono font-bold text-amber-400">{dailyInc.toLocaleString()}</td>
+                          <td className="px-4 py-2.5 text-right font-mono text-slate-300">{rate}</td>
+                          <td className="px-4 py-2.5 text-center">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${isHigh ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'}`}>
+                              {isHigh ? 'Active Surge' : 'Baseline'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2.5 text-center">
+                            <button
+                              onClick={() => setSelectedArea(area)}
+                              className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-medium"
+                            >
+                              Inspect
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-6 text-center text-slate-500 italic">
+                        No spatial sectors loaded. Run a simulation to generate area trajectories.
                       </td>
                     </tr>
-                  ))}
+                  )}
                 </tbody>
               </table>
             </div>
           </div>
         </div>
-
-        {/* Right Side: Situational Story Feed */}
-        <div className="w-80 bg-slate-900/90 border-l border-slate-800 flex flex-col">
-          <div className="p-4 border-b border-slate-800 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4 text-blue-400" />
-              <span className="text-xs font-semibold text-slate-200">Situational Briefing</span>
-            </div>
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
-              Live Feed
-            </span>
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
-            {storyLogs.map((log, idx) => (
-              <div
-                key={idx}
-                className={`p-3 rounded-xl border text-xs leading-relaxed transition-all ${
-                  log.type === 'alert'
-                    ? 'border-rose-500/40 bg-rose-500/10 text-rose-200'
-                    : log.type === 'policy'
-                    ? 'border-blue-500/40 bg-blue-500/10 text-blue-200'
-                    : 'border-slate-800 bg-slate-800/50 text-slate-300'
-                }`}
-              >
-                <div className="flex justify-between items-center mb-1">
-                  <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    Day {log.day}
-                  </span>
-                  {log.type === 'alert' && (
-                    <span className="text-[9px] font-bold uppercase text-rose-400 flex items-center gap-1">
-                      <ShieldAlert className="w-3 h-3" /> Strain
-                    </span>
-                  )}
-                </div>
-                <div>{log.text}</div>
-              </div>
-            ))}
-          </div>
-
-          <div className="p-4 border-t border-slate-800 bg-slate-950/40 text-center">
-            <button
-              onClick={() => navigate('/insights')}
-              className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-medium transition-colors"
-            >
-              Open Comprehensive Insights &rarr;
-            </button>
-          </div>
-        </div>
       </div>
 
-      {/* Interactive Bottom Scrubber Dock */}
-      <div className="h-20 bg-slate-950 border-t border-slate-800 px-8 flex items-center justify-between z-30">
+      {/* Bottom Timeline Control Deck */}
+      <div className="h-20 px-8 bg-slate-950/95 border-t border-slate-800 flex items-center justify-between z-20 shadow-2xl">
         {/* Playback Controls */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setCurrentDay(0)}
+            className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all hover:scale-105"
+            title="Reset to Day 0"
+          >
+            <RotateCcw className="w-4 h-4" />
+          </button>
+
           <button
             onClick={() => setIsPlaying(!isPlaying)}
-            className="w-10 h-10 rounded-xl bg-blue-600 hover:bg-blue-500 text-white flex items-center justify-center shadow-lg shadow-blue-500/20 transition-transform active:scale-95"
-            title={isPlaying ? 'Pause simulation' : 'Resume simulation'}
+            className="p-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold shadow-lg shadow-blue-600/30 transition-all hover:scale-105"
+            title={isPlaying ? 'Pause Playback' : 'Play Simulation Telemetry'}
           >
             {isPlaying ? <Pause className="w-4 h-4 fill-white" /> : <Play className="w-4 h-4 fill-white" />}
           </button>
 
           <button
             onClick={handleStepForward}
-            disabled={isPlaying}
-            className="p-2.5 rounded-xl border border-slate-800 bg-slate-900 text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-40 transition-colors"
-            title="Step forward +1 day"
+            className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all hover:scale-105"
+            title="Step 1 Day Forward"
           >
             <SkipForward className="w-4 h-4" />
           </button>
 
-          {/* Speed Multiplier */}
-          <div className="flex items-center bg-slate-900 rounded-xl p-1 border border-slate-800 text-xs">
-            {[0.5, 1, 2, 5].map((speed) => (
+          {/* Speed Presets */}
+          <div className="flex items-center bg-slate-800/80 p-1 rounded-xl border border-slate-700/60 ml-2">
+            {[0.5, 1, 2, 5].map((spd) => (
               <button
-                key={speed}
-                onClick={() => setSpeedMultiplier(speed)}
-                className={`px-2.5 py-1 rounded-lg font-mono font-medium transition-colors ${
-                  speedMultiplier === speed ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
+                key={spd}
+                onClick={() => setSpeedMultiplier(spd)}
+                className={`px-2 py-1 rounded-lg text-xs font-mono font-medium transition-all ${
+                  speedMultiplier === spd ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
                 }`}
               >
-                {speed}x
+                {spd}x
               </button>
             ))}
           </div>
@@ -715,7 +644,7 @@ export const SimulateStage: React.FC = () => {
           <input
             type="range"
             min={0}
-            max={maxHorizon}
+            max={maxHorizon - 1}
             value={currentDay}
             onChange={(e) => {
               setCurrentDay(Number(e.target.value));
@@ -726,11 +655,11 @@ export const SimulateStage: React.FC = () => {
           <span className="font-mono text-xs text-slate-400">Day {maxHorizon}</span>
         </div>
 
-        {/* Action Buttons: Intervene Now & Branch */}
+        {/* Action Buttons: Intervene & Branch */}
         <div className="flex items-center gap-3">
           <button
             onClick={() => setInterveneModalOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold shadow-md shadow-amber-600/20 transition-all hover:scale-102"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold shadow-md transition-all hover:scale-102"
           >
             <ShieldAlert className="w-3.5 h-3.5" />
             <span>Intervene Now</span>
@@ -738,73 +667,139 @@ export const SimulateStage: React.FC = () => {
 
           <button
             onClick={() => setBranchModalOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold shadow-sm transition-all hover:scale-102"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md transition-all hover:scale-102"
           >
-            <GitBranch className="w-3.5 h-3.5 text-blue-400" />
+            <GitBranch className="w-3.5 h-3.5" />
             <span>Branch from Day {currentDay}</span>
           </button>
         </div>
       </div>
 
-      {/* Borough Inspector Slide-over */}
-      {selectedBorough && (
-        <div className="fixed inset-y-0 right-0 w-88 bg-slate-900 border-l border-slate-800 shadow-2xl z-40 p-6 flex flex-col justify-between animate-in slide-in-from-right duration-200">
-          <div>
-            <div className="flex items-center justify-between pb-4 border-b border-slate-800">
-              <div>
-                <h3 className="text-base font-bold text-white">{selectedBorough.name}</h3>
-                <span className="text-xs text-slate-400">Jurisdiction Inspector</span>
-              </div>
-              <button onClick={() => setSelectedBorough(null)} className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800">
+      {/* Launch New Simulation Modal */}
+      {launchModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm">
+          <div className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl text-slate-100 space-y-4">
+            <div className="flex justify-between items-center pb-3 border-b border-slate-800">
+              <h3 className="text-base font-bold flex items-center gap-2">
+                <Play className="w-4 h-4 text-blue-500 fill-blue-500" />
+                Launch Vectorized Simulation Job
+              </h3>
+              <button onClick={() => setLaunchModalOpen(false)} className="text-slate-400 hover:text-white">
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="mt-6 space-y-4 text-xs">
-              <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800">
-                <span className="text-slate-400">Resident Population</span>
-                <div className="text-base font-mono font-bold text-white mt-1">
-                  {selectedBorough.population.toLocaleString()}
+            <form onSubmit={handleLaunchSubmit} className="space-y-4 text-xs">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-slate-400 font-semibold mb-1">Region</label>
+                  <select
+                    value={formRegion}
+                    onChange={(e) => setFormRegion(e.target.value)}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white"
+                  >
+                    {regions?.map((r) => (
+                      <option key={r.id} value={r.id}>{r.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 font-semibold mb-1">Disease Pathogen</label>
+                  <select
+                    value={formDisease}
+                    onChange={(e) => setFormDisease(e.target.value)}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white"
+                  >
+                    {diseases?.map((d) => (
+                      <option key={d.id} value={d.id}>{d.name}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
-              <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800">
-                <span className="text-slate-400">Active Infectious Cases</span>
-                <div className="text-base font-mono font-bold text-amber-400 mt-1">
-                  {selectedBorough.infected.toLocaleString()}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-slate-400 font-semibold mb-1">Intervention Scenario</label>
+                  <select
+                    value={formScenario}
+                    onChange={(e) => setFormScenario(e.target.value)}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white"
+                  >
+                    {scenarios?.map((s) => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 font-semibold mb-1">Behavior Mode</label>
+                  <select
+                    value={formBehaviorMode}
+                    onChange={(e) => setFormBehaviorMode(e.target.value as any)}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white"
+                  >
+                    <option value="rule">Rule-Based Vectorized (Fast)</option>
+                    <option value="llm">LLM Decision Agent (Gemini / Ollama)</option>
+                    <option value="none">Pure Epidemic (No Behavioral Shift)</option>
+                  </select>
                 </div>
               </div>
 
-              <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800">
-                <div className="flex justify-between items-center mb-1">
-                  <span className="text-slate-400">Acute Bed Occupancy</span>
-                  <span className="font-mono font-bold text-rose-400">
-                    {selectedBorough.bedsUsed} / {selectedBorough.bedsTotal}
-                  </span>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-slate-400 font-semibold mb-1">Population Scale</label>
+                  <input
+                    type="number"
+                    min={1000}
+                    max={100000}
+                    step={1000}
+                    value={formAgents}
+                    onChange={(e) => setFormAgents(Number(e.target.value))}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white font-mono"
+                  />
                 </div>
-                <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-rose-500 rounded-full"
-                    style={{ width: `${Math.min(100, (selectedBorough.bedsUsed / selectedBorough.bedsTotal) * 100)}%` }}
+
+                <div>
+                  <label className="block text-slate-400 font-semibold mb-1">Simulation Horizon (Days)</label>
+                  <input
+                    type="number"
+                    min={10}
+                    max={180}
+                    value={formHorizon}
+                    onChange={(e) => setFormHorizon(Number(e.target.value))}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-white font-mono"
                   />
                 </div>
               </div>
-            </div>
-          </div>
 
-          <button
-            onClick={() => {
-              setInterveneModalOpen(true);
-              setSelectedBorough(null);
-            }}
-            className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold shadow-md transition-colors"
-          >
-            Apply Measure to {selectedBorough.name}
-          </button>
+              <div className="p-3 bg-blue-950/40 border border-blue-900/60 rounded-xl text-blue-300 text-[11px]">
+                🚀 Executes on the real Python simulation engine (NumPy vectorized transmission + healthcare allocation). Runs in background.
+              </div>
+
+              <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setLaunchModalOpen(false)}
+                  className="px-4 py-2 rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800 text-xs"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isLaunching}
+                  className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs flex items-center gap-2"
+                >
+                  {isLaunching ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+                  <span>{isLaunching ? 'Launching...' : 'Start Real Simulation'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
-      {/* Live Intervention Injection Modal */}
+      {/* Intervene Modal */}
       {interveneModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm">
           <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl text-slate-100 space-y-4">
@@ -815,38 +810,36 @@ export const SimulateStage: React.FC = () => {
               </button>
             </div>
             <p className="text-xs text-slate-400">
-              Dynamically modify policy stringency without restarting the simulation. Preserves bitwise RNG state for counterfactual evaluation.
+              Injects policy counter-measures directly into the current simulation run or branches an alternative timeline.
             </p>
-
             <div className="space-y-3 text-xs">
-              <label className="block font-medium text-slate-300">Select Measure to Inject:</label>
+              <label className="block font-medium text-slate-300">Select Countermeasure:</label>
               <select className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white">
-                <option>Emergency Circuit Breaker (Non-essential closures)</option>
-                <option>Mandatory Indoor Mask Promotion (50% efficacy)</option>
-                <option>ICU Bed Surge Expansion (+25% capacity)</option>
-                <option>Targeted Misinformation Debunking Campaign</option>
+                <option>Emergency Transit Circuit Breaker (-65% travel)</option>
+                <option>Mandatory Indoor Mask Promotion</option>
+                <option>Regional ICU Mutual-Aid Surge</option>
+                <option>Targeted Misinformation Fact-Checking Campaign</option>
               </select>
             </div>
-
             <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
-              <button
-                onClick={() => setInterveneModalOpen(false)}
-                className="px-4 py-2 rounded-lg border border-slate-700 text-xs text-slate-300 hover:bg-slate-800"
-              >
+              <button onClick={() => setInterveneModalOpen(false)} className="px-4 py-2 rounded-lg border border-slate-700 text-xs text-slate-300">
                 Cancel
               </button>
               <button
-                onClick={handleInjectIntervention}
+                onClick={() => {
+                  setInterveneModalOpen(false);
+                  navigate(`/insights?tab=advisor&prompt=${encodeURIComponent(`Evaluate injecting an emergency circuit breaker at Day ${currentDay}`)}`);
+                }}
                 className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold shadow-md"
               >
-                Inject into Live Engine
+                Analyze with Gemini Advisor &rarr;
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Branch from Day Modal */}
+      {/* Branch Modal */}
       {branchModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm">
           <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl text-slate-100 space-y-4">
@@ -857,9 +850,8 @@ export const SimulateStage: React.FC = () => {
               </button>
             </div>
             <p className="text-xs text-slate-400">
-              Forks the exact engine checkpoint at Day {currentDay} into an independent "what-if" run for comparative analysis.
+              Forks the exact state at Day {currentDay} into an independent "what-if" counterfactual for comparative evaluation in Insights.
             </p>
-
             <div className="space-y-2 text-xs">
               <label className="block font-medium text-slate-300">Branch Scenario Title:</label>
               <input
@@ -869,18 +861,11 @@ export const SimulateStage: React.FC = () => {
                 className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-white text-xs font-medium"
               />
             </div>
-
             <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
-              <button
-                onClick={() => setBranchModalOpen(false)}
-                className="px-4 py-2 rounded-lg border border-slate-700 text-xs text-slate-300 hover:bg-slate-800"
-              >
+              <button onClick={() => setBranchModalOpen(false)} className="px-4 py-2 rounded-lg border border-slate-700 text-xs text-slate-300">
                 Cancel
               </button>
-              <button
-                onClick={handleCreateBranch}
-                className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md"
-              >
+              <button onClick={handleCreateBranch} className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md">
                 Fork & Compare in Insights
               </button>
             </div>

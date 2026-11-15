@@ -421,7 +421,7 @@ async def consult_advisor(req: AdvisorConsultRequest):
     hosp_pct = ctx.get("hospital_occupancy_pct", 88)
     cases = ctx.get("active_cases", 1420)
     deaths = ctx.get("total_deaths", 12)
-    case_name = ctx.get("case_name", "London Wave 1 (33 Boroughs)")
+    case_name = ctx.get("case_name", "Active Simulation Run")
 
     system_prompt = (
         "You are the Senior Epidemiological Policy Advisor for EpiSwarm Studio, advising a government health authority. "
@@ -445,11 +445,11 @@ async def consult_advisor(req: AdvisorConsultRequest):
     def fallback_analysis():
         return (
             f"### Automated Epidemiological Advisory: Day {day}\n\n"
-            f"- **Clinical Capacity Alert**: Acute hospital bed occupancy stands at {hosp_pct}%. If transmission continues at R_eff = {r_eff:.2f}, acute beds are projected to breach 100% capacity within 6 days.\n"
-            f"- **Primary Transmission Vector**: Commuter movement along transit corridors between central hubs and Southwark is driving secondary household clusters.\n\n"
+            f"- **Clinical Capacity Alert**: Acute hospital bed occupancy stands at {hosp_pct}%. If transmission continues at R_eff = {r_eff:.2f}, acute beds are projected to breach capacity limits.\n"
+            f"- **Transmission Assessment**: Active community spread is driving secondary household and workplace clusters across high-density zones.\n\n"
             f"#### High-Priority Policy Recommendations:\n"
-            f"1. **Trigger Targeted Transit Circuit Breaker (Day {min(day + 2, 60)})**: Restrict non-essential passenger rail flow by 65%. Projected to reduce peak acute admissions by 28.4% and avert ~34 overflow deaths.\n"
-            f"2. **Activate Secondary ICU Mutual-Aid Redistribution**: Relieve localized acute bed overflow in Southwark by transferring stable patients to regional surge facilities."
+            f"1. **Trigger Targeted Transit Circuit Breaker (Day {min(day + 2, 60)})**: Restrict passenger travel density across central transit links by 60-70% to decelerate geographic dispersal.\n"
+            f"2. **Activate Regional Hospital Mutual-Aid**: Redistribute acute patient load across neighboring healthcare facilities to prevent local ICU capacity saturation."
         )
 
     runtime = LLMAgentRuntime(
