@@ -119,25 +119,50 @@ export const Insights: React.FC = () => {
     }
   };
 
-  // ECharts Configurations
+  // ECharts Configurations: 60-Day Mathematical Outbreak Trajectories
+  const days60 = Array.from({ length: 60 }, (_, i) => `Day ${i}`);
+
+  const infectious60 = Array.from({ length: 60 }, (_, d) => {
+    const bell = Math.exp(-Math.pow((d - 11.5) / 5.2, 2));
+    return Math.max(2, Math.round(25 + 3755 * bell));
+  });
+
+  const ciUpper60 = infectious60.map((v) => Math.round(v * 1.15));
+  const ciLower60 = infectious60.map((v) => Math.round(v * 0.85));
+
+  const recovered60 = Array.from({ length: 60 }, (_, d) => {
+    const sigmoid = 1 / (1 + Math.exp(-0.28 * (d - 11.5)));
+    return Math.round(18850 * sigmoid);
+  });
+
+  const acuteDemand60 = Array.from({ length: 60 }, (_, d) => {
+    const bell = Math.exp(-Math.pow((d - 15) / 6.5, 2));
+    return Math.max(8, Math.round(40 + 2580 * bell));
+  });
+
+  const icuDemand60 = Array.from({ length: 60 }, (_, d) => {
+    const bell = Math.exp(-Math.pow((d - 15.8) / 6.8, 2));
+    return Math.max(1, Math.round(6 + 279 * bell));
+  });
+
   const trajectoryOption = {
     tooltip: { trigger: 'axis' },
-    legend: { data: ['Susceptible (Mean)', 'Infectious (Mean)', '95% CI Upper', '95% CI Lower', 'Recovered'], bottom: 0 },
+    legend: { data: ['Infectious (Mean)', '95% CI Upper', '95% CI Lower', 'Recovered'], bottom: 0 },
     grid: { left: '3%', right: '4%', bottom: '12%', containLabel: true },
-    xAxis: { type: 'category', data: Array.from({ length: 60 }, (_, i) => `Day ${i}`) },
+    xAxis: { type: 'category', data: days60 },
     yAxis: { type: 'value', name: 'Population' },
     series: [
       {
         name: 'Infectious (Mean)',
         type: 'line',
-        data: [25, 45, 90, 160, 280, 480, 820, 1340, 2100, 2850, 3420, 3780, 3650, 3200, 2600, 1950, 1400, 980, 650, 420, 280, 180, 120, 80, 50, 30, 20, 15, 10, 5],
+        data: infectious60,
         smooth: true,
         lineStyle: { width: 3, color: '#f59e0b' },
       },
       {
         name: '95% CI Upper',
         type: 'line',
-        data: [30, 55, 110, 190, 330, 560, 950, 1550, 2400, 3200, 3850, 4200, 4050, 3550, 2900, 2200, 1600, 1150, 780, 500, 340, 220, 150, 100, 65, 40, 25, 18, 12, 8],
+        data: ciUpper60,
         lineStyle: { opacity: 0 },
         stack: 'confidence-band',
         symbol: 'none',
@@ -145,7 +170,7 @@ export const Insights: React.FC = () => {
       {
         name: '95% CI Lower',
         type: 'line',
-        data: [20, 35, 70, 130, 230, 400, 690, 1130, 1800, 2500, 3000, 3350, 3250, 2850, 2300, 1700, 1200, 810, 520, 340, 220, 140, 90, 60, 35, 20, 15, 10, 8, 3],
+        data: ciLower60,
         lineStyle: { opacity: 0 },
         areaStyle: { color: 'rgba(245, 158, 11, 0.15)' },
         stack: 'confidence-band',
@@ -154,7 +179,7 @@ export const Insights: React.FC = () => {
       {
         name: 'Recovered',
         type: 'line',
-        data: [0, 5, 20, 55, 130, 290, 620, 1200, 2100, 3400, 5100, 7100, 9200, 11300, 13200, 14800, 16100, 17100, 17800, 18300],
+        data: recovered60,
         smooth: true,
         lineStyle: { width: 2, color: '#10b981' },
       },
@@ -165,13 +190,13 @@ export const Insights: React.FC = () => {
     tooltip: { trigger: 'axis' },
     legend: { data: ['Acute Demand', 'Acute Capacity Limit', 'ICU Demand', 'ICU Capacity Limit'], bottom: 0 },
     grid: { left: '3%', right: '4%', bottom: '12%', containLabel: true },
-    xAxis: { type: 'category', data: Array.from({ length: 60 }, (_, i) => `Day ${i}`) },
+    xAxis: { type: 'category', data: days60 },
     yAxis: { type: 'value', name: 'Beds Required' },
     series: [
       {
         name: 'Acute Demand',
         type: 'line',
-        data: [80, 120, 210, 380, 650, 1050, 1620, 2150, 2480, 2620, 2510, 2180, 1750, 1320, 940, 620, 410, 270, 180, 120],
+        data: acuteDemand60,
         smooth: true,
         lineStyle: { width: 3, color: '#3b82f6' },
       },
@@ -184,7 +209,7 @@ export const Insights: React.FC = () => {
       {
         name: 'ICU Demand',
         type: 'line',
-        data: [10, 16, 28, 52, 90, 145, 210, 260, 285, 275, 230, 180, 135, 95, 60, 40, 25, 18, 12, 8],
+        data: icuDemand60,
         smooth: true,
         lineStyle: { width: 3, color: '#8b5cf6' },
       },
