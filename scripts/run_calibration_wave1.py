@@ -25,8 +25,8 @@ from episwarm.evidence.validation_controls import (
 from episwarm.evidence.ledger import EvidenceLedger
 
 
-def run_wave1_calibration():
-    print("=== EpiSwarm Wave 1 Empirical Calibration (Phase 28) ===")
+def run_wave1_calibration(scale_agents: int = 50000):
+    print(f"=== EpiSwarm Wave 1 Empirical Calibration (Phase 28, scale_agents={scale_agents}) ===")
     region_dir = Path("regions/reference_london")
     obs_file = region_dir / "observed_cases.csv"
 
@@ -55,7 +55,7 @@ def run_wave1_calibration():
     # 3. Fit Analytical Transmission & Timing Parameters
     # We calibrate R0 and takeoff lag t_0 to match peak day (Day 39) and trajectory shape
     # Forward model evaluation function
-    pop = build_synthetic_population("regions/reference_london", scale_agents=5000, random_seed=42)
+    pop = build_synthetic_population("regions/reference_london", scale_agents=scale_agents, random_seed=42)
     pop_scale_factor = pop.total_population_represented / pop.n_agents
 
     # Forward epidemiological transmission model with statutory intervention and onset-to-death delay
@@ -169,4 +169,8 @@ def run_wave1_calibration():
 
 
 if __name__ == "__main__":
-    run_wave1_calibration()
+    import argparse
+    parser = argparse.ArgumentParser(description="Wave 1 Calibration")
+    parser.add_argument("--scale-agents", type=int, default=50000, help="Microscopic agent resolution (convergence default: 50000)")
+    args = parser.parse_args()
+    run_wave1_calibration(scale_agents=args.scale_agents)

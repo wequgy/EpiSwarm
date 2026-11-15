@@ -27,8 +27,7 @@ MANIFEST
 
 # Ephemeral runtime databases and caches
 runs/
-case_files/case_1*
-case_files/exports/
+case_files/
 *.manifest
 *.sqlite
 *.sqlite3

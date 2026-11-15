@@ -81,6 +81,34 @@ def calculate_adverse_probability(
     return float(1.0 / (1.0 + np.exp(-logit_adverse)))
 
 
+def calculate_adverse_probability_vectorized(
+    p_served: np.ndarray,
+    service_level: np.ndarray,
+    severity_level: np.ndarray,
+    self_care: np.ndarray,
+    support: np.ndarray,
+    alt_care: np.ndarray,
+    unserved_days: np.ndarray,
+    config: UnservedOutcomeConfig
+) -> np.ndarray:
+    """Vectorized adverse outcome calculation for SoA patient cohorts (Spec 6.3)."""
+    p_clamped = np.clip(p_served, 1e-6, 1.0 - 1e-6)
+    logit_served = np.log(p_clamped / (1.0 - p_clamped))
+
+    sev_delta = np.maximum(0.0, severity_level - config.ref_severity)
+    logit_adverse = (
+        logit_served
+        + config.theta_0 * (1.0 - np.clip(service_level, 0.0, 1.0))
+        + config.theta_sev * sev_delta
+        + config.theta_care * (1.0 - np.clip(self_care, 0.0, 1.0))
+        + config.theta_sup * (1.0 - np.clip(support, 0.0, 1.0))
+        + config.theta_alt * (1.0 - np.clip(alt_care, 0.0, 1.0))
+        + config.theta_delay * np.maximum(0, unserved_days)
+    )
+    logit_adverse = np.clip(logit_adverse, -20.0, 20.0)
+    return (1.0 / (1.0 + np.exp(-logit_adverse))).astype(np.float32)
+
+
 class RegionalResourceSystem:
     """Manages generic resource availability, spatial patient allocation, and overflow."""
 
@@ -296,17 +324,17 @@ class RegionalResourceSystem:
                     if local_pool.get(r, 0.0) < qty:
                         unmet_counts[r] = unmet_counts.get(r, 0) + 1
 
-            # Compute individual adverse probability
-            adverse_probs[i] = calculate_adverse_probability(
-                p_served=float(p_served_adverse[i]),
-                service_level=float(service_levels[i]),
-                severity_level=float(severity_levels[i]),
-                self_care=float(self_care[i]),
-                support=float(support[i]),
-                alt_care=float(alt_care[i]),
-                unserved_days=int(unserved_days[i]),
-                config=self.config
-            )
+        # Vectorized adverse probability calculation for all patients (Spec 6.3)
+        adverse_probs = calculate_adverse_probability_vectorized(
+            p_served=p_served_adverse,
+            service_level=service_levels,
+            severity_level=severity_levels,
+            self_care=self_care,
+            support=support,
+            alt_care=alt_care,
+            unserved_days=unserved_days,
+            config=self.config
+        )
 
         return service_levels, adverse_probs, unmet_counts
 

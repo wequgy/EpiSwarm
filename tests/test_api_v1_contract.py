@@ -1,6 +1,7 @@
 """Contract tests for EpiSwarm API v1 routers and services (Stage B1)."""
 
 import time
+from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
@@ -392,6 +393,10 @@ def test_v1_rfc7807_pack_not_found():
 
 def test_v1_spa_serving():
     """Verify FastAPI root and client-side fallback routes serve Vite SPA."""
+    dist_index = Path("web/dist/index.html")
+    if not dist_index.exists():
+        pytest.skip("web/dist/index.html not built; run 'npm run build' in web/ to build SPA assets")
+
     resp_root = client.get("/")
     assert resp_root.status_code == 200
     assert "text/html" in resp_root.headers.get("content-type", "")

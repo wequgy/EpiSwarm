@@ -11,6 +11,10 @@ class SeedingConfig(BaseModel):
         default=None,
         description="Target area ID to seed initial cases (null means distributed according to area population)"
     )
+    area_seeds: Optional[Dict[str, int]] = Field(
+        default=None,
+        description="Per-area seed counts for multi-borough importation"
+    )
     all_areas: bool = Field(
         default=False,
         description="Flag indicating sequential evaluation across all areas (for spread matrix computation)"

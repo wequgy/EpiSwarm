@@ -1,11 +1,11 @@
-"""Scenario Author Agent: Translates policy briefs into valid, verified ScenarioPacks (Stage A5).
+"""Rule-Based Scenario Parser: Translates structured policy briefs into valid ScenarioPacks (Stage A5).
 
-Parses structured intentions (e.g. school closures, workplace mandates, stay-at-home orders)
-into typed InterventionAction sequences with validated timing, costs, and compliance expectations.
+Deterministic rule-based parser that maps keyword patterns (e.g. school closures, workplace mandates)
+into typed InterventionAction sequences with validated timing and parameters. Note: Real LLM generation is deferred to Stage R3.3.
 """
 
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Tuple
 import re
 import yaml
 
@@ -15,7 +15,7 @@ from episwarm.packs.scenario import ScenarioPack, InterventionAction, SeedingCon
 class ScenarioAuthor:
     """Parses natural language policy intentions into valid ScenarioPack objects."""
 
-    def __init__(self, base_scenario_dict: Optional[Dict[str, Any]] = None):
+    def __init__(self, base_scenario_dict: Optional[Dict[str, Any]] = None, model_name: Optional[str] = None):
         if base_scenario_dict is not None:
             self.base_dict = base_scenario_dict
         else:
@@ -28,6 +28,24 @@ class ScenarioAuthor:
                 "seeding": {"initial_cases_per_area": 30, "seeded_state": "I"},
                 "interventions": []
             }
+        from episwarm.advisor.llm_client import LLMAgentRuntime
+        self.runtime = LLMAgentRuntime(
+            agent_name="scenario_author",
+            system_instruction=(
+                "You are the EpiSwarm Scenario Author. You translate health authority intentions "
+                "into structured, temporal InterventionAction lists. You never invent unsupported parameters "
+                "and ensure all policy dates, stringencies, and costs comply with engine capabilities."
+            ),
+            model_name=model_name,
+        )
+
+    def author_interactive(self, brief_text: str) -> Tuple[ScenarioPack, Any]:
+        """Interactively author a ScenarioPack with transcript logging and LLM/fallback triage."""
+        def fallback():
+            return f"Parsed scenario brief: {brief_text}"
+        reply, transcript = self.runtime.run(brief_text, fallback_fn=fallback)
+        sc = self.parse_natural_language_brief(brief_text)
+        return sc, transcript
 
     def parse_natural_language_brief(self, brief_text: str) -> ScenarioPack:
         """Parse natural language brief text and synthesize typed ScenarioPack."""

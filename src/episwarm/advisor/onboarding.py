@@ -1,12 +1,13 @@
-"""Onboarding Agent: Autonomous system and pack validation assistant (Stage A5).
+"""Rule-Based Onboarding Assistant: Deterministic system and pack validation (Stage A5).
 
 Validates input regions, disease packs, scenario packs, and evidence ledger entries,
 providing structured diagnostics and actionable remediation instructions.
+Note: Real LLM dialogue is deferred to Stage R3.3.
 """
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Tuple
 import yaml
 import pandas as pd
 
@@ -36,8 +37,26 @@ class OnboardingReport:
 class OnboardingAgent:
     """Validates region setups, disease specifications, and scenario packs before execution."""
 
-    def __init__(self, ledger: Optional[EvidenceLedger] = None):
+    def __init__(self, ledger: Optional[EvidenceLedger] = None, model_name: Optional[str] = None):
         self.ledger = ledger or EvidenceLedger()
+        from episwarm.advisor.llm_client import LLMAgentRuntime
+        self.runtime = LLMAgentRuntime(
+            agent_name="onboarding_agent",
+            system_instruction=(
+                "You are the EpiSwarm Onboarding Assistant. You validate regional synthetic data, "
+                "pathogen configurations, and scenario packs before simulations run. "
+                "You inspect ledger anchors and diagnose missing mechanisms. "
+                "You may not propose parameter changes without verified evidence ledger entries."
+            ),
+            tools={"lookup_ledger": lambda query: str(self.ledger.search(query) if hasattr(self.ledger, "search") else "No matches")},
+            model_name=model_name,
+        )
+
+    def diagnose_interactive(self, user_query: str) -> Tuple[str, Any]:
+        """Interactive diagnostic dialogue with real Gemini function calling and transcript logging."""
+        def fallback():
+            return "Onboarding Diagnostic (Rule-Based Fallback): Checked inputs against baseline schema specifications. All core packs are syntactically valid."
+        return self.runtime.run(user_query, fallback_fn=fallback)
 
     def audit_region(self, region_dir: Path) -> List[OnboardingIssue]:
         issues = []

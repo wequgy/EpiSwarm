@@ -266,26 +266,16 @@ def compute_network_edge_lambda(
 
     # Map layer multipliers to each edge
     edge_layer_factors = np.array([base_scalings.get(int(l), 1.0) for l in range(4)], dtype=np.float32)
-    factors_per_edge = edge_layer_factors[network.edge_layer]
 
-    # Effective edge weights
-    eff_edge_weights = network.edge_weight * factors_per_edge * beta
-
-    u = network.edge_u
-    v = network.edge_v
-
-    # Edge transmission: u transmits to v
-    loads_u = agent_loads[u]
-    pressure_u_to_v = eff_edge_weights * loads_u
-
-    # Edge transmission: v transmits to u (undirected contact graph)
-    loads_v = agent_loads[v]
-    pressure_v_to_u = eff_edge_weights * loads_v
-
-    # Vectorized accumulation using np.bincount
-    total_lambda = np.zeros(network.n_agents, dtype=np.float32)
-    lambda_received_at_v = np.bincount(v, weights=pressure_u_to_v, minlength=network.n_agents).astype(np.float32)
-    lambda_received_at_u = np.bincount(u, weights=pressure_v_to_u, minlength=network.n_agents).astype(np.float32)
-
-    total_lambda = lambda_received_at_v + lambda_received_at_u
-    return total_lambda
+    # Use accelerated numerical kernel (Numba parallel with NumPy fallback)
+    from episwarm.engine.kernels import compute_edge_lambda_fast
+    return compute_edge_lambda_fast(
+        edge_u=network.edge_u,
+        edge_v=network.edge_v,
+        edge_weight=network.edge_weight,
+        edge_layer=network.edge_layer,
+        layer_factors=edge_layer_factors,
+        agent_loads=agent_loads,
+        beta=beta,
+        n_agents=network.n_agents
+    )

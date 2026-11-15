@@ -1,14 +1,15 @@
-"""Policy Critic Agent: Multi-attribute feasibility, equity, and fatigue critique (Stage A5).
+"""Rule-Based Policy Critic: Multi-attribute feasibility, equity, and fatigue critique (Stage A5).
 
-Evaluates policy packages across four dimensions:
+Deterministic heuristic scoring across four dimensions:
 1. Operational feasibility & temporal consistency
 2. Socioeconomic equity & age distribution impact
 3. Budget efficiency (cost per hospitalization averted)
 4. Behavioral fatigue and compliance exhaustion risk
+Note: Real LLM evaluation is deferred to Stage R3.3.
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Tuple
 import numpy as np
 
 from episwarm.packs.scenario import ScenarioPack, InterventionAction
@@ -33,6 +34,27 @@ class PolicyCritique:
 
 class PolicyCritic:
     """Evaluates proposed scenarios across feasibility, equity, cost, and fatigue."""
+
+    def __init__(self, model_name: Optional[str] = None):
+        from episwarm.advisor.llm_client import LLMAgentRuntime
+        self.runtime = LLMAgentRuntime(
+            agent_name="policy_critic",
+            system_instruction=(
+                "You are the EpiSwarm Policy Critic. You evaluate proposed epidemic response portfolios "
+                "across four dimensions: feasibility, equity impact across demographics, budget efficiency, "
+                "and behavioral fatigue. You never soft-pedal severe risks."
+            ),
+            model_name=model_name,
+        )
+
+    def critique_interactive(self, scenario: ScenarioPack) -> Tuple[PolicyCritique, Any]:
+        """Critique scenario with transcript logging and LLM/fallback synthesis."""
+        def fallback():
+            return f"Critiqued scenario {scenario.name}: evaluated feasibility and equity dimensions."
+        prompt = f"Critique scenario '{scenario.name}' with interventions: {[a.name for a in scenario.interventions]}"
+        reply, transcript = self.runtime.run(prompt, fallback_fn=fallback)
+        critique = self.evaluate_scenario(scenario)
+        return critique, transcript
 
     def evaluate_scenario(
         self,

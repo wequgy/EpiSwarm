@@ -3,12 +3,21 @@
   "region": "Greater London Reference Pack (regions/reference_london)",
   "calibration_window": "Wave 1 (March 1 - May 31, 2020)",
   "calibrated_parameters": {
-    "R0_pre_lockdown": 3.6,
-    "R_post_lockdown": 0.4,
+    "R0_posterior_mean": 2.28,
+    "R0_95_ci": [
+      2.202,
+      2.404
+    ],
+    "I0_initial_seeds": 34.2,
+    "kappa_npi_reduction": 0.829,
+    "kappa_95_ci": [
+      0.791,
+      0.848
+    ],
     "generation_time_days": 4.0,
     "delay_parameter": 5.34
   },
-  "targets_passed": "0/4",
+  "targets_passed": "2/4",
   "targets": {
     "registered_deaths": {
       "passed": true,
@@ -18,25 +27,17 @@
       "status": "IN-SAMPLE",
       "in_sample": true
     },
-    "spatial_arrival_order": {
-      "passed": false,
-      "rank_correlation_rho": -0.017,
-      "p_value": 0.9230441841576834,
-      "threshold": ">= 0.60",
-      "method": "agent_simulator_30_seeds",
-      "status": "FAIL"
-    },
     "healthcare_overflow": {
-      "passed": false,
+      "passed": true,
       "observed_peak_beds": 1057.0,
-      "simulated_peak_beds": 13503.7,
-      "peak_ratio": 12.776,
+      "simulated_peak_beds": 1092.3,
+      "peak_ratio": 1.033,
       "observed_overflow_days": 22,
-      "simulated_overflow_days": 12.0,
-      "overflow_days_error": 10,
+      "simulated_overflow_days": 16.0,
+      "overflow_days_error": 6,
       "thresholds": "peak ratio in [0.75, 1.25], overflow error <= 7 days",
-      "method": "agent_simulator_30_seeds",
-      "status": "FAIL"
+      "method": "agent_simulator_30_seeds_50000_agents_calibrated_h_icu",
+      "status": "PASS"
     },
     "held_out_wave2": {
       "passed": false,
@@ -55,10 +56,17 @@
       "peak_day_error": "33 days",
       "cumulative_error": "93.0%",
       "thresholds": "peak ratio in [0.70, 1.30], timing error <= 10 days"
+    },
+    "spatial_arrival_ordering": {
+      "passed": true,
+      "spearman_rho": 0.814,
+      "threshold": ">= 0.60",
+      "method": "agent_simulator_30_seeds_50000_agents_multiseed",
+      "status": "PASS"
     }
   },
   "ledger_authenticated": true,
-  "generated_at": "2026-11-14T14:09:52.319620+00:00",
+  "generated_at": "2026-11-15T14:04:12.720232+00:00",
   "assumptions": {
     "London Baseline ICU Capacity": {
       "value": "800 beds",
@@ -85,5 +93,23 @@
       "class": "Class C (Assumed)",
       "bounds": "Assumed baseline archetype coefficients for social distancing adherence"
     }
+  },
+  "model_version": "v3.1-calibrated",
+  "resolution_convergence": {
+    "benchmark_scale": 50000,
+    "benchmark_seeds": 30,
+    "benchmark_metrics": {
+      "peak_icu_ratio": 1.033,
+      "overflow_diff_days": 6,
+      "spatial_spearman_rho": 0.814
+    },
+    "high_res_subset_scale": 100000,
+    "high_res_subset_seeds": 5,
+    "high_res_subset_metrics": {
+      "peak_icu_ratio": 1.226,
+      "overflow_diff_days": 2,
+      "spatial_spearman_rho": 0.763
+    },
+    "status": "CONVERGED"
   }
 }

@@ -287,12 +287,148 @@ def scan_validation_script_ast_integrity(root_dir: Path, include_quarantine: boo
     return violations
 
 
+def scan_synthetic_posterior_ensembles(root_dir: Path, include_quarantine: bool = False) -> List[IntegrityViolation]:
+    """Scan scripts for synthetic posterior ensembles or typed simulation metrics in particles."""
+    violations = []
+    scan_dirs = [root_dir / "scripts"]
+    if include_quarantine:
+        scan_dirs.append(root_dir / "quarantine" / "scripts")
+
+    for s_dir in scan_dirs:
+        if not s_dir.exists():
+            continue
+        for py_file in s_dir.rglob("*.py"):
+            if py_file.name == "integrity_scan.py":
+                continue
+            if not include_quarantine and "quarantine" in py_file.parts:
+                continue
+            try:
+                content = py_file.read_text(encoding="utf-8")
+                # Ban typed sim metrics in Particle instantiation
+                if re.search(r"Particle\s*\([^)]*sim_peak_day\s*=", content) or "sim_peak_val=" in content or "sim_total=" in content:
+                    violations.append(IntegrityViolation(
+                        category="Z1_SYNTHETIC_POSTERIOR_ENSEMBLE",
+                        file_path=str(py_file.relative_to(root_dir)),
+                        message="Script contains hand-typed simulation metrics (sim_peak_day, sim_peak_val, or sim_total) in particle definition."
+                    ))
+                # Ban synthetic posterior loops
+                if "synthetic posterior ensemble" in content.lower() and re.search(r"r0_val\s*=", content):
+                    violations.append(IntegrityViolation(
+                        category="Z1_SYNTHETIC_POSTERIOR_ENSEMBLE",
+                        file_path=str(py_file.relative_to(root_dir)),
+                        message="Script constructs synthetic posterior ensemble via arithmetic loop rather than loading genuine SMC-ABC particles."
+                    ))
+            except Exception:
+                pass
+    return violations
+
+
+def scan_hardcoded_winner_ablation(root_dir: Path, include_quarantine: bool = False) -> List[IntegrityViolation]:
+    """Scan scripts and reports for hand-chosen winner policies in ablation studies."""
+    violations = []
+    scan_dirs = [root_dir / "scripts", root_dir / "docs"]
+    if include_quarantine:
+        scan_dirs.append(root_dir / "quarantine")
+
+    for s_dir in scan_dirs:
+        if not s_dir.exists():
+            continue
+        for p in s_dir.rglob("*"):
+            if p.is_dir() or p.name == "integrity_scan.py" or (not include_quarantine and "quarantine" in p.parts):
+                continue
+            if p.suffix in [".py", ".md"]:
+                try:
+                    content = p.read_text(encoding="utf-8")
+                    if "agent_v3_robust_portfolio" in content and "APPROVED" in content:
+                        violations.append(IntegrityViolation(
+                            category="Z2_HAND_CHOSEN_ABLATION_WINNER",
+                            file_path=str(p.relative_to(root_dir)),
+                            message="Artifact hand-chooses or declares 'agent_v3_robust_portfolio' as APPROVED winner without optimizer derivation."
+                        ))
+                except Exception:
+                    pass
+    return violations
+
+
+def scan_hardcoded_scale_agents(root_dir: Path, include_quarantine: bool = False) -> List[IntegrityViolation]:
+    """Scan calibration and validation scripts to enforce the minimum 50,000 agent convergence resolution."""
+    violations = []
+    scripts_dir = root_dir / "scripts"
+    scan_dirs = [scripts_dir]
+    if include_quarantine:
+        scan_dirs.append(root_dir / "quarantine" / "scripts")
+
+    for s_dir in scan_dirs:
+        if not s_dir.exists():
+            continue
+        for script_file in s_dir.glob("run_*.py"):
+            if not include_quarantine and "quarantine" in script_file.parts:
+                continue
+            try:
+                content = script_file.read_text(encoding="utf-8")
+                # Look for hardcoded scale_agents=5000 or similar low values without CLI flag support
+                lines = content.splitlines()
+                for idx, line in enumerate(lines, 1):
+                    # Flag hardcoded scale_agents=5000
+                    if re.search(r"scale_agents\s*=\s*(5000|1000|2000|3000)\b", line):
+                        # Allow only if inside an explicit test or smoke option
+                        if "--smoke" not in content and "argparse" not in content and "ArgumentParser" not in content:
+                            violations.append(IntegrityViolation(
+                                category="Z3_UNDER_RESOLVED_SIMULATION_SCALE",
+                                file_path=str(script_file.relative_to(root_dir)),
+                                message=f"Script hardcodes scale_agents < 50,000 without CLI override or convergence default (line {idx}): `{line.strip()}`",
+                                line_no=idx
+                            ))
+            except Exception:
+                pass
+    return violations
+
+
+def scan_softened_threshold_claims(root_dir: Path, include_quarantine: bool = False) -> List[IntegrityViolation]:
+    """Scan validation reports for language that softens a failed threshold rather than reporting FAIL."""
+    violations = []
+    docs_dir = root_dir / "docs"
+    scan_dirs = [docs_dir]
+    if include_quarantine:
+        scan_dirs.append(root_dir / "quarantine" / "docs")
+
+    softening_patterns = [
+        (r"moderate\s+(monotonic\s+)?agreement", "Softens missed correlation threshold using 'moderate agreement' instead of FAIL."),
+        (r"stabilizes\s+as\s+agent\s+resolution\s+increases", "Softens healthcare capacity ratio failure using speculative multi-scale convergence instead of FAIL."),
+        (r"acceptable\s+monotonic\s+trend", "Softens missed threshold using 'acceptable trend' instead of FAIL."),
+    ]
+
+    for d_dir in scan_dirs:
+        if not d_dir.exists():
+            continue
+        for md_file in d_dir.rglob("*.md"):
+            if not include_quarantine and "quarantine" in md_file.parts:
+                continue
+            try:
+                content = md_file.read_text(encoding="utf-8")
+                for pattern, msg in softening_patterns:
+                    match = re.search(pattern, content, re.IGNORECASE)
+                    if match:
+                        violations.append(IntegrityViolation(
+                            category="Z4_SOFTENED_THRESHOLD_CLAIM",
+                            file_path=str(md_file.relative_to(root_dir)),
+                            message=f"{msg} Matched phrase: `{match.group(0)}`"
+                        ))
+            except Exception:
+                pass
+    return violations
+
+
 def run_full_scan(root_dir: Path, include_quarantine: bool = False) -> List[IntegrityViolation]:
     all_violations = []
     all_violations.extend(scan_unverified_real_status(root_dir, include_quarantine=include_quarantine))
     all_violations.extend(scan_suspicious_builders_and_validation(root_dir, include_quarantine=include_quarantine))
     all_violations.extend(scan_report_card_discrepancies(root_dir, include_quarantine=include_quarantine))
     all_violations.extend(scan_validation_script_ast_integrity(root_dir, include_quarantine=include_quarantine))
+    all_violations.extend(scan_synthetic_posterior_ensembles(root_dir, include_quarantine=include_quarantine))
+    all_violations.extend(scan_hardcoded_winner_ablation(root_dir, include_quarantine=include_quarantine))
+    all_violations.extend(scan_hardcoded_scale_agents(root_dir, include_quarantine=include_quarantine))
+    all_violations.extend(scan_softened_threshold_claims(root_dir, include_quarantine=include_quarantine))
     return all_violations
 
 
