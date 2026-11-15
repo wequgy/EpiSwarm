@@ -42,7 +42,7 @@ export const App: React.FC = () => {
             <Route path="regions" element={<Navigate to="/case-file" replace />} />
             <Route path="diseases" element={<Navigate to="/case-file" replace />} />
             <Route path="scenarios" element={<Navigate to="/case-file" replace />} />
-            <Route path="behaviors" element={<Navigate to="/case-file" replace />} />
+            <Route path="behaviors" element={<Navigate to="/insights?tab=behavior" replace />} />
             <Route path="builder" element={<Navigate to="/case-file" replace />} />
 
             {/* Default Catch-all */}
