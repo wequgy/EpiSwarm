@@ -5,6 +5,12 @@ import os
 import requests
 from typing import Optional, Tuple
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 from episwarm.behavior.policy_base import DecisionPolicy
 from episwarm.behavior.policy_rules import RulePolicy
 from episwarm.behavior.policy_jev import JevPolicy

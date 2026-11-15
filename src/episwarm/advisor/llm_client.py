@@ -15,6 +15,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Callable, Tuple
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 TRANSCRIPTS_DIR = Path(__file__).resolve().parent.parent.parent.parent / "runs" / "ai_transcripts"
 TRANSCRIPTS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -80,7 +86,7 @@ class LLMAgentRuntime:
         self.system_instruction = system_instruction
         self.tools = tools or {}
         self.tool_schemas = tool_schemas or []
-        self.model_name = model_name or os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+        self.model_name = model_name or os.environ.get("GEMINI_MODEL", "gemini-3.5-flash")
         self.max_tool_iterations = max_tool_iterations
         self.api_key = os.environ.get("GEMINI_API_KEY", "").strip()
 

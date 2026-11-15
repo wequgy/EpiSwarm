@@ -7,6 +7,13 @@ assumptions provenance, and isometric diorama topology.
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 import json
+
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 import yaml
 import numpy as np
 import pandas as pd
