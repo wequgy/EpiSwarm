@@ -6,7 +6,7 @@
 |---|---|---|---|---|
 | **Registered Deaths** | 0 days | 1.0 | 0.37% | **IN-SAMPLE (Calibration Fit)** |
 | **Spatial Arrival Order** | - | - | - | **FAIL** |
-| **Healthcare Overflow** | - | 12.776 | - | **FAIL** |
+| **Healthcare Overflow** | - | 21.293 | - | **FAIL** |
 | **Held Out Wave2** | - | - | - | **FAIL** |
 | **Held Out Wave3** | 33 days | 0.295 | 93.0% | **FAIL** |
 

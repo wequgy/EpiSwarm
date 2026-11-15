@@ -29,8 +29,8 @@
     },
     "spatial_arrival_order": {
       "passed": false,
-      "rank_correlation_rho": -0.017,
-      "p_value": 0.9230441841576834,
+      "rank_correlation_rho": -0.062,
+      "p_value": 0.7323000849918075,
       "threshold": ">= 0.60",
       "method": "agent_simulator_30_seeds",
       "status": "FAIL"
@@ -38,11 +38,11 @@
     "healthcare_overflow": {
       "passed": false,
       "observed_peak_beds": 1057.0,
-      "simulated_peak_beds": 13503.7,
-      "peak_ratio": 12.776,
+      "simulated_peak_beds": 22506.2,
+      "peak_ratio": 21.293,
       "observed_overflow_days": 22,
-      "simulated_overflow_days": 12.0,
-      "overflow_days_error": 10,
+      "simulated_overflow_days": 22.0,
+      "overflow_days_error": 0,
       "thresholds": "peak ratio in [0.75, 1.25], overflow error <= 7 days",
       "method": "agent_simulator_30_seeds",
       "status": "FAIL"
@@ -67,7 +67,7 @@
     }
   },
   "ledger_authenticated": true,
-  "generated_at": "2026-11-15T10:27:57.203519+00:00",
+  "generated_at": "2026-11-15T11:24:54.534597+00:00",
   "assumptions": {
     "London Baseline ICU Capacity": {
       "value": "800 beds",

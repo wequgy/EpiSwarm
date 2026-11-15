@@ -112,20 +112,77 @@ def run_replicates(
     base_seed: int = 100,
     behavior_mode: Optional[str] = None,
     paired_scenario: Optional[ScenarioPack] = None,
-    max_workers: int = 4
+    max_workers: Optional[int] = None,
+    use_processes: bool = True,
 ) -> ReplicateSummary:
-    """Execute N paired replicates in parallel across Common Random Numbers (CRN)."""
+    """Execute N paired replicates in parallel across Common Random Numbers (CRN).
+
+    Uses ProcessPoolExecutor with SharedPopulationContext (multiprocessing.shared_memory)
+    for true multi-core parallel scaling and zero GIL contention.
+    """
+    from episwarm.system.parallel import (
+        SharedPopulationContext,
+        worker_simulate_replicate_shm,
+        compute_safe_worker_count,
+    )
+
     seeds = [base_seed + i for i in range(n_replicates)]
+    workers = max_workers or compute_safe_worker_count(n_replicates, pop.n_agents)
+    workers = max(1, workers)
+
     results_a: List[SingleSeedResult] = []
 
+    def _dict_to_res(d: Dict[str, Any]) -> SingleSeedResult:
+        return SingleSeedResult(
+            seed=d["seed"],
+            attack_rate=d["attack_rate"],
+            peak_day=d["peak_day"],
+            peak_infections=d["peak_infections"],
+            total_deaths=d["total_deaths"],
+            overflow_deaths=d["overflow_deaths"],
+            peak_hospital_demand=d["peak_hospital_demand"],
+            peak_icu_demand=d["peak_icu_demand"],
+            runtime_sec=d["runtime_sec"],
+        )
+
     # Run Scenario A
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = {
-            executor.submit(_run_single_seed, pop, disease_pack, scenario_pack, s, behavior_mode): s
-            for s in seeds
-        }
-        for fut in as_completed(futures):
-            results_a.append(fut.result())
+    if use_processes and workers > 1:
+        try:
+            with SharedPopulationContext(pop) as shm_ctx:
+                d_dict = disease_pack.model_dump()
+                s_dict = scenario_pack.model_dump()
+                with ProcessPoolExecutor(max_workers=workers) as executor:
+                    futures = {
+                        executor.submit(
+                            worker_simulate_replicate_shm,
+                            shm_ctx.meta,
+                            d_dict,
+                            s_dict,
+                            s,
+                            behavior_mode,
+                        ): s
+                        for s in seeds
+                    }
+                    for fut in as_completed(futures):
+                        results_a.append(_dict_to_res(fut.result()))
+        except Exception:
+            # Clean fallback to thread/serial execution
+            results_a.clear()
+            with ThreadPoolExecutor(max_workers=workers) as executor:
+                futures = {
+                    executor.submit(_run_single_seed, pop, disease_pack, scenario_pack, s, behavior_mode): s
+                    for s in seeds
+                }
+                for fut in as_completed(futures):
+                    results_a.append(fut.result())
+    else:
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            futures = {
+                executor.submit(_run_single_seed, pop, disease_pack, scenario_pack, s, behavior_mode): s
+                for s in seeds
+            }
+            for fut in as_completed(futures):
+                results_a.append(fut.result())
 
     # Sort deterministically by seed
     results_a.sort(key=lambda r: r.seed)
@@ -161,13 +218,42 @@ def run_replicates(
     if paired_scenario is not None:
         paired_name = paired_scenario.name
         results_b: List[SingleSeedResult] = []
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures_b = {
-                executor.submit(_run_single_seed, pop, disease_pack, paired_scenario, s, behavior_mode): s
-                for s in seeds
-            }
-            for fut in as_completed(futures_b):
-                results_b.append(fut.result())
+        if use_processes and workers > 1:
+            try:
+                with SharedPopulationContext(pop) as shm_ctx_b:
+                    d_dict = disease_pack.model_dump()
+                    s_dict_b = paired_scenario.model_dump()
+                    with ProcessPoolExecutor(max_workers=workers) as executor:
+                        futures_b = {
+                            executor.submit(
+                                worker_simulate_replicate_shm,
+                                shm_ctx_b.meta,
+                                d_dict,
+                                s_dict_b,
+                                s,
+                                behavior_mode,
+                            ): s
+                            for s in seeds
+                        }
+                        for fut in as_completed(futures_b):
+                            results_b.append(_dict_to_res(fut.result()))
+            except Exception:
+                results_b.clear()
+                with ThreadPoolExecutor(max_workers=workers) as executor:
+                    futures_b = {
+                        executor.submit(_run_single_seed, pop, disease_pack, paired_scenario, s, behavior_mode): s
+                        for s in seeds
+                    }
+                    for fut in as_completed(futures_b):
+                        results_b.append(fut.result())
+        else:
+            with ThreadPoolExecutor(max_workers=workers) as executor:
+                futures_b = {
+                    executor.submit(_run_single_seed, pop, disease_pack, paired_scenario, s, behavior_mode): s
+                    for s in seeds
+                }
+                for fut in as_completed(futures_b):
+                    results_b.append(fut.result())
         results_b.sort(key=lambda r: r.seed)
 
         delta_means = {}

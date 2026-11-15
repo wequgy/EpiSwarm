@@ -393,7 +393,8 @@ def run_simulation(
 
     # 5. Social Network, Rumor Dynamics, and Compliance Engines (Spec 7 & 8)
     horizon = scenario_pack.horizon_days
-    social_network = build_social_network(pop, rng=rng)
+    needs_social_network = bool(behavior_pack and getattr(behavior_pack, "rumor_topics", None) and enable_rumor)
+    social_network = build_social_network(pop, rng=rng) if needs_social_network else None
 
     rumor_engine: Optional[RumorDynamicsEngine] = None
     compliance_engine: Optional[DynamicComplianceEngine] = None

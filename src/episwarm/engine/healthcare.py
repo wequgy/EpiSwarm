@@ -87,15 +87,11 @@ class RegionalHealthcareSystem:
             else self.overflow_config.bed_unavailable_mortality_multiplier
         )
 
-        mortality_mults = np.ones(n_patients, dtype=np.float32)
-        for i in range(n_patients):
-            if not is_served[i]:
-                comp = patient_compliances[i]
-                comp_factor = (
-                    self.overflow_config.compliance_mortality_benefit * comp +
-                    self.overflow_config.non_compliance_mortality_penalty * (1.0 - comp)
-                )
-                mortality_mults[i] = base_mult * comp_factor
+        comp_factor = (
+            self.overflow_config.compliance_mortality_benefit * patient_compliances +
+            self.overflow_config.non_compliance_mortality_penalty * (1.0 - patient_compliances)
+        )
+        mortality_mults = np.where(is_served, 1.0, base_mult * comp_factor).astype(np.float32)
 
         unmet = int(np.sum(~is_served))
         return is_served, mortality_mults, unmet
