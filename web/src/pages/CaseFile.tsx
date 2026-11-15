@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { api } from '../api/client';
 import {
   FileText,
   Upload,
@@ -19,6 +20,7 @@ import {
   ShieldCheck,
   Play,
   Sliders,
+  Loader2,
 } from 'lucide-react';
 
 interface CaseFileItem {
@@ -115,8 +117,26 @@ export const CaseFile: React.FC = () => {
     }
   };
 
-  const handleLaunchSimulation = () => {
-    navigate(`/simulate?case=${selectedCaseId}`);
+  const [isLaunching, setIsLaunching] = useState(false);
+
+  const handleLaunchSimulation = async () => {
+    setIsLaunching(true);
+    try {
+      const job = await api.launchRun({
+        region_id: 'example_synthetic',
+        disease_id: 'respiratory_generic',
+        scenario_id: 'targeted_containment',
+        scale_agents: formData.agentCount || 50000,
+        horizon_days: formData.horizonDays || 90,
+        behavior_mode: 'rule',
+        n_replicates: formData.replicates || 1,
+        use_mock: false,
+      });
+      navigate(`/simulate?jobId=${job.job_id}`);
+    } catch (err: any) {
+      alert(`Simulation launch failed: ${err.message || 'Unable to start simulation'}`);
+      setIsLaunching(false);
+    }
   };
 
   const handleDownloadTemplate = (templateName: string) => {
@@ -482,10 +502,20 @@ export const CaseFile: React.FC = () => {
                 </div>
                 <button
                   onClick={handleLaunchSimulation}
-                  className="flex items-center gap-2 px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm shadow-md shadow-blue-500/20 transition-all hover:scale-102 cursor-pointer"
+                  disabled={isLaunching}
+                  className="flex items-center gap-2 px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold text-sm shadow-md shadow-blue-500/20 transition-all hover:scale-102 cursor-pointer"
                 >
-                  <Play className="w-4 h-4 fill-white" />
-                  <span>Lock & Launch Simulation</span>
+                  {isLaunching ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-white" />
+                      <span>Submitting {formData.agentCount.toLocaleString()} Agents ({formData.horizonDays}d)...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Play className="w-4 h-4 fill-white" />
+                      <span>Lock & Launch Simulation</span>
+                    </>
+                  )}
                 </button>
               </div>
             </div>

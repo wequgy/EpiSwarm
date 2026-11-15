@@ -29,6 +29,7 @@ import {
   Cpu,
   PlusCircle,
   RefreshCw,
+  Loader2,
 } from 'lucide-react';
 
 export const SimulateStage: React.FC = () => {
@@ -47,40 +48,49 @@ export const SimulateStage: React.FC = () => {
   const { data: scenarios } = useQuery({ queryKey: ['scenarios'], queryFn: api.getScenarios });
 
   const allJobs = runsList?.jobs || [];
-  const completedJobs = allJobs.filter((j) => j.status === 'COMPLETED');
-  const runningJobs = allJobs.filter((j) => j.status === 'RUNNING');
+  const completedJobs = allJobs
+    .filter((j) => j.status === 'COMPLETED' && !j.is_mock)
+    .sort((a, b) => (b.total_days || 0) - (a.total_days || 0) || new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  const runningJobs = allJobs.filter((j) => j.status === 'RUNNING' || j.status === 'QUEUED');
   const validJobs = [...runningJobs, ...completedJobs];
 
-  const initialJobId = searchParams.get('jobId') || completedJobs[0]?.job_id || allJobs[0]?.job_id || '';
+  const urlJobId = searchParams.get('jobId');
+  const initialJobId = urlJobId || completedJobs[0]?.job_id || allJobs[0]?.job_id || '';
   const [selectedJobId, setSelectedJobId] = useState<string>(initialJobId);
 
-  // Sync selected job if list loads: always prefer latest completed run with data
+  // Sync selected job if list loads or URL changes: always prefer urlJobId or substantial completed run
   useEffect(() => {
-    if ((!selectedJobId || selectedJobId === 'job_4cd06fe860e6') && completedJobs.length > 0) {
+    if (urlJobId) {
+      setSelectedJobId(urlJobId);
+    } else if ((!selectedJobId || selectedJobId === 'job_4cd06fe860e6' || selectedJobId === 'job_944328648e56') && completedJobs.length > 0) {
       setSelectedJobId(completedJobs[0].job_id);
     }
-  }, [completedJobs, selectedJobId]);
+  }, [urlJobId, completedJobs]);
 
-  const activeJob = allJobs.find((j) => j.job_id === selectedJobId) || completedJobs[0] || allJobs[0];
+  const activeJob = allJobs.find((j) => j.job_id === selectedJobId) || runningJobs[0] || completedJobs[0] || allJobs[0];
   const activeJobId = activeJob?.job_id || '';
+  const isJobRunning = activeJob?.status === 'RUNNING' || activeJob?.status === 'QUEUED';
 
-  // Telemetry Queries for the active simulation run
+  // Telemetry Queries for the active simulation run with live polling if running
   const { data: timeseries, isLoading: isTimeseriesLoading } = useQuery({
     queryKey: ['runTimeseries', activeJobId],
     queryFn: () => api.getRunTimeseries(activeJobId),
     enabled: !!activeJobId,
+    refetchInterval: isJobRunning ? 1000 : false,
   });
 
   const { data: capacity } = useQuery({
     queryKey: ['runCapacity', activeJobId],
     queryFn: () => api.getRunCapacity(activeJobId),
     enabled: !!activeJobId,
+    refetchInterval: isJobRunning ? 1000 : false,
   });
 
   const { data: spatial } = useQuery({
     queryKey: ['runSpatial', activeJobId],
     queryFn: () => api.getRunSpatial(activeJobId),
     enabled: !!activeJobId,
+    refetchInterval: isJobRunning ? 1500 : false,
   });
 
   // Playback & Scrubbing State
@@ -319,6 +329,32 @@ export const SimulateStage: React.FC = () => {
 
   return (
     <div className="flex-1 flex flex-col bg-slate-50 text-slate-900 relative min-h-screen select-none">
+      {/* Live Simulation Execution Banner */}
+      {activeJob && (activeJob.status === 'RUNNING' || activeJob.status === 'QUEUED') && (
+        <div className="bg-blue-600 text-white px-6 py-2.5 flex items-center justify-between text-xs shadow-sm">
+          <div className="flex items-center gap-3">
+            <Loader2 className="w-4 h-4 text-white animate-spin" />
+            <div>
+              <span className="font-bold uppercase tracking-wider bg-white/20 px-2 py-0.5 rounded mr-2">
+                Simulation Running ({activeJob.status})
+              </span>
+              <span className="font-mono text-blue-100">
+                {activeJob.request?.scale_agents?.toLocaleString() || '50,000'} agents &bull; Day {activeJob.current_day} of {activeJob.total_days} ({Math.round(activeJob.progress * 100)}% complete)
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="w-48 bg-blue-800/60 rounded-full h-2 overflow-hidden border border-blue-400/40">
+              <div
+                className="bg-white h-2 rounded-full transition-all duration-300"
+                style={{ width: `${Math.max(5, Math.round(activeJob.progress * 100))}%` }}
+              />
+            </div>
+            <span className="font-mono font-bold text-white text-[11px]">{Math.round(activeJob.progress * 100)}%</span>
+          </div>
+        </div>
+      )}
+
       {/* Simulation Stage Header HUD */}
       <div className="bg-white border-b border-slate-200/80 px-6 py-3 flex flex-wrap items-center justify-between shadow-2xs gap-3">
         <div className="flex items-center gap-4">
@@ -349,11 +385,11 @@ export const SimulateStage: React.FC = () => {
                   setSearchParams({ jobId: e.target.value });
                   setCurrentDay(0);
                 }}
-                className="bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1 text-xs text-slate-800 font-mono font-medium focus:ring-1 focus:ring-blue-500"
+                className="bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1 text-xs text-slate-800 font-mono font-semibold focus:ring-1 focus:ring-blue-500"
               >
                 {validJobs.map((j) => (
                   <option key={j.job_id} value={j.job_id}>
-                    {j.job_id} ({j.request?.region_id || 'synthetic'} • {(j.request?.scale_agents || 10000).toLocaleString()} agents • {j.status})
+                    {j.job_id} ({j.request?.scenario_id || 'baseline'} • {(j.request?.scale_agents || 10000).toLocaleString()} agents • {j.total_days}d • {j.status})
                   </option>
                 ))}
               </select>

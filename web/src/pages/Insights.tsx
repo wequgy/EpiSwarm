@@ -41,8 +41,8 @@ export const Insights: React.FC = () => {
   // Live Runs & Simulation Telemetry Query
   const { data: runsList } = useQuery({ queryKey: ['runsList'], queryFn: () => api.listRuns(50) });
   const completedRuns = (runsList?.jobs || [])
-    .filter((j) => j.status === 'COMPLETED')
-    .sort((a, b) => Number(a.is_mock) - Number(b.is_mock));
+    .filter((j) => j.status === 'COMPLETED' && !j.is_mock)
+    .sort((a, b) => (b.total_days || 0) - (a.total_days || 0) || new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   const defaultRunId = searchParams.get('jobId') || completedRuns[0]?.job_id || '';
   const [selectedRunId, setSelectedRunId] = useState(defaultRunId);
   const activeRunId = selectedRunId || defaultRunId;
