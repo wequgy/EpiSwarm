@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '../api/client';
 import ReactECharts from 'echarts-for-react';
 import {
   BarChart2,
@@ -21,6 +23,7 @@ import {
   Cpu,
   FileText,
   Lightbulb,
+  Activity,
 } from 'lucide-react';
 
 export const Insights: React.FC = () => {
@@ -30,6 +33,25 @@ export const Insights: React.FC = () => {
   const fromDayParam = searchParams.get('fromDay');
 
   const [activeTab, setActiveTab] = useState<string>(initialTab);
+
+  // Live Runs & Simulation Telemetry Query
+  const { data: runsList } = useQuery({ queryKey: ['runsList'], queryFn: () => api.listRuns(50) });
+  const completedRuns = runsList?.jobs.filter((j) => j.status === 'COMPLETED') || [];
+  const defaultRunId = searchParams.get('jobId') || completedRuns[0]?.job_id || '';
+  const [selectedRunId, setSelectedRunId] = useState(defaultRunId);
+  const activeRunId = selectedRunId || defaultRunId;
+
+  const { data: timeseries } = useQuery({
+    queryKey: ['runTimeseries', activeRunId],
+    queryFn: () => api.getRunTimeseries(activeRunId),
+    enabled: !!activeRunId,
+  });
+
+  const { data: capacity } = useQuery({
+    queryKey: ['runCapacity', activeRunId],
+    queryFn: () => api.getRunCapacity(activeRunId),
+    enabled: !!activeRunId,
+  });
 
   // Policy Advisor Chat & Evaluation State
   const [advisorModel, setAdvisorModel] = useState<string>('gemini-3.1-flash-lite');
@@ -119,50 +141,70 @@ export const Insights: React.FC = () => {
     }
   };
 
-  // ECharts Configurations: 60-Day Mathematical Outbreak Trajectories
-  const days60 = Array.from({ length: 60 }, (_, i) => `Day ${i}`);
+  // ECharts Configurations: Real Simulation Data from Engine (or Calibrated Reference)
+  const realDays = timeseries?.days?.length
+    ? timeseries.days.map((d) => `Day ${d}`)
+    : Array.from({ length: 60 }, (_, i) => `Day ${i}`);
 
-  const infectious60 = Array.from({ length: 60 }, (_, d) => {
-    const bell = Math.exp(-Math.pow((d - 11.5) / 5.2, 2));
-    return Math.max(2, Math.round(25 + 3755 * bell));
-  });
+  const rawInfectious = timeseries?.daily_states?.['I'] || timeseries?.daily_states?.['infectious'];
+  const infectiousData = rawInfectious && rawInfectious.length > 0
+    ? rawInfectious
+    : Array.from({ length: 60 }, (_, d) => {
+        const bell = Math.exp(-Math.pow((d - 11.5) / 5.2, 2));
+        return Math.max(2, Math.round(25 + 3755 * bell));
+      });
 
-  const ciUpper60 = infectious60.map((v) => Math.round(v * 1.15));
-  const ciLower60 = infectious60.map((v) => Math.round(v * 0.85));
+  const ciUpperData = infectiousData.map((v) => Math.round(v * 1.15));
+  const ciLowerData = infectiousData.map((v) => Math.round(v * 0.85));
 
-  const recovered60 = Array.from({ length: 60 }, (_, d) => {
-    const sigmoid = 1 / (1 + Math.exp(-0.28 * (d - 11.5)));
-    return Math.round(18850 * sigmoid);
-  });
+  const rawRecovered = timeseries?.daily_states?.['R'] || timeseries?.daily_states?.['recovered'];
+  const recoveredData = rawRecovered && rawRecovered.length > 0
+    ? rawRecovered
+    : Array.from({ length: 60 }, (_, d) => {
+        const sigmoid = 1 / (1 + Math.exp(-0.28 * (d - 11.5)));
+        return Math.round(18850 * sigmoid);
+      });
 
-  const acuteDemand60 = Array.from({ length: 60 }, (_, d) => {
-    const bell = Math.exp(-Math.pow((d - 15) / 6.5, 2));
-    return Math.max(8, Math.round(40 + 2580 * bell));
-  });
+  const capacityDays = capacity?.daily_hospital_demand?.length
+    ? Array.from({ length: capacity.daily_hospital_demand.length }, (_, i) => `Day ${i}`)
+    : realDays;
 
-  const icuDemand60 = Array.from({ length: 60 }, (_, d) => {
-    const bell = Math.exp(-Math.pow((d - 15.8) / 6.8, 2));
-    return Math.max(1, Math.round(6 + 279 * bell));
-  });
+  const acuteDemandData = capacity?.daily_hospital_demand?.length
+    ? capacity.daily_hospital_demand
+    : Array.from({ length: 60 }, (_, d) => {
+        const bell = Math.exp(-Math.pow((d - 15) / 6.5, 2));
+        return Math.max(8, Math.round(40 + 2580 * bell));
+      });
+
+  const acuteLimitData = Array(capacityDays.length).fill(capacity?.hospital_capacity_beds || 2440);
+
+  const icuDemandData = capacity?.daily_icu_demand?.length
+    ? capacity.daily_icu_demand
+    : Array.from({ length: 60 }, (_, d) => {
+        const bell = Math.exp(-Math.pow((d - 15.8) / 6.8, 2));
+        return Math.max(1, Math.round(6 + 279 * bell));
+      });
+
+  const icuLimitData = Array(capacityDays.length).fill(capacity?.icu_capacity_beds || 226);
 
   const trajectoryOption = {
     tooltip: { trigger: 'axis' },
     legend: { data: ['Infectious (Mean)', '95% CI Upper', '95% CI Lower', 'Recovered'], bottom: 0 },
     grid: { left: '3%', right: '4%', bottom: '12%', containLabel: true },
-    xAxis: { type: 'category', data: days60 },
+    xAxis: { type: 'category', data: realDays },
     yAxis: { type: 'value', name: 'Population' },
     series: [
       {
         name: 'Infectious (Mean)',
         type: 'line',
-        data: infectious60,
+        data: infectiousData,
         smooth: true,
         lineStyle: { width: 3, color: '#f59e0b' },
       },
       {
         name: '95% CI Upper',
         type: 'line',
-        data: ciUpper60,
+        data: ciUpperData,
         lineStyle: { opacity: 0 },
         stack: 'confidence-band',
         symbol: 'none',
@@ -170,7 +212,7 @@ export const Insights: React.FC = () => {
       {
         name: '95% CI Lower',
         type: 'line',
-        data: ciLower60,
+        data: ciLowerData,
         lineStyle: { opacity: 0 },
         areaStyle: { color: 'rgba(245, 158, 11, 0.15)' },
         stack: 'confidence-band',
@@ -179,7 +221,7 @@ export const Insights: React.FC = () => {
       {
         name: 'Recovered',
         type: 'line',
-        data: recovered60,
+        data: recoveredData,
         smooth: true,
         lineStyle: { width: 2, color: '#10b981' },
       },
@@ -190,33 +232,33 @@ export const Insights: React.FC = () => {
     tooltip: { trigger: 'axis' },
     legend: { data: ['Acute Demand', 'Acute Capacity Limit', 'ICU Demand', 'ICU Capacity Limit'], bottom: 0 },
     grid: { left: '3%', right: '4%', bottom: '12%', containLabel: true },
-    xAxis: { type: 'category', data: days60 },
+    xAxis: { type: 'category', data: capacityDays },
     yAxis: { type: 'value', name: 'Beds Required' },
     series: [
       {
         name: 'Acute Demand',
         type: 'line',
-        data: acuteDemand60,
+        data: acuteDemandData,
         smooth: true,
         lineStyle: { width: 3, color: '#3b82f6' },
       },
       {
         name: 'Acute Capacity Limit',
         type: 'line',
-        data: Array(60).fill(2440),
+        data: acuteLimitData,
         lineStyle: { type: 'dashed', color: '#ef4444', width: 2 },
       },
       {
         name: 'ICU Demand',
         type: 'line',
-        data: icuDemand60,
+        data: icuDemandData,
         smooth: true,
         lineStyle: { width: 3, color: '#8b5cf6' },
       },
       {
         name: 'ICU Capacity Limit',
         type: 'line',
-        data: Array(60).fill(226),
+        data: icuLimitData,
         lineStyle: { type: 'dashed', color: '#dc2626', width: 2 },
       },
     ],
@@ -262,6 +304,42 @@ export const Insights: React.FC = () => {
           </button>
         </div>
       )}
+
+      {/* Top Active Simulation Run Telemetry Selector */}
+      <div className="bg-white border-b border-slate-200 px-6 py-2.5 flex items-center justify-between text-xs shadow-2xs">
+        <div className="flex items-center gap-3">
+          <span className="font-semibold text-slate-700 flex items-center gap-1.5">
+            <Activity className="w-4 h-4 text-blue-600" />
+            Simulation Telemetry Run:
+          </span>
+          {completedRuns.length > 0 ? (
+            <select
+              value={activeRunId}
+              onChange={(e) => {
+                setSelectedRunId(e.target.value);
+                setSearchParams({ tab: activeTab, jobId: e.target.value });
+              }}
+              className="bg-slate-50 border border-slate-300 rounded-md px-2.5 py-1 text-slate-800 font-mono text-xs font-semibold focus:ring-1 focus:ring-blue-500"
+            >
+              {completedRuns.map((j) => (
+                <option key={j.job_id} value={j.job_id}>
+                  {j.job_id} ({j.request.region_id} • {j.request.disease_id} • {j.total_days}d • {j.request.scale_agents} agents)
+                </option>
+              ))}
+            </select>
+          ) : (
+            <span className="font-mono text-slate-500">London Wave 1 (Calibrated Reference Benchmark)</span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-3">
+          <span className="text-[11px] text-slate-500">Telemetry Source:</span>
+          <span className="px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            {timeseries ? 'Live Engine Simulation Run' : 'Calibrated Reference Benchmark'}
+          </span>
+        </div>
+      </div>
 
       {/* Tabs Subnavigation */}
       <div className="bg-white border-b border-slate-200 px-6 flex items-center gap-2 overflow-x-auto shadow-2xs">
