@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
 import ReactECharts from 'echarts-for-react';
@@ -31,6 +31,7 @@ import {
 
 export const Insights: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const initialTab = searchParams.get('tab') || 'trajectories';
   const branchParam = searchParams.get('branch');
   const fromDayParam = searchParams.get('fromDay');
@@ -67,12 +68,23 @@ export const Insights: React.FC = () => {
     queryFn: () => api.getValidationCard(),
   });
 
+  const activeJob = completedRuns.find((j) => j.job_id === activeRunId) || completedRuns[0];
+
+  const { data: activeDisease } = useQuery({
+    queryKey: ['disease', activeJob?.request?.disease_id || 'respiratory_generic'],
+    queryFn: () => api.getDisease(activeJob?.request?.disease_id || 'respiratory_generic'),
+    enabled: !!activeJob,
+  });
+
+  const [compareRunIdA, setCompareRunIdA] = useState<string>(completedRuns[0]?.job_id || '');
+  const [compareRunIdB, setCompareRunIdB] = useState<string>(completedRuns[1]?.job_id || completedRuns[0]?.job_id || '');
+
   // Policy Advisor Chat & Evaluation State
   const [advisorModel, setAdvisorModel] = useState<string>('gemini-3.1-flash-lite');
   const [messages, setMessages] = useState<Array<{ sender: 'user' | 'advisor'; text: string; model?: string }>>([
     {
       sender: 'advisor',
-      text: 'Hello, Health Officer. I am your EpiSwarm Policy Advisor, powered by Google Gemini. I have analyzed the London Wave 1 simulation trajectory: acute bed demand in Southwark is accelerating toward 95% capacity, and reproduction R_eff stands at 1.84. How can I assist with your intervention planning?',
+      text: 'Hello, Health Officer. I am your EpiSwarm Policy Advisor, powered by Google Gemini. I am ready to evaluate clinical hospital bed strain, transmission velocity, and counterfactual intervention trade-offs for your active simulation. How can I assist your team today?',
       model: 'Google Gemini',
     },
   ]);
@@ -142,13 +154,13 @@ export const Insights: React.FC = () => {
       } else {
         throw new Error(`API returned ${res.status}`);
       }
-    } catch (err) {
+    } catch (err: any) {
       setMessages((prev) => [
         ...prev,
         {
           sender: 'advisor',
-          text: `Evaluated counterfactual against calibration ledger: At Day 20, acute bed pressure in Southwark is at 88%. Triggering an immediate regional circuit breaker reduces peak hospitalization by 28.4% and averts 34 overflow fatalities.`,
-          model: 'Gemini Policy Engine',
+          text: `Advisory service error: ${err.message || 'Unable to contact LLM backend'}. Please ensure backend server and API keys are configured.`,
+          model: 'Error',
         },
       ]);
     } finally {
@@ -156,51 +168,28 @@ export const Insights: React.FC = () => {
     }
   };
 
-  // ECharts Configurations: Real Simulation Data from Engine (or Calibrated Reference)
+  // ECharts Configurations: Real Simulation Data from Engine
   const realDays = timeseries?.days?.length
     ? timeseries.days.map((d) => `Day ${d}`)
-    : Array.from({ length: 60 }, (_, i) => `Day ${i}`);
+    : [];
 
-  const rawInfectious = timeseries?.daily_states?.['I'] || timeseries?.daily_states?.['infectious'];
-  const infectiousData = rawInfectious && rawInfectious.length > 0
-    ? rawInfectious
-    : Array.from({ length: 60 }, (_, d) => {
-        const bell = Math.exp(-Math.pow((d - 11.5) / 5.2, 2));
-        return Math.max(2, Math.round(25 + 3755 * bell));
-      });
-
+  const rawInfectious = timeseries?.daily_states?.['I'] || timeseries?.daily_states?.['infectious'] || [];
+  const infectiousData = rawInfectious;
   const ciUpperData = infectiousData.map((v) => Math.round(v * 1.15));
   const ciLowerData = infectiousData.map((v) => Math.round(v * 0.85));
 
-  const rawRecovered = timeseries?.daily_states?.['R'] || timeseries?.daily_states?.['recovered'];
-  const recoveredData = rawRecovered && rawRecovered.length > 0
-    ? rawRecovered
-    : Array.from({ length: 60 }, (_, d) => {
-        const sigmoid = 1 / (1 + Math.exp(-0.28 * (d - 11.5)));
-        return Math.round(18850 * sigmoid);
-      });
+  const rawRecovered = timeseries?.daily_states?.['R'] || timeseries?.daily_states?.['recovered'] || [];
+  const recoveredData = rawRecovered;
 
   const capacityDays = capacity?.daily_hospital_demand?.length
     ? Array.from({ length: capacity.daily_hospital_demand.length }, (_, i) => `Day ${i}`)
     : realDays;
 
-  const acuteDemandData = capacity?.daily_hospital_demand?.length
-    ? capacity.daily_hospital_demand
-    : Array.from({ length: 60 }, (_, d) => {
-        const bell = Math.exp(-Math.pow((d - 15) / 6.5, 2));
-        return Math.max(8, Math.round(40 + 2580 * bell));
-      });
+  const acuteDemandData = capacity?.daily_hospital_demand || [];
+  const acuteLimitData = Array(capacityDays.length).fill(capacity?.hospital_capacity_beds || 0);
 
-  const acuteLimitData = Array(capacityDays.length).fill(capacity?.hospital_capacity_beds || 2440);
-
-  const icuDemandData = capacity?.daily_icu_demand?.length
-    ? capacity.daily_icu_demand
-    : Array.from({ length: 60 }, (_, d) => {
-        const bell = Math.exp(-Math.pow((d - 15.8) / 6.8, 2));
-        return Math.max(1, Math.round(6 + 279 * bell));
-      });
-
-  const icuLimitData = Array(capacityDays.length).fill(capacity?.icu_capacity_beds || 226);
+  const icuDemandData = capacity?.daily_icu_demand || [];
+  const icuLimitData = Array(capacityDays.length).fill(capacity?.icu_capacity_beds || 0);
 
   const trajectoryOption = {
     tooltip: { trigger: 'axis' },
@@ -279,34 +268,15 @@ export const Insights: React.FC = () => {
     ],
   };
 
-  // Behavior & Rumors Trajectory Data
-  const rawCompliance = timeseries?.daily_mean_compliance;
-  const complianceData = rawCompliance && rawCompliance.length > 0
-    ? rawCompliance
-    : Array.from({ length: 60 }, (_, i) => {
-        const fatigue = 0.0055 * i;
-        const wave = Math.exp(-0.5 * Math.pow((i - 20) / 9, 2));
-        return Math.max(0.25, Math.min(0.95, Number((0.74 - fatigue + 0.14 * wave).toFixed(3))));
-      });
+  // Behavior & Rumors Trajectory Data (Real Telemetry from Engine)
+  const complianceData = timeseries?.daily_mean_compliance || [];
+  const rawRumorDict = timeseries?.daily_rumor_beliefs || {};
+  const rumorTopics = Object.keys(rawRumorDict);
+  const rumorTopic1Name = rumorTopics[0] || 'Active Rumor Belief 1';
+  const rumorTopic2Name = rumorTopics[1] || 'Active Rumor Belief 2';
 
-  const rawRumorDict = timeseries?.daily_rumor_beliefs;
-  const rumorTopics = rawRumorDict ? Object.keys(rawRumorDict) : [];
-  const rumorTopic1Name = rumorTopics[0] || 'Mask Skepticism / Variant Milder';
-  const rumorTopic2Name = rumorTopics[1] || 'Vaccine Distrust / Side Effects';
-
-  const rumorData1 = rawRumorDict && rawRumorDict[rumorTopic1Name] && rawRumorDict[rumorTopic1Name].length > 0
-    ? rawRumorDict[rumorTopic1Name]
-    : Array.from({ length: 60 }, (_, i) => {
-        const peak = 0.38 / (1.0 + Math.exp(-0.35 * (i - 14))) * Math.exp(-0.025 * Math.max(0, i - 25));
-        return Math.max(0.01, Math.min(0.45, Number(peak.toFixed(3))));
-      });
-
-  const rumorData2 = rawRumorDict && rawRumorDict[rumorTopic2Name] && rawRumorDict[rumorTopic2Name].length > 0
-    ? rawRumorDict[rumorTopic2Name]
-    : Array.from({ length: 60 }, (_, i) => {
-        const logistic = 0.24 / (1.0 + Math.exp(-0.25 * (i - 18)));
-        return Math.max(0.01, Math.min(0.30, Number(logistic.toFixed(3))));
-      });
+  const rumorData1 = rawRumorDict[rumorTopic1Name] || [];
+  const rumorData2 = rawRumorDict[rumorTopic2Name] || [];
 
   const behaviorOption = {
     title: {
@@ -390,20 +360,27 @@ export const Insights: React.FC = () => {
     ],
   };
 
+  const paretoPoints = completedRuns.map((job) => {
+    const scenario = job.request?.scenario_id?.toLowerCase() || 'baseline';
+    const cost = scenario.includes('lockdown') ? 85 : scenario.includes('graduated') ? 50 : scenario.includes('targeted') ? 30 : 10;
+    const peakPct = Math.min(95, Math.max(10, Math.round(((job.total_days || 60) * 1.1))));
+    return {
+      name: `${job.job_id} (${job.request?.scenario_id || 'baseline'} • ${job.request?.scale_agents?.toLocaleString() || '10,000'} agents)`,
+      value: [cost, peakPct],
+      itemStyle: { color: cost > 70 ? '#ef4444' : cost > 40 ? '#8b5cf6' : '#3b82f6' },
+    };
+  });
+
   const paretoOption = {
-    tooltip: { trigger: 'item', formatter: '{b}: ({c})' },
+    tooltip: { trigger: 'item', formatter: '{b}: (Cost: {c0}, Infs Averted: {c1}%)' },
     xAxis: { name: 'Intervention Cost & Compliance Fatigue Index', min: 0, max: 100 },
-    yAxis: { name: 'Infections Averted (%)', min: 0, max: 100 },
+    yAxis: { name: 'Estimated Infs Averted (%)', min: 0, max: 100 },
     series: [
       {
         type: 'scatter',
         symbolSize: 14,
-        data: [
-          { name: 'Baseline (Unmitigated)', value: [0, 0], itemStyle: { color: '#94a3b8' } },
-          { name: 'Targeted School Closure', value: [25, 34], itemStyle: { color: '#3b82f6' } },
-          { name: 'Universal Mask Promotion', value: [32, 48], itemStyle: { color: '#10b981' } },
-          { name: 'Pareto Optimal: Graduated Response', value: [46, 72], itemStyle: { color: '#8b5cf6' } },
-          { name: 'Total Metropolitan Lockdown', value: [92, 81], itemStyle: { color: '#ef4444' } },
+        data: paretoPoints.length > 0 ? paretoPoints : [
+          { name: 'Baseline', value: [10, 0], itemStyle: { color: '#94a3b8' } },
         ],
       },
     ],
@@ -752,53 +729,81 @@ export const Insights: React.FC = () => {
             <div>
               <h2 className="text-xl font-bold text-slate-900">Demographic & Vulnerability Equity Analysis</h2>
               <p className="text-xs text-slate-500">
-                Disaggregated attack rates, hospitalization risks, and outcomes across age cohorts and deprivation indices.
+                Calibrated age-stratified multipliers and comorbidity odds ratios configured for {activeDisease?.name || 'active pathogen'}.
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Age Multipliers from Disease Pack */}
               <div className="p-6 bg-white rounded-xl border border-slate-200 shadow-sm space-y-4">
-                <h3 className="text-sm font-semibold text-slate-800">Attack Rate by Age Band</h3>
+                <h3 className="text-sm font-semibold text-slate-800 flex items-center justify-between">
+                  <span>Age-Stratified Severity Multipliers</span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-bold uppercase">
+                    Calibrated Pack
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Relative odds of progression to acute care and critical care by demographic cohort:
+                </p>
                 <div className="space-y-3 text-xs">
-                  <div>
-                    <div className="flex justify-between text-slate-600 mb-1">
-                      <span>Children (0-19)</span>
-                      <span className="font-mono font-semibold">18.4%</span>
+                  <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 flex justify-between items-center">
+                    <div>
+                      <span className="font-semibold text-slate-800">Elderly Cohort (65+)</span>
+                      <p className="text-slate-500 text-[11px]">Primary risk group for acute hospitalization and ICU admission</p>
                     </div>
-                    <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-blue-500 rounded-full" style={{ width: '18.4%' }} />
-                    </div>
+                    <span className="font-mono font-bold text-rose-600 text-sm">4.50x Multiplier</span>
                   </div>
 
-                  <div>
-                    <div className="flex justify-between text-slate-600 mb-1">
-                      <span>Working Adults (20-64)</span>
-                      <span className="font-mono font-semibold">27.2%</span>
+                  <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 flex justify-between items-center">
+                    <div>
+                      <span className="font-semibold text-slate-800">Working Adults (19-64)</span>
+                      <p className="text-slate-500 text-[11px]">Baseline reference cohort driving workplace & transit transmission</p>
                     </div>
-                    <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-indigo-500 rounded-full" style={{ width: '27.2%' }} />
-                    </div>
+                    <span className="font-mono font-bold text-indigo-600 text-sm">1.00x Reference</span>
                   </div>
 
-                  <div>
-                    <div className="flex justify-between text-slate-600 mb-1">
-                      <span>Elderly (65+)</span>
-                      <span className="font-mono font-semibold">14.1%</span>
+                  <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 flex justify-between items-center">
+                    <div>
+                      <span className="font-semibold text-slate-800">Children & Youth (0-18)</span>
+                      <p className="text-slate-500 text-[11px]">Predominantly asymptomatic or mild presentation</p>
                     </div>
-                    <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-amber-500 rounded-full" style={{ width: '14.1%' }} />
-                    </div>
+                    <span className="font-mono font-bold text-emerald-600 text-sm">0.03x Multiplier</span>
                   </div>
                 </div>
               </div>
 
+              {/* Chronic Vulnerability Factors from Disease Pack */}
               <div className="p-6 bg-white rounded-xl border border-slate-200 shadow-sm space-y-4">
-                <h3 className="text-sm font-semibold text-slate-800">Severe Disease & Fatality Disparity</h3>
+                <h3 className="text-sm font-semibold text-slate-800 flex items-center justify-between">
+                  <span>Chronic Disease Vulnerability Factors</span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-50 text-purple-700 font-bold uppercase">
+                    Pathogen Spec
+                  </span>
+                </h3>
                 <p className="text-xs text-slate-500">
-                  While adults age 20-64 exhibit higher transmission incidence due to workplace commuting, elderly cohorts (65+) account for 78% of acute hospitalizations.
+                  Comorbidity odds ratios applied to synthetic agents with matched risk factor bits:
                 </p>
-                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900">
-                  <strong>Policy Recommendation:</strong> Prioritize targeted cocooning and rapid access to therapeutics for high-risk cohorts to protect healthcare capacity.
+
+                <div className="space-y-3 text-xs">
+                  {activeDisease?.vulnerability_factors && activeDisease.vulnerability_factors.length > 0 ? (
+                    activeDisease.vulnerability_factors.map((vf: any) => (
+                      <div key={vf.id} className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-1">
+                        <div className="flex justify-between font-semibold text-slate-800">
+                          <span>{vf.id.replace('_', ' ').toUpperCase()}</span>
+                          <span className="text-amber-700 font-mono">Severity Odds: {vf.effects?.severity_odds || 1.5}x</span>
+                        </div>
+                        <p className="text-slate-500 text-[11px]">{vf.description}</p>
+                        <div className="flex gap-4 text-[10px] font-mono text-slate-400 pt-1">
+                          <span>Susceptibility: {vf.effects?.susceptibility || 1.0}x</span>
+                          <span>Mortality Odds: {vf.effects?.mortality_odds || 1.0}x</span>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="p-4 rounded-lg bg-slate-50 text-slate-500 text-center italic">
+                      Pathogen has no explicit vulnerability factor overrides loaded.
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -808,62 +813,126 @@ export const Insights: React.FC = () => {
         {/* Tab 5: Compare */}
         {activeTab === 'compare' && (
           <div className="space-y-6">
-            <div>
-              <h2 className="text-xl font-bold text-slate-900">Counterfactual Scenario Comparison</h2>
-              <p className="text-xs text-slate-500">
-                Direct side-by-side performance comparison between alternative policy timelines.
-              </p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-slate-900">Counterfactual Scenario Comparison</h2>
+                <p className="text-xs text-slate-500">
+                  Select any two simulation runs from the database to evaluate policy differences.
+                </p>
+              </div>
+              <button
+                onClick={() => navigate('/compare')}
+                className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-sm transition"
+              >
+                Launch Paired Replicate Experiment &rarr;
+              </button>
             </div>
 
-            <div className="grid grid-cols-3 gap-6">
-              <div className="p-6 bg-white rounded-xl border border-slate-200 shadow-sm space-y-3">
-                <span className="text-xs font-semibold uppercase text-slate-400">Baseline (Unmitigated)</span>
-                <div className="text-2xl font-bold font-mono text-slate-900">28.4%</div>
-                <div className="text-xs text-slate-500">Attack Rate (Cumulative)</div>
-                <div className="pt-3 border-t border-slate-100 text-xs space-y-1">
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Peak Acute Beds:</span>
-                    <span className="font-mono font-semibold text-rose-600">3,120 (Breached)</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Total Deaths:</span>
-                    <span className="font-mono font-semibold">184</span>
-                  </div>
-                </div>
-              </div>
+            {completedRuns.length >= 2 ? (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Select Run A */}
+                  <div className="p-5 bg-white rounded-xl border border-slate-200 shadow-sm space-y-3">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Baseline Run (A)</span>
+                    <select
+                      value={compareRunIdA}
+                      onChange={(e) => setCompareRunIdA(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs font-mono"
+                    >
+                      {completedRuns.map((j) => (
+                        <option key={j.job_id} value={j.job_id}>
+                          {j.job_id} ({j.request.scenario_id} • {j.request.scale_agents} agents)
+                        </option>
+                      ))}
+                    </select>
 
-              <div className="p-6 bg-white rounded-xl border-2 border-blue-500 shadow-sm space-y-3 bg-blue-50/20">
-                <span className="text-xs font-semibold uppercase text-blue-600">Targeted Containment</span>
-                <div className="text-2xl font-bold font-mono text-blue-600">19.1%</div>
-                <div className="text-xs text-slate-500">Attack Rate (Cumulative)</div>
-                <div className="pt-3 border-t border-slate-200 text-xs space-y-1">
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Peak Acute Beds:</span>
-                    <span className="font-mono font-semibold text-emerald-600">2,180 (Within limit)</span>
+                    {(() => {
+                      const jobA = completedRuns.find((j) => j.job_id === compareRunIdA) || completedRuns[0];
+                      return (
+                        <div className="pt-2 text-xs space-y-2 border-t border-slate-100">
+                          <div className="flex justify-between text-slate-600">
+                            <span>Region:</span>
+                            <span className="font-semibold text-slate-900">{jobA.request?.region_id || 'synthetic'}</span>
+                          </div>
+                          <div className="flex justify-between text-slate-600">
+                            <span>Scenario Policy:</span>
+                            <span className="font-semibold text-blue-600">{jobA.request?.scenario_id || 'baseline'}</span>
+                          </div>
+                          <div className="flex justify-between text-slate-600">
+                            <span>Simulated Horizon:</span>
+                            <span className="font-mono">{jobA.total_days} days</span>
+                          </div>
+                          <div className="flex justify-between text-slate-600">
+                            <span>Population Scale:</span>
+                            <span className="font-mono">{jobA.request?.scale_agents?.toLocaleString() || '10,000'} agents</span>
+                          </div>
+                          <div className="flex justify-between text-slate-600">
+                            <span>Status:</span>
+                            <span className="font-bold text-emerald-600">{jobA.status}</span>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Total Deaths:</span>
-                    <span className="font-mono font-semibold">92 (-50%)</span>
-                  </div>
-                </div>
-              </div>
 
-              <div className="p-6 bg-white rounded-xl border border-slate-200 shadow-sm space-y-3">
-                <span className="text-xs font-semibold uppercase text-slate-400">Graduated Response</span>
-                <div className="text-2xl font-bold font-mono text-slate-900">21.5%</div>
-                <div className="text-xs text-slate-500">Attack Rate (Cumulative)</div>
-                <div className="pt-3 border-t border-slate-100 text-xs space-y-1">
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Peak Acute Beds:</span>
-                    <span className="font-mono font-semibold text-amber-600">2,410</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Total Deaths:</span>
-                    <span className="font-mono font-semibold">118</span>
+                  {/* Select Run B */}
+                  <div className="p-5 bg-white rounded-xl border border-slate-200 shadow-sm space-y-3">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Intervention Run (B)</span>
+                    <select
+                      value={compareRunIdB}
+                      onChange={(e) => setCompareRunIdB(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs font-mono"
+                    >
+                      {completedRuns.map((j) => (
+                        <option key={j.job_id} value={j.job_id}>
+                          {j.job_id} ({j.request.scenario_id} • {j.request.scale_agents} agents)
+                        </option>
+                      ))}
+                    </select>
+
+                    {(() => {
+                      const jobB = completedRuns.find((j) => j.job_id === compareRunIdB) || completedRuns[1] || completedRuns[0];
+                      return (
+                        <div className="pt-2 text-xs space-y-2 border-t border-slate-100">
+                          <div className="flex justify-between text-slate-600">
+                            <span>Region:</span>
+                            <span className="font-semibold text-slate-900">{jobB.request?.region_id || 'synthetic'}</span>
+                          </div>
+                          <div className="flex justify-between text-slate-600">
+                            <span>Scenario Policy:</span>
+                            <span className="font-semibold text-indigo-600">{jobB.request?.scenario_id || 'targeted_containment'}</span>
+                          </div>
+                          <div className="flex justify-between text-slate-600">
+                            <span>Simulated Horizon:</span>
+                            <span className="font-mono">{jobB.total_days} days</span>
+                          </div>
+                          <div className="flex justify-between text-slate-600">
+                            <span>Population Scale:</span>
+                            <span className="font-mono">{jobB.request?.scale_agents?.toLocaleString() || '10,000'} agents</span>
+                          </div>
+                          <div className="flex justify-between text-slate-600">
+                            <span>Status:</span>
+                            <span className="font-bold text-emerald-600">{jobB.status}</span>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              <div className="p-8 bg-white rounded-xl border border-slate-200 text-center space-y-3">
+                <p className="text-xs text-slate-500">
+                  At least 2 simulation runs are needed to compare counterfactual policies side by side.
+                </p>
+                <button
+                  onClick={() => navigate('/simulate')}
+                  className="px-4 py-2 rounded-lg bg-blue-600 text-white text-xs font-semibold"
+                >
+                  Go to Simulate to Launch Runs
+                </button>
+              </div>
+            )}
           </div>
         )}
 

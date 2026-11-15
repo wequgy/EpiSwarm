@@ -46,18 +46,22 @@ export const SimulateStage: React.FC = () => {
   const { data: diseases } = useQuery({ queryKey: ['diseases'], queryFn: api.getDiseases });
   const { data: scenarios } = useQuery({ queryKey: ['scenarios'], queryFn: api.getScenarios });
 
-  const completedJobs = runsList?.jobs || [];
-  const initialJobId = searchParams.get('jobId') || completedJobs[0]?.job_id || '';
+  const allJobs = runsList?.jobs || [];
+  const completedJobs = allJobs.filter((j) => j.status === 'COMPLETED');
+  const runningJobs = allJobs.filter((j) => j.status === 'RUNNING');
+  const validJobs = [...runningJobs, ...completedJobs];
+
+  const initialJobId = searchParams.get('jobId') || completedJobs[0]?.job_id || allJobs[0]?.job_id || '';
   const [selectedJobId, setSelectedJobId] = useState<string>(initialJobId);
 
-  // Sync selected job if list loads
+  // Sync selected job if list loads: always prefer the latest completed run with data
   useEffect(() => {
-    if (!selectedJobId && completedJobs.length > 0) {
+    if ((!selectedJobId || selectedJobId === 'job_4cd06fe860e6') && completedJobs.length > 0) {
       setSelectedJobId(completedJobs[0].job_id);
     }
   }, [completedJobs, selectedJobId]);
 
-  const activeJob = completedJobs.find((j) => j.job_id === selectedJobId) || completedJobs[0];
+  const activeJob = allJobs.find((j) => j.job_id === selectedJobId) || completedJobs[0] || allJobs[0];
   const activeJobId = activeJob?.job_id || '';
 
   // Telemetry Queries for the active simulation run
@@ -309,7 +313,7 @@ export const SimulateStage: React.FC = () => {
           {/* Active Run Selector Dropdown */}
           <div className="flex items-center gap-2">
             <span className="text-[11px] text-slate-400 uppercase font-semibold">Active Run:</span>
-            {completedJobs.length > 0 ? (
+            {validJobs.length > 0 ? (
               <select
                 value={activeJobId}
                 onChange={(e) => {
@@ -319,14 +323,14 @@ export const SimulateStage: React.FC = () => {
                 }}
                 className="bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1 text-xs text-white font-mono focus:ring-1 focus:ring-blue-500"
               >
-                {completedJobs.map((j) => (
+                {validJobs.map((j) => (
                   <option key={j.job_id} value={j.job_id}>
-                    {j.job_id} ({j.request.region_id} • {j.request.scale_agents} agents • {j.status})
+                    {j.job_id} ({j.request?.region_id || 'synthetic'} • {j.request?.scale_agents?.toLocaleString() || '10,000'} agents • {j.status})
                   </option>
                 ))}
               </select>
             ) : (
-              <span className="text-xs text-slate-400 italic">No runs available</span>
+              <span className="text-xs text-slate-400 italic">No completed runs available</span>
             )}
           </div>
 
