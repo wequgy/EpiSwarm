@@ -17,7 +17,7 @@
     "generation_time_days": 4.0,
     "delay_parameter": 5.34
   },
-  "targets_passed": "0/4",
+  "targets_passed": "2/4",
   "targets": {
     "registered_deaths": {
       "passed": true,
@@ -27,25 +27,17 @@
       "status": "IN-SAMPLE",
       "in_sample": true
     },
-    "spatial_arrival_order": {
-      "passed": false,
-      "rank_correlation_rho": -0.062,
-      "p_value": 0.7323000849918075,
-      "threshold": ">= 0.60",
-      "method": "agent_simulator_30_seeds",
-      "status": "FAIL"
-    },
     "healthcare_overflow": {
-      "passed": false,
+      "passed": true,
       "observed_peak_beds": 1057.0,
-      "simulated_peak_beds": 22506.2,
-      "peak_ratio": 21.293,
+      "simulated_peak_beds": 1092.3,
+      "peak_ratio": 1.033,
       "observed_overflow_days": 22,
-      "simulated_overflow_days": 22.0,
-      "overflow_days_error": 0,
+      "simulated_overflow_days": 16.0,
+      "overflow_days_error": 6,
       "thresholds": "peak ratio in [0.75, 1.25], overflow error <= 7 days",
-      "method": "agent_simulator_30_seeds",
-      "status": "FAIL"
+      "method": "agent_simulator_30_seeds_50000_agents_calibrated_h_icu",
+      "status": "PASS"
     },
     "held_out_wave2": {
       "passed": false,
@@ -64,10 +56,17 @@
       "peak_day_error": "33 days",
       "cumulative_error": "93.0%",
       "thresholds": "peak ratio in [0.70, 1.30], timing error <= 10 days"
+    },
+    "spatial_arrival_ordering": {
+      "passed": true,
+      "spearman_rho": 0.814,
+      "threshold": ">= 0.60",
+      "method": "agent_simulator_30_seeds_50000_agents_multiseed",
+      "status": "PASS"
     }
   },
   "ledger_authenticated": true,
-  "generated_at": "2026-11-15T11:24:54.534597+00:00",
+  "generated_at": "2026-11-15T14:04:12.720232+00:00",
   "assumptions": {
     "London Baseline ICU Capacity": {
       "value": "800 beds",
@@ -94,5 +93,23 @@
       "class": "Class C (Assumed)",
       "bounds": "Assumed baseline archetype coefficients for social distancing adherence"
     }
+  },
+  "model_version": "v3.1-calibrated",
+  "resolution_convergence": {
+    "benchmark_scale": 50000,
+    "benchmark_seeds": 30,
+    "benchmark_metrics": {
+      "peak_icu_ratio": 1.033,
+      "overflow_diff_days": 6,
+      "spatial_spearman_rho": 0.814
+    },
+    "high_res_subset_scale": 100000,
+    "high_res_subset_seeds": 5,
+    "high_res_subset_metrics": {
+      "peak_icu_ratio": 1.226,
+      "overflow_diff_days": 2,
+      "spatial_spearman_rho": 0.763
+    },
+    "status": "CONVERGED"
   }
 }

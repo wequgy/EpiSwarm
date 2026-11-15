@@ -483,21 +483,35 @@ def run_simulation(
             inf_ids = np.where(state_graph.is_infectious)[0]
             seeded_state_idx = int(inf_ids[0]) if len(inf_ids) > 0 else 1
 
-        if seeding.area_id and seeding.area_id in pop.area_id_to_int:
+        area_seeds = getattr(seeding, "area_seeds", None)
+        if area_seeds:
+            seed_chosen_list = []
+            for aid_str, count in area_seeds.items():
+                if aid_str in pop.area_id_to_int and count > 0:
+                    aid_int = pop.area_id_to_int[aid_str]
+                    el = np.where(pop.area_id == aid_int)[0]
+                    if len(el) > 0:
+                        chosen_el = rng.choice(el, size=min(len(el), count), replace=False)
+                        seed_chosen_list.extend(chosen_el)
+            seed_chosen = np.array(seed_chosen_list, dtype=np.int32) if seed_chosen_list else np.empty(0, dtype=np.int32)
+        elif seeding.area_id and seeding.area_id in pop.area_id_to_int:
             target_aid_int = pop.area_id_to_int[seeding.area_id]
             eligible = np.where(pop.area_id == target_aid_int)[0]
+            n_seed = min(len(eligible), seeding.initial_cases_per_area)
+            seed_chosen = rng.choice(eligible, size=n_seed, replace=False)
         else:
             eligible = np.arange(pop.n_agents)
+            n_seed = min(len(eligible), seeding.initial_cases_per_area)
+            seed_chosen = rng.choice(eligible, size=n_seed, replace=False)
 
-        n_seed = min(len(eligible), seeding.initial_cases_per_area)
-        seed_chosen = rng.choice(eligible, size=n_seed, replace=False)
-        states[seed_chosen] = seeded_state_idx
-        dwell_remaining[seed_chosen] = state_graph.sample_state_dwell_time(
-            seeded_state_idx, n_seed, rng
-        )
+        if len(seed_chosen) > 0:
+            states[seed_chosen] = seeded_state_idx
+            dwell_remaining[seed_chosen] = state_graph.sample_state_dwell_time(
+                seeded_state_idx, len(seed_chosen), rng
+            )
 
         seed_mode = getattr(seeding, "seed_infectiousness", "mean")
-        if seed_mode == "mean":
+        if seed_mode == "mean" and len(seed_chosen) > 0:
             individual_k[seed_chosen] = 1.0
 
         daily_state_counts = np.zeros((horizon, n_states), dtype=np.int32)
@@ -509,6 +523,7 @@ def run_simulation(
         daily_incident_icu = np.zeros(horizon, dtype=np.int32)
         daily_incident_deaths = np.zeros(horizon, dtype=np.int32)
         total_overflow_deaths = 0
+        n_seed = len(seed_chosen)
         event_logs = [f"Day 0: Initialized outbreak simulation (R0: {target_r0:.2f}, Seeds: {n_seed})."]
     else:
         start_day = checkpoint.day + 1
@@ -586,10 +601,14 @@ def run_simulation(
                     area_active_measures[aid].append(iv.measure_type)
                     if iv.measure_type == "school_closure":
                         layer_scalings["school"][aid] = min(layer_scalings["school"][aid], scale_val)
-                    elif iv.measure_type == "workplace_reduction":
+                    elif iv.measure_type in ("workplace_reduction", "workplace_closure"):
                         layer_scalings["work"][aid] = min(layer_scalings["work"][aid], scale_val)
-                    elif iv.measure_type in ("curfew", "market_closure"):
+                    elif iv.measure_type in ("curfew", "market_closure", "stay_at_home", "movement_curfew"):
                         layer_scalings["community"][aid] = min(layer_scalings["community"][aid], scale_val)
+                    elif iv.measure_type in ("lockdown", "statutory_lockdown"):
+                        layer_scalings["community"][aid] = min(layer_scalings["community"][aid], scale_val)
+                        layer_scalings["work"][aid] = min(layer_scalings["work"][aid], max(scale_val, 0.25))
+                        layer_scalings["school"][aid] = min(layer_scalings["school"][aid], 0.0)
                     elif iv.measure_type == "vaccination":
                         vaccine_available_areas.add(aid)
 

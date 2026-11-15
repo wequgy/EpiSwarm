@@ -143,6 +143,27 @@ class CompiledStateGraph:
         if not transitions:
             return np.full(n_samples, 5.0, dtype=np.float32)
 
+        if len(transitions) == 1:
+            dur = transitions[0].duration
+            if dur.type == "constant":
+                return np.full(n_samples, dur.mean_days, dtype=np.float32)
+            elif dur.type == "exponential":
+                scale = max(0.1, dur.mean_days)
+                return np.clip(rng.exponential(scale, size=n_samples), 0.5, None).astype(np.float32)
+            elif dur.type == "gamma":
+                sd = dur.sd_days or (0.3 * dur.mean_days)
+                k = max(0.1, (dur.mean_days / max(0.01, sd)) ** 2)
+                theta = max(0.1, (sd ** 2) / max(0.01, dur.mean_days))
+                return np.clip(rng.gamma(k, theta, size=n_samples), 0.5, None).astype(np.float32)
+            elif dur.type == "lognormal":
+                mean = max(0.1, dur.mean_days)
+                sd = dur.sd_days or (0.3 * mean)
+                sigma2 = np.log(1.0 + (sd / mean) ** 2)
+                mu = np.log(mean) - 0.5 * sigma2
+                return np.clip(rng.lognormal(mu, np.sqrt(sigma2), size=n_samples), 0.5, None).astype(np.float32)
+            else:
+                return np.full(n_samples, dur.mean_days, dtype=np.float32)
+
         probs = np.array([t.base_probability for t in transitions], dtype=np.float64)
         if probs.sum() > 0:
             probs = probs / probs.sum()
@@ -230,47 +251,56 @@ class CompiledStateGraph:
         if not transitions:
             return np.full(n_agents, current_state_idx, dtype=np.int16), np.full(n_agents, 99999.0, dtype=np.float32)
 
-        next_states = np.full(n_agents, current_state_idx, dtype=np.int16)
-        dwell_times = np.ones(n_agents, dtype=np.float32)
-
         to_indices = [self.name_to_idx[t.to_state] for t in transitions]
+        n_transitions = len(transitions)
+
+        # Fast path for deterministic single transition (e.g. E -> I_symp)
+        if n_transitions == 1:
+            chosen_state = to_indices[0]
+            next_states = np.full(n_agents, chosen_state, dtype=np.int16)
+            dwell_times = self.sample_state_dwell_time(chosen_state, n_agents, rng)
+            return next_states, dwell_times
+
+        # Multiple outgoing transitions: vectorized branch resolution
         base_probs = np.array([t.base_probability for t in transitions], dtype=np.float64)
+        probs = np.tile(base_probs, (n_agents, 1))
 
-        for i in range(n_agents):
-            band = agent_age_bands[i]
-            c_mult = comorbidity_multipliers[i]
-            v_odds = vulnerability_odds[i] if vulnerability_odds is not None else 1.0
-            adv_override = adverse_prob_override[i] if adverse_prob_override is not None else None
+        # Vectorized probability adjustments across all agents
+        unique_bands = np.unique(agent_age_bands)
+        for t_idx, t in enumerate(transitions):
+            to_idx = to_indices[t_idx]
+            is_worse = (to_idx == self.idx_D) or (self.severity_level[to_idx] > self.severity_level[current_state_idx])
 
-            adj_probs = base_probs.copy()
-            for t_idx, t in enumerate(transitions):
-                to_idx = to_indices[t_idx]
-                is_worse = (to_idx == self.idx_D) or (self.severity_level[to_idx] > self.severity_level[current_state_idx])
+            if t.age_multipliers:
+                for band in unique_bands:
+                    if band in t.age_multipliers:
+                        probs[agent_age_bands == band, t_idx] *= t.age_multipliers[band]
 
-                if band in t.age_multipliers:
-                    adj_probs[t_idx] *= t.age_multipliers[band]
+            if t.comorbidity_multipliers:
+                probs[:, t_idx] *= comorbidity_multipliers
 
-                if t.comorbidity_multipliers:
-                    adj_probs[t_idx] *= c_mult
+            if is_worse:
+                if vulnerability_odds is not None:
+                    p = np.clip(probs[:, t_idx], 1e-5, 1.0 - 1e-5)
+                    v_clamped = np.maximum(1e-4, vulnerability_odds.astype(np.float64))
+                    logit_p = np.log(p / (1.0 - p)) + np.log(v_clamped)
+                    probs[:, t_idx] = 1.0 / (1.0 + np.exp(-logit_p))
 
-                if is_worse and v_odds != 1.0 and adj_probs[t_idx] > 0:
-                    p = np.clip(adj_probs[t_idx], 1e-5, 1.0 - 1e-5)
-                    logit_p = np.log(p / (1.0 - p)) + np.log(max(1e-4, float(v_odds)))
-                    adj_probs[t_idx] = 1.0 / (1.0 + np.exp(-logit_p))
+                if adverse_prob_override is not None and to_idx == self.idx_D:
+                    probs[:, t_idx] = adverse_prob_override
 
-                if is_worse and adv_override is not None:
-                    adj_probs[t_idx] = float(adv_override)
+        p_sum = np.sum(probs, axis=1, keepdims=True)
+        safe_sum = np.where(p_sum > 0, p_sum, 1.0)
+        probs_norm = probs / safe_sum
 
-            p_sum = adj_probs.sum()
-            if p_sum > 0:
-                p_norm = adj_probs / p_sum
-                chosen_idx = rng.choice(to_indices, p=p_norm)
-            else:
-                chosen_idx = to_indices[0]
+        cdf = np.cumsum(probs_norm, axis=1)
+        u = rng.uniform(0.0, 1.0, size=n_agents)[:, None]
+        chosen_slot = np.sum(u > cdf, axis=1)
+        chosen_slot = np.clip(chosen_slot, 0, n_transitions - 1)
+        to_indices_arr = np.array(to_indices, dtype=np.int16)
+        next_states = to_indices_arr[chosen_slot]
 
-            next_states[i] = chosen_idx
-
-        # Dwell times in the NEW state are sampled from that state's duration distribution
+        dwell_times = np.zeros(n_agents, dtype=np.float32)
         for to_idx in to_indices:
             mask = (next_states == to_idx)
             count = int(np.sum(mask))
